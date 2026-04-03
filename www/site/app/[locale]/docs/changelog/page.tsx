@@ -16,7 +16,7 @@ export default async function ChangelogPage({
   const dict = await getDictionary(locale as "en" | "tr");
   const ch = dict.Docs.changelog;
 
-  const versions = ["v0_5_0", "v0_4_0"];
+  const versions = ["v0_5_1", "v0_5_0", "v0_4_0"];
 
   const getPath = (path: string) => `/${locale}${path}`;
 

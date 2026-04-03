@@ -220,6 +220,34 @@ export default async function PackageManagerPage({
           </div>
         </section>
 
+        {/* Native Packages */}
+        <section className="mb-24">
+          <h2 className="text-2xl font-bold text-on-surface mb-8 flex items-center gap-3">
+            <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
+              05
+            </span>
+            {p.native_title}
+          </h2>
+          <p className="text-on-surface-variant mb-8 leading-relaxed">
+            {p.native_desc}
+          </p>
+          <div className="bg-surface-container-low p-8 rounded-2xl border border-outline-variant/10">
+            <h4 className="font-mono text-[10px] font-bold text-primary uppercase tracking-widest mb-4">
+              {locale === "tr" ? "Native Konfigürasyon Örneği" : "Native Configuration Example"}
+            </h4>
+            <CodeBlock 
+              filename="huma.json"
+              code={`{
+  "ad": "huma_sqlite",
+  "crate_bagimliliklari": {
+    "rusqlite": "0.31"
+  },
+  "yerleşik_rust": "use rusqlite::Connection; ..."
+}`} 
+            />
+          </div>
+        </section>
+
         {/* Platform Callout */}
         <section className="mb-24">
           <div className="bg-primary/5 border border-primary/20 rounded-3xl p-10 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden">

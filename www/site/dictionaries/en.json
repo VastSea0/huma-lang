@@ -75,6 +75,7 @@
       "huma_sunucu": "Server (HTTP)",
       "package_manager": "Package Manager",
       "my_first_package": "My First Package",
+      "sqlite": "SQLite Database",
       "changelog": "Changelog"
     }
   },
@@ -242,6 +243,8 @@
       "manifest_desc": "Every Hüma package must contain a 'huma.json' file in its root directory. This file defines the package name, version, and dependencies.",
       "dependencies_title": "Dependency Management",
       "dependencies_desc": "Hüma supports installing dependencies from both GitHub and local directories. The huma.lock file ensures that your project uses the same dependency versions in every installation.",
+      "native_title": "Native Packages",
+      "native_desc": "Hüma v0.5.1+ supports direct integration of Rust crates into Hüma projects. This enables performance-critical tasks like database drivers or cryptography to run at native speeds.",
       "publishing_title": "Publishing Packages",
       "publishing_desc": "To publish your own package, simply upload the code to GitHub and add a valid SemVer tag (like v1.0.0).",
       "scripts_title": "Project Scripts",
@@ -261,6 +264,21 @@
         "hero_desc": "Contribute to the Hüma community by creating and sharing your own libraries. This guide will show you how to build a package from scratch."
       }
     },
+    "sqlite": {
+      "title": "SQLite Database",
+      "description": "Persist your data with Hüma's native SQLite library.",
+      "hero_title": "Database Management",
+      "hero_desc": "The huma_sqlite module is a high-performance and secure local database solution built on top of Rust's rusqlite crate.",
+      "quick_start": {
+        "title": "Quick Start",
+        "desc": "Use the 'Veritabanı' class to connect to a database and execute your SQL commands."
+      },
+      "methods": {
+        "kur": "Opens or creates a database file.",
+        "yürüt": "Executes data-modifying commands like INSERT, UPDATE, DELETE.",
+        "sorgula": "Executes SELECT commands and returns data as a list of objects."
+      }
+    },
     "ide": {
       "title": "Hüma IDE",
       "description": "Official Hüma desktop editor and development environment.",
@@ -276,6 +294,17 @@
       "description": "Official update history of the Hüma language and toolchain.",
       "hero_title": "What's New?",
       "hero_desc": "Hüma is constantly evolving. In every version, you can track new language features, performance improvements, and community-driven bug fixes here.",
+      "v0_5_1": {
+        "version": "v0.5.1 (Native Architecture)",
+        "date": "April 3, 2026",
+        "changes": [
+          "Native Package Architecture: support for direct integration of Rust Crates (Cargo) into Hüma projects.",
+          "Official SQLite Support: high-performance local database module based on rusqlite (huma_sqlite).",
+          "Full Standalone Compilation: 'huma gen' now produces full Cargo projects containing all native dependencies.",
+          "Database Object Mapping: automatic conversion of SQL query results to Hüma objects.",
+          "Hüma CLI Improvements: automatic Cargo guidance after standalone project generation."
+        ]
+      },
       "v0_5_0": {
         "version": "v0.5.0 (Modern Network Dawn)",
         "date": "April 2, 2026",
