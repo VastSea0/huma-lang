@@ -170,10 +170,7 @@ impl Parser {
             self.next_token();
             if self.current_token == Token::NoktaliVirgul { self.next_token(); }
             if let Ifade::ListeErisim { liste, indeks } = ifade {
-                if let Ifade::Degisken(ref ad) = *liste {
-                    return Some(Komut::ListeEkle { liste: ad.clone(), deger: *indeks });
-                }
-                return Some(Komut::IfadeKomutu(Ifade::ListeErisim { liste, indeks }));
+                return Some(Komut::ListeEkle { liste: *liste, deger: *indeks });
             }
             return Some(Komut::IfadeKomutu(ifade));
         }
@@ -183,10 +180,7 @@ impl Parser {
             self.next_token();
             if self.current_token == Token::NoktaliVirgul { self.next_token(); }
             if let Ifade::ListeErisim { liste, indeks } = ifade {
-                if let Ifade::Degisken(ref ad) = *liste {
-                    return Some(Komut::ListeCikar { liste: ad.clone(), indeks: *indeks });
-                }
-                return Some(Komut::IfadeKomutu(Ifade::ListeErisim { liste, indeks }));
+                return Some(Komut::ListeCikar { liste: *liste, indeks: *indeks });
             }
             return Some(Komut::IfadeKomutu(ifade));
         }

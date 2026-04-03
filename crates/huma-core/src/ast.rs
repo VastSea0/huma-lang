@@ -84,12 +84,12 @@ pub enum Komut {
     },
     /// sayılar'a [5]'i ekle
     ListeEkle {
-        liste: String,
+        liste: Ifade,
         deger: Ifade,
     },
     /// sayılar'dan [0]'ı çıkar
     ListeCikar {
-        liste: String,
+        liste: Ifade,
         indeks: Ifade,
     },
     /// dene { } hata var ise { }

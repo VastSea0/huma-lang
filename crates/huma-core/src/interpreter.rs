@@ -16,6 +16,7 @@ use std::io::Read;
 
 static SUNUCULAR: Lazy<Mutex<HashMap<u64, tiny_http::Server>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 static ISTEKLER: Lazy<Mutex<HashMap<u64, tiny_http::Request>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static SQL_CONNECTIONS: Lazy<Mutex<HashMap<u64, rusqlite::Connection>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 static NEXT_ID: Lazy<Mutex<u64>> = Lazy::new(|| Mutex::new(1));
 
 fn get_id() -> u64 {
@@ -497,6 +498,71 @@ impl Yorumlayici {
             Deger::Bos
         }));
 
+        // ── SQL / Veritabanı Fonksiyonları ───────────────────────────────
+        globals.insert("dahili_sql_bağlan".to_string(), Deger::DahiliFonksiyon(|args| {
+            if let Some(Deger::Metin(yol)) = args.first() {
+                if let Ok(conn) = rusqlite::Connection::open(yol) {
+                    let id = get_id();
+                    SQL_CONNECTIONS.lock().unwrap().insert(id, conn);
+                    return Deger::Sayi(id as f64);
+                }
+            }
+            Deger::Bos
+        }));
+
+        globals.insert("dahili_sql_yürüt".to_string(), Deger::DahiliFonksiyon(|args| {
+            if args.len() < 2 { return Deger::Sayi(0.0); }
+            if let (Deger::Sayi(id), Deger::Metin(sql)) = (&args[0], &args[1]) {
+                let conn_id = *id as u64;
+                let mut conns = SQL_CONNECTIONS.lock().unwrap();
+                if let Some(conn) = conns.get(&conn_id) {
+                    match conn.execute(sql, []) {
+                        Ok(_) => return Deger::Sayi(1.0),
+                        Err(e) => eprintln!("[Hüma SQL Hatası] Yürütme: {}", e),
+                    }
+                } else {
+                    eprintln!("[Hüma SQL Hatası] Bağlantı ID bulunamadı: {} (Haritadaki boyut: {})", conn_id, conns.len());
+                }
+            }
+            Deger::Sayi(0.0)
+        }));
+
+        globals.insert("dahili_sql_sorgula".to_string(), Deger::DahiliFonksiyon(|args| {
+            if args.len() < 2 { return Deger::Bos; }
+            if let (Deger::Sayi(id), Deger::Metin(sql)) = (&args[0], &args[1]) {
+                let conn_id = *id as u64;
+                let mut conns = SQL_CONNECTIONS.lock().unwrap();
+                if let Some(conn) = conns.get(&conn_id) {
+                    match conn.prepare(sql) {
+                        Ok(mut stmt) => {
+                            let col_names: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
+                            let rows: Vec<Deger> = stmt.query_map([], |row| {
+                                let mut fields = HashMap::new();
+                                for i in 0..col_names.len() {
+                                    let val: rusqlite::types::Value = row.get(i).unwrap_or(rusqlite::types::Value::Null);
+                                    let d_val = match val {
+                                        rusqlite::types::Value::Integer(i) => Deger::Sayi(i as f64),
+                                        rusqlite::types::Value::Real(f) => Deger::Sayi(f),
+                                        rusqlite::types::Value::Text(t) => Deger::Metin(t),
+                                        _ => Deger::Bos,
+                                    };
+                                    let col_name = col_names[i].to_lowercase().trim().to_string();
+                                    fields.insert(col_name, d_val);
+                                }
+                                Ok(Deger::Nesne { sinif_adi: "Satır".to_string(), alanlar: Rc::new(RefCell::new(fields)) })
+                            }).unwrap().flatten().collect();
+                            
+                            return Deger::Liste(Rc::new(RefCell::new(rows)));
+                        }
+                        Err(e) => eprintln!("[Hüma SQL Hatası] Sorgulama: {}", e),
+                    }
+                } else {
+                    eprintln!("[Hüma SQL Hatası] Sorgulama - Bağlantı ID bulunamadı: {} (Haritadaki boyut: {})", conn_id, conns.len());
+                }
+            }
+            Deger::Bos
+        }));
+
         // ── Argümanları al ──────────────────────────────────────────────────────
         let cli_args: Vec<Deger> = std::env::args().map(|s| Deger::Metin(s)).collect();
         globals.insert("argümanlar".to_string(), Deger::Liste(Rc::new(RefCell::new(cli_args))));
@@ -662,15 +728,14 @@ impl Yorumlayici {
             }
             Komut::ListeEkle { liste, deger } => {
                 let deger_val = self.ifade_hesapla(deger);
-                let liste_val = self.get_degisken(&liste);
+                let liste_val = self.ifade_hesapla(liste);
                 if let Deger::Liste(l) = liste_val {
                     l.borrow_mut().push(deger_val);
-                    // O(1) mutation: degisken_ata gerekmez çünkü Rc paylaşımlı
                 }
             }
             Komut::ListeCikar { liste, indeks } => {
                 let idx_val = self.ifade_hesapla(indeks);
-                let liste_val = self.get_degisken(&liste);
+                let liste_val = self.ifade_hesapla(liste);
                 if let (Deger::Liste(l), Deger::Sayi(i)) = (liste_val, idx_val) {
                     let idx = i as usize;
                     let mut b = l.borrow_mut();

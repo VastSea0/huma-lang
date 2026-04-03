@@ -22,6 +22,10 @@ pub struct PaketMetadata {
     pub bagimliliklar: Option<HashMap<String, String>>,
     /// Çalıştırılabilir betikler (betik adı -> komut)
     pub betikler: Option<HashMap<String, String>>,
+    /// Native Rust bağımlılıkları (crate adı -> sürüm)
+    pub crate_bagimliliklari: Option<HashMap<String, String>>,
+    /// Transpilation (huma gen) sırasında enjekte edilecek Rust kodu
+    pub yerleşik_rust: Option<String>,
 }
 
 
@@ -118,6 +122,8 @@ pub fn create_package(name: &str) -> Result<()> {
         huma_surum: Some(format!(">={}", CURRENT_HUMA_VER)),
         bagimliliklar: Some(HashMap::new()),
         betikler: Some(betikler),
+        crate_bagimliliklari: None,
+        yerleşik_rust: None,
     };
 
     fs::write(dir.join("huma.json"), serde_json::to_string_pretty(&meta)?)?;
@@ -201,6 +207,8 @@ pub fn install_package(input: Option<&str>) -> Result<()> {
                 huma_surum: Some(">=0.3.0".to_string()),
                 bagimliliklar: None,
                 betikler: None, // Added field
+                crate_bagimliliklari: None,
+                yerleşik_rust: None,
             };
 
             let content = match input {
@@ -389,6 +397,8 @@ pub fn init_project() -> Result<()> {
         huma_surum: Some(format!(">={}", CURRENT_HUMA_VER)),
         bagimliliklar: Some(HashMap::new()),
         betikler: Some(betikler),
+        crate_bagimliliklari: None,
+        yerleşik_rust: None,
     };
 
     fs::write(PROJECT_FILE, serde_json::to_string_pretty(&meta)?)?;
