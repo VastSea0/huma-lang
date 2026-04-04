@@ -518,7 +518,10 @@ impl Yorumlayici {
                 if let Some(conn) = conns.get(&conn_id) {
                     match conn.execute(sql, []) {
                         Ok(_) => return Deger::Sayi(1.0),
-                        Err(e) => eprintln!("[Hüma SQL Hatası] Yürütme: {}", e),
+                        Err(e) => {
+                            eprintln!("[Hüma SQL Hatası] Yürütme: {}", e);
+                            return Deger::Sayi(0.0);
+                        }
                     }
                 } else {
                     eprintln!("[Hüma SQL Hatası] Bağlantı ID bulunamadı: {} (Haritadaki boyut: {})", conn_id, conns.len());
@@ -528,7 +531,7 @@ impl Yorumlayici {
         }));
 
         globals.insert("dahili_sql_sorgula".to_string(), Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 { return Deger::Bos; }
+            if args.len() < 2 { return Deger::Liste(Rc::new(RefCell::new(Vec::new()))); }
             if let (Deger::Sayi(id), Deger::Metin(sql)) = (&args[0], &args[1]) {
                 let conn_id = *id as u64;
                 let mut conns = SQL_CONNECTIONS.lock().unwrap();
@@ -536,7 +539,7 @@ impl Yorumlayici {
                     match conn.prepare(sql) {
                         Ok(mut stmt) => {
                             let col_names: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
-                            let rows: Vec<Deger> = stmt.query_map([], |row| {
+                            let rows_res = stmt.query_map([], |row| {
                                 let mut fields = HashMap::new();
                                 for i in 0..col_names.len() {
                                     let val: rusqlite::types::Value = row.get(i).unwrap_or(rusqlite::types::Value::Null);
@@ -550,9 +553,15 @@ impl Yorumlayici {
                                     fields.insert(col_name, d_val);
                                 }
                                 Ok(Deger::Nesne { sinif_adi: "Satır".to_string(), alanlar: Rc::new(RefCell::new(fields)) })
-                            }).unwrap().flatten().collect();
-                            
-                            return Deger::Liste(Rc::new(RefCell::new(rows)));
+                            });
+
+                            match rows_res {
+                                Ok(iterator) => {
+                                    let rows: Vec<Deger> = iterator.flatten().collect();
+                                    return Deger::Liste(Rc::new(RefCell::new(rows)));
+                                }
+                                Err(e) => eprintln!("[Hüma SQL Hatası] Sorgu Haritalama: {}", e),
+                            }
                         }
                         Err(e) => eprintln!("[Hüma SQL Hatası] Sorgulama: {}", e),
                     }
@@ -560,7 +569,7 @@ impl Yorumlayici {
                     eprintln!("[Hüma SQL Hatası] Sorgulama - Bağlantı ID bulunamadı: {} (Haritadaki boyut: {})", conn_id, conns.len());
                 }
             }
-            Deger::Bos
+            Deger::Liste(Rc::new(RefCell::new(Vec::new())))
         }));
 
         // ── Argümanları al ──────────────────────────────────────────────────────
