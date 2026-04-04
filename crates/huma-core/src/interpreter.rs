@@ -730,12 +730,25 @@ impl Yorumlayici {
                 let deger_val = self.ifade_hesapla(deger);
                 let liste_val = self.ifade_hesapla(liste);
                 if let Deger::Liste(l) = liste_val {
-                    l.borrow_mut().push(deger_val);
+                    if let Deger::Liste(vals) = &deger_val {
+                        // Eğer değer bir listeyse (özellikle [x] syntax'ında), elemanlarını ekle
+                        l.borrow_mut().extend(vals.borrow().iter().cloned());
+                    } else {
+                        l.borrow_mut().push(deger_val);
+                    }
                 }
             }
             Komut::ListeCikar { liste, indeks } => {
-                let idx_val = self.ifade_hesapla(indeks);
+                let mut idx_val = self.ifade_hesapla(indeks);
                 let liste_val = self.ifade_hesapla(liste);
+                
+                // Eğer indeks bir listeyse (özellikle [i] syntax'ında), ilk elemanı al
+                if let Deger::Liste(l_idx) = &idx_val {
+                    if let Some(first) = l_idx.borrow().first() {
+                        idx_val = first.clone();
+                    }
+                }
+
                 if let (Deger::Liste(l), Deger::Sayi(i)) = (liste_val, idx_val) {
                     let idx = i as usize;
                     let mut b = l.borrow_mut();
