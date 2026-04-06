@@ -281,36 +281,55 @@
 
     <script>
         async function fetchLibs() {
-            const res = await fetch('/api/kutuphaneler');
-            const libs = await res.json();
-            
             const grid = document.getElementById('lib-grid');
-            grid.innerHTML = '';
-            
-            libs.filter(l => l.durum === 'onaylandı').forEach((lib, i) => {
-                const card = document.createElement('div');
-                card.className = 'card';
-                card.style.animation = `fadeUp 0.6s ease-out ${i * 0.1}s forwards`;
-                card.style.opacity = '0';
+            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--outline); padding: 40px;">Kütüphaneler yükleniyor...</div>';
+
+            try {
+                const res = await fetch('/api/kutuphaneler');
+                if (!res.ok) throw new Error('Sunucu hatası');
+                const libs = await res.json();
                 
-                card.innerHTML = `
-                    <div>
-                        <div class="card-title">
-                            ${lib.ad}
-                            <span class="version-badge">v${lib.surum}</span>
+                grid.innerHTML = '';
+                
+                if (!Array.isArray(libs)) {
+                    grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--accent); padding: 40px;">Hata: Geçersiz veri formatı alındı.</div>';
+                    return;
+                }
+
+                const approved = libs.filter(l => l.durum === 'onaylandı');
+
+                if (approved.length === 0) {
+                    grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--outline); padding: 40px;">Henüz onaylanmış bir kütüphane bulunmuyor. İlk kütüphaneyi siz gönderin!</div>';
+                    return;
+                }
+
+                approved.forEach((lib, i) => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.style.animation = `fadeUp 0.6s ease-out ${i * 0.1}s forwards`;
+                    card.style.opacity = '0';
+                    
+                    card.innerHTML = `
+                        <div>
+                            <div class="card-title">
+                                ${lib.ad}
+                                <span class="version-badge">v${lib.surum}</span>
+                            </div>
+                            <p class="description">${lib.aciklama}</p>
                         </div>
-                        <p class="description">${lib.aciklama}</p>
-                    </div>
-                    <div>
-                        <div class="install-cmd" onclick="copy('${lib.ad}')">huma paket kur ${lib.ad}</div>
-                        <div class="meta">
-                            <span class="author">@${lib.yazar}</span>
-                            <span class="downloads">${lib.indirme_sayisi} indirme</span>
+                        <div>
+                            <div class="install-cmd" onclick="copy('${lib.ad}')">huma paket kur ${lib.ad}</div>
+                            <div class="meta">
+                                <span class="author">@${lib.yazar}</span>
+                                <span class="downloads">${lib.indirme_sayisi} indirme</span>
+                            </div>
                         </div>
-                    </div>
-                `;
-                grid.appendChild(card);
-            });
+                    `;
+                    grid.appendChild(card);
+                });
+            } catch (err) {
+                grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; color: var(--accent); padding: 40px;">Kütüphaneler yüklenirken hata oluştu: ${err.message}</div>`;
+            }
         }
 
         function copy(name) {

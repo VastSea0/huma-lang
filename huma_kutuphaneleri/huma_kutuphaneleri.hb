@@ -1,15 +1,24 @@
 yükle "huma_sunucu";
+yükle "huma_sqlite";
 
 // VERİTABANI YÖNETİMİ
-db_dosyasi = "kutuphaneler.json" olsun
-veriler = metinden_nesneye(dosya_oku(db_dosyasi)) olsun
+vt = Veritabanı() olsun
 
-kaydet fonksiyon olsun {
-    dosya_yaz(db_dosyasi, nesneden_metine(veriler))
+"Kütüphane veritabanına bağlanılıyor..."'ı yazdır
+vt'nin kur("kutuphaneler.db")
+
+vt'nin id == boş ise {
+    "Hata: Veritabanı bağlantısı kurulamadı!"'ı yazdır
+} yoksa {
+    "Veritabanı bağlantısı başarılı (ID: " + vt'nin id + ")"'ı yazdır
 }
 
+// Tabloyu oluştur (eğer yoksa)
+"Tablo kontrol ediliyor..."'ı yazdır
+vt'nin yürüt("CREATE TABLE IF NOT EXISTS kutuphaneler (ad TEXT PRIMARY KEY, aciklama TEXT, yazar TEXT, github TEXT, surum TEXT, durum TEXT, indirme_sayisi INTEGER)")
+
 sunucu = Sunucu() olsun
-sunucu.kur(3000)
+sunucu.kur(8080)
 
 // 1. ANA SAYFA
 sunucu.getir("/", fonksiyon olsun istek, cevap alsın {
@@ -25,17 +34,23 @@ sunucu.getir("/ekle", fonksiyon olsun istek, cevap alsın {
 
 // 3. API - TÜM KÜTÜPHANELER
 sunucu.getir("/api/kutuphaneler", fonksiyon olsun istek, cevap alsın {
+    veriler = vt'nin sorgula("SELECT * FROM kutuphaneler") olsun
     cevap.json(veriler)
 })
 
 // 4. API - YENİ KÜTÜPHANE GÖNDER
 sunucu.gönder("/api/gonder", fonksiyon olsun istek, cevap alsın {
     yok = metinden_nesneye(istek.gövde) olsun
-    yok.durum = "bekliyor" olsun
-    yok.indirme_sayisi = 0 olsun
     
-    veriler'e [yok]'u ekle
-    kaydet()
+    // Gelen verileri SQL'e ekle
+    ad = değer_al(yok, "ad") olsun
+    aciklama = değer_al(yok, "aciklama") olsun
+    yazar = değer_al(yok, "yazar") olsun
+    github = değer_al(yok, "github") olsun
+    surum = değer_al(yok, "surum") olsun
+    
+    sorgu = "INSERT INTO kutuphaneler (ad, aciklama, yazar, github, surum, durum, indirme_sayisi) VALUES ('" + ad + "', '" + aciklama + "', '" + yazar + "', '" + github + "', '" + surum + "', 'bekliyor', 0)" olsun
+    vt'nin yürüt(sorgu)
     
     sonuc = metinden_nesneye("{}") olsun
     değer_ata(sonuc, "durum", "başarılı")
@@ -51,24 +66,10 @@ sunucu.getir("/admin", fonksiyon olsun istek, cevap alsın {
 // 6. API - ONAYLA
 sunucu.gönder("/api/onayla", fonksiyon olsun istek, cevap alsın {
     body = metinden_nesneye(istek.gövde) olsun
-    hedef_ad = değer_al(body, "ad")
+    hedef_ad = değer_al(body, "ad") olsun
     
-    i = 0 olsun
-    uz = veriler'in uzunluğu olsun
-    bulundu = 0 olsun
-    
-    i < uz olduğu sürece {
-        k = veriler[i] olsun
-        değer_al(k, "ad") == hedef_ad ise {
-            değer_ata(k, "durum", "onaylandı")
-            bulundu = 1 olsun
-        }
-        i = i + 1 olsun
-    }
-    
-    bulundu == 1 ise {
-        kaydet()
-    }
+    sorgu = "UPDATE kutuphaneler SET durum = 'onaylandı' WHERE ad = '" + hedef_ad + "'" olsun
+    vt'nin yürüt(sorgu)
     
     sonuc = metinden_nesneye("{}") olsun
     değer_ata(sonuc, "durum", "başarılı")

@@ -7,11 +7,12 @@
   "huma_surum": ">=0.4.0",
   "bagimliliklar": {
     "nlp_temel": "^1.0.0",
-    "ag_istekleri": "^1.0.0",
-    "huma_sunucu": "^1.0.0"
+    "huma_sqlite": "^1.0.0",
+    "huma_sunucu": "^1.0.0",
+    "ag_istekleri": "^1.0.0"
   },
   "betikler": {
-    "baslat": "huma run huma_kutuphaneleri.hb",
-    "test": "huma run tests/test_mimari.hb"
+    "test": "huma run tests/test_mimari.hb",
+    "baslat": "huma run huma_kutuphaneleri.hb"
   }
 }

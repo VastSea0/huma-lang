@@ -2,16 +2,16 @@
   "paketler": {
     "huma_sunucu": {
       "surum": "1.0.0",
-      "hash": "8ee61692d5f9c4e9efcfbf0d4256d17f193d0ee1565bc729fbf424f76110c48a"
+      "hash": "0a2d1e18ea23907e9f2eb68f6bfb335c505fb067c53a46fb4d38eb34f0784c30"
     },
     "nlp_temel": {
       "surum": "1.0.0",
-      "hash": "4859be4167782f25c34836e914061a82e5ec7326a8ed5bffce8b5587d669de9c"
+      "hash": "ffd539a656a1dff918b68f89522c6787ce47fba5d6317f5b5f52c22dad81c463"
     },
     "ag_istekleri": {
       "surum": "1.0.0",
-      "hash": "4532221689bed54a3c1996812d5ab4d98f5f7a35b2012911f357721437f12103"
+      "hash": "cd7faea7a6a4c57614b1ca9939bf0bdcc3520f20e89c1df00d572b3146f33106"
     }
   },
-  "guncelleme_zamani": "2026-03-31T22:21:52.179120198+03:00"
+  "guncelleme_zamani": "2026-04-03T17:01:25.000636479+03:00"
 }
