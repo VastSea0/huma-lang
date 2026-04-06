@@ -752,13 +752,15 @@ impl Yorumlayici {
                 let liste_val = self.ifade_hesapla(liste);
                 
                 // Eğer indeks bir listeyse (özellikle [i] syntax'ında), ilk elemanı al
+                let mut final_idx = idx_val.clone();
                 if let Deger::Liste(l_idx) = &idx_val {
-                    if let Some(first) = l_idx.borrow().first() {
-                        idx_val = first.clone();
+                    let b = l_idx.borrow();
+                    if let Some(first) = b.first() {
+                        final_idx = first.clone();
                     }
                 }
 
-                if let (Deger::Liste(l), Deger::Sayi(i)) = (liste_val, idx_val) {
+                if let (Deger::Liste(l), Deger::Sayi(i)) = (liste_val, final_idx) {
                     let idx = i as usize;
                     let mut b = l.borrow_mut();
                     if idx < b.len() {

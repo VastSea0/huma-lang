@@ -153,7 +153,7 @@ pub enum PackageAction {
         name: Option<String>,
     },
     /// Kurulu bir paketi siler
-    #[command(alias = "sil", alias = "remove", alias = "uninstall")]
+    #[command(alias = "remove", alias = "uninstall")]
     Sil {
         /// Paketin adı
         name: String,
