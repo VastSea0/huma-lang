@@ -198,10 +198,10 @@ pub fn install_package(input: Option<&str>) -> Result<()> {
     // Mock local installation for built-in libs
     match input {
         "nlp_temel" | "ag_istekleri" | "huma_sunucu" => {
-            let meta = PaketMetadata {
+            let mut meta = PaketMetadata {
                 ad: input.to_string(),
                 surum: "1.0.0".to_string(),
-                aciklama: "Simüle edilmiş topluluk paketi.".to_string(),
+                aciklama: "Topluluk kütüphanesi.".to_string(),
                 yazar: "Hüma Takımı".to_string(),
                 giris: format!("{}.hb", input),
                 huma_surum: Some(">=0.3.0".to_string()),
@@ -213,22 +213,35 @@ pub fn install_package(input: Option<&str>) -> Result<()> {
 
             let content = match input {
                 "huma_sunucu" => {
+                    meta.aciklama = "Hüma için dahili web sunucusu modülü.".to_string();
                     // Path may change depending on execution context, but using absolute for internal simulation
                     fs::read_to_string("/home/egehan/development/humapy/huma_modulleri/huma_sunucu/huma_sunucu.hb")
                         .unwrap_or_else(|_| "// huma_sunucu içeriği".to_string())
                 },
                 "ag_istekleri" => {
+                    meta.surum = "1.1.0".to_string();
+                    meta.aciklama = "Hüma Programlama Dili için profesyonel ve hafif HTTP kütüphanesi.".to_string();
+                    meta.yazar = "Egehan KAHRAMAN".to_string();
                     fs::read_to_string("/home/egehan/development/humapy/ag_istekleri/ag_istekleri.hb")
                         .unwrap_or_else(|_| "// ag_istekleri içeriği".to_string())
                 },
                 "nlp_temel" => {
+                    meta.surum = "3.1.0".to_string();
+                    meta.aciklama = "Hüma Dili Türkçe NLP Kütüphanesi.".to_string();
                     fs::read_to_string("/home/egehan/development/humapy/lib/nlp.hb")
                         .unwrap_or_else(|_| "// nlp_temel içeriği".to_string())
                 },
                 _ => "// Simülasyon içeriği".to_string(),
             };
 
-            save_package(meta, &content)?;
+            save_package(meta.clone(), &content)?;
+
+            // Ek dosyaları kopyala (örneğin nlp_temel için bağımlılıklar)
+            if input == "nlp_temel" {
+                let package_path = format!("{}/{}", PACKAGE_DIR, input);
+                let _ = fs::copy("/home/egehan/development/humapy/lib/dizgi.hb", format!("{}/dizgi.hb", package_path));
+                let _ = fs::copy("/home/egehan/development/humapy/lib/liste.hb", format!("{}/liste.hb", package_path));
+            }
         },
         _ => return Err(anyhow!("Paket bulunamadı. Lütfen GitHub linki kullanın (örn: github.com/user/repo).")),
     }
