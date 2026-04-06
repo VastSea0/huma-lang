@@ -217,6 +217,14 @@ pub fn install_package(input: Option<&str>) -> Result<()> {
                     fs::read_to_string("/home/egehan/development/humapy/huma_modulleri/huma_sunucu/huma_sunucu.hb")
                         .unwrap_or_else(|_| "// huma_sunucu içeriği".to_string())
                 },
+                "ag_istekleri" => {
+                    fs::read_to_string("/home/egehan/development/humapy/ag_istekleri/ag_istekleri.hb")
+                        .unwrap_or_else(|_| "// ag_istekleri içeriği".to_string())
+                },
+                "nlp_temel" => {
+                    fs::read_to_string("/home/egehan/development/humapy/lib/nlp.hb")
+                        .unwrap_or_else(|_| "// nlp_temel içeriği".to_string())
+                },
                 _ => "// Simülasyon içeriği".to_string(),
             };
 
