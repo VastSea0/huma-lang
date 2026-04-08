@@ -12,7 +12,8 @@ Hüma is a high-performance, safe, and intuitive programming language that combi
 - **Flexible Suffix System:** Turkish grammatical suffixes like `x'i yazdır` or `liste'ye ekle` are automatically handled for a most natural writing experience.
 - **Hybrid Execution:** Choose between direct interpretation for development and bytecode execution for higher performance.
 - **Standalone Compilation:** Compile your code into native binary executables with zero external dependencies.
-- **Rich Standard Library:** Built-in support for mathematics, terminal coloring, time management, advanced list manipulation, and unit testing.
+- **Rich Standard Library:** Built-in support for mathematics, NLP, terminal coloring, time management, advanced list manipulation, and unit testing.
+- **Secure Package Management:** SHA-256 integrity verification, path traversal protection, and mono-repo (sub-directory) support (v0.5.2).
 - **Bilingual CLI (Turkish & English):** All commands work in both languages (e.g., `run` or `çalıştır`, `build` or `derle`, `package` or `paket`).
 - **Modern IDE Support:** Full-featured IDEs available in both Native (GTK) and Web/Tauri flavors.
 

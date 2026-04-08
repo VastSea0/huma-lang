@@ -10,8 +10,9 @@ Hüma, modern yazılım geliştirme prensiplerini Türkçe doğal dil yapısıyl
 - **Esnek Ek Yönetimi (Suffix):** `liste'yi yazdır`, `x'ten çıkar` gibi ifadelerdeki ekler otomatik olarak temizlenir, en doğal yazıma imkan tanır.
 - **Hibrit Çalışma Modu:** İsterseniz doğrudan yorumlayın, isterseniz bytecode'a derleyip sanal makinede (VM) koşturun.
 - **Bağımsız İkili Dosyalar (Standalone):** Kodlarınızı derleyip herhangi bir bağımlılık olmadan çalışabilen native binary'lere dönüştürebilirsiniz.
-- **Zengin Sistem Kütüphaneleri:** Matematik, terminal renklendirme, zaman yönetimi, liste araçları ve birim test çerçevesi hazırdır.
-- **İki Dilli CLI (Bilingual CLI):** Tüm komutları hem Türkçe hem de İngilizce olarak kullanabilirsiniz (Örn: `run` veya `çalıştır`, `build` veya `derle`).
+- **Zengin Sistem Kütüphaneleri:** Matematik, NLP, terminal renklendirme, zaman yönetimi, liste araçları ve birim test çerçevesi hazırdır.
+- **Güvenli Paket Yönetimi:** SHA-256 bütünlük doğrulaması, path traversal koruması ve mono-repo (alt dizin) desteği ile güvenli modül yönetimi (v0.5.2).
+- **İki Dilli CLI (Bilingual CLI):** Tüm komutları hem Türkçe hem İngilizce olarak kullanabilirsiniz (Örn: `run` veya `çalıştır`, `build` veya `derle`).
 - **Modern IDE Desteği:** Kod yazmanız için hem Native (GTK) hem de Web tabanlı modern editörler sunulur.
 
 ---
