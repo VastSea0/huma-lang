@@ -126,6 +126,10 @@ enum Commands {
     Kur {
         /// Paketin adı
         name: Option<String>,
+
+        /// Native kod içeren paketleri onay sormadan kur
+        #[arg(long = "güvenilir", alias = "trusted")]
+        trusted: bool,
     },
 
     /// Yeni bir paket projesi şablonu oluşturur (Kısa yol)
@@ -151,6 +155,10 @@ pub enum PackageAction {
     Kur {
         /// Paketin adı (boş bırakılırsa tüm bağımlılıklar kurulur)
         name: Option<String>,
+
+        /// Native kod içeren paketleri onay sormadan kur
+        #[arg(long = "güvenilir", alias = "trusted")]
+        trusted: bool,
     },
     /// Kurulu bir paketi siler
     #[command(alias = "remove", alias = "uninstall")]
@@ -263,7 +271,7 @@ fn run(cli: Cli) -> i32 {
             }
         }
         Some(Commands::Paket { action }) => match action {
-            PackageAction::Kur { name } => package_manager::install_package(name.as_deref()),
+            PackageAction::Kur { name, trusted } => package_manager::install_package(name.as_deref(), trusted),
             PackageAction::Sil { name } => package_manager::remove_package(&name),
             PackageAction::Güncelle => package_manager::update_packages(),
             PackageAction::Yeni { name } => package_manager::create_package(&name),
@@ -273,7 +281,7 @@ fn run(cli: Cli) -> i32 {
             PackageAction::Run { name } => package_manager::run_script(&name),
         },
 
-        Some(Commands::Kur { name }) => package_manager::install_package(name.as_deref()),
+        Some(Commands::Kur { name, trusted }) => package_manager::install_package(name.as_deref(), trusted),
         Some(Commands::Yeni { name }) => package_manager::create_package(&name),
         Some(Commands::Listele) => package_manager::list_packages(),
         Some(Commands::İlkle) => package_manager::init_project(),
