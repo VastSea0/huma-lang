@@ -1,6 +1,6 @@
 [package]
 name = "huma-compiler"
-version = "0.5.0"
+version = "0.5.2"
 description = "Hüma bytecode compiler and binary code-generation utilities."
 authors = ["VastSea0 <vastseaoffical0@outlook.com>"]
 license = "MIT"

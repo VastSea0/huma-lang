@@ -1,6 +1,6 @@
 [package]
 name = "huma-cli"
-version = "0.5.0"
+version = "0.5.2"
 description = "Unified CLI entry point for the Hüma programming language — build, run, REPL, update."
 authors = ["VastSea0 <vastseaoffical0@outlook.com>"]
 license = "MIT"

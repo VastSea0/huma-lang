@@ -10,7 +10,7 @@ members = [
 # It will be a thin re-export shim pointing at huma-core.
 [package]
 name = "huma"
-version = "0.5.0"
+version = "0.5.2"
 description = "A high-performance, safe, and intuitive programming language with Turkish syntax, featuring a bytecode VM."
 authors = ["VastSea0 <vastseaoffical0@outlook.com>"]
 license = "MIT"

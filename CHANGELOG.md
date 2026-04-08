@@ -1,18 +1,18 @@
-## [v0.5.2] - 2026-04-08
-### Güvenlik ve Standardizasyon
-- Paket Yöneticisi Güvenlik Sertleştirmesi: Path traversal, RCE/kod enjeksiyon ve komut enjeksiyon açıkları kapatıldı.
-- SHA-256 Bütünlük Doğrulaması: huma.lock dosyasında paket hash kontrolü eklendi.
-- Atomik Dosya Yazımı: Metadata ve kilit dosyaları artık write-then-rename ile güvenli yazılıyor.
-- Özyinelemeli Bağımlılık Kurulumu: Döngü tespiti ile derin bağımlılık ağaçları destekleniyor.
-- Native Kod Güvenlik Uyarısı: yerleşik_rust içeren paketler için --güvenilir bayrağı eklendi.
-- Kütüphane Standardizasyonu: Tüm lib/*.hb dosyalarına sürüm/yazar/bağımlılık başlıkları eklendi.
-- GUI Modül Taşınması: gui.hb artık gömülü değil, huma_modulleri/gui/ altından yükleniyor.
-- PaketMetadata Genişletmesi: github ve lisans alanları eklendi.
-
 
 # Değişim Günlüğü (Changelog)
 
-Tüm önemli değişiklikler bu dosyada takip edilecektir.
+Tüm önemli değişiklikler bu dosyada takip edilecektir.## [v0.5.2] - 2026-04-08
+
+### Güvenlik, Stabilite ve Paket Yönetimi
+- **Paket Yöneticisi Alt Dizin Desteği**: GitHub reposu içindeki alt klasörlerden paket yükleme özelliği eklendi (Mono-repo desteği).
+- **Dahili Registry Düzeltildi**: Gömülü modüllerin indirme yolları ve repository isimleri güncellenerek erişilebilirlik sağlandı.
+- **Güvenlik Sertleştirmesi**: Path traversal, atomic-write ve yerleşik Rust kodu güvenlik uyarıları eklendi.
+- **Web Sitesi Derleme Hataları Giderildi**: Next.js 16.2.1 geçişindeki proxy ve sözlük (i18n) uyumsuzlukları düzeltildi.
+- **Kütüphane Standardizasyonu**: Standart kütüphane dosyaları v1.1.0 sürümüne ve yeni header formatına güncellendi.
+- **Kod Kalitesi**: huma-core üzerindeki derleyici uyarıları temizlendi ve performans iyileştirmeleri yapıldı.
+- **SHA-256 Bütünlük Doğrulaması**: huma.lock dosyasında paket hash kontrolü eklendi.
+
+
 
 ## [0.50] - 2026-04-02
 
