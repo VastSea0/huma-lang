@@ -1,4 +1,20 @@
-// Dizgi (String) Yardımcı Fonksiyonları
+// ═══════════════════════════════════════════════════════════════════
+// dizgi.hb — Hüma Dizgi (String) Yardımcı Fonksiyonları
+// Sürüm: 1.1.0
+// Yazar: Egehan KAHRAMAN
+// ═══════════════════════════════════════════════════════════════════
+//
+// Rust Built-in Bağımlılıklar (interpreter tarafından sağlanır):
+//   - içeriyor(metin, aranan)    → metin içinde arama
+//   - başlıyor_mu(metin, önek)  → önek kontrolü
+//   - bitiyor_mu(metin, sonek)  → sonek kontrolü
+//   - kırp(metin)               → boşluk kırpma
+//   - küçük_harf(metin)         → küçük harfe çevir
+//   - büyük_harf(metin)         → büyük harfe çevir
+//   - böl(metin, ayraç)         → parçalara ayır
+//   - değiştir(metin, a, b)     → metin değiştirme
+//   - dizi_dilim(metin, b, s)   → alt dizgi alma
+// ═══════════════════════════════════════════════════════════════════
 
 büyük_mü fonksiyon olsun karakter alsın {
     (karakter >= "A") ve (karakter <= "Z")'yi döndür
@@ -12,65 +28,19 @@ boşluk_mu fonksiyon olsun karakter alsın {
     (karakter = " ") veya (karakter = "\n") veya (karakter = "\t")'yi döndür
 }
 
-içeriyor_mu fonksiyon olsun dizgi, aranan alsın {
-    i = 0 olsun
-    boy = uzunluk(dizgi) olsun
-    aranan_boy = uzunluk(aranan) olsun
-    
-    i <= (boy - aranan_boy) olduğu sürece {
-        j = 0 olsun
-        eşleşti = 1 olsun
-        j < aranan_boy olduğu sürece {
-            dizgi[i + j] != aranan[j] ise {
-                eşleşti = 0 olsun
-                j = aranan_boy olsun
-            }
-            j = j + 1 olsun
-        }
-        eşleşti ise { 1'i döndür }
-        i = i + 1 olsun
-    }
-    0'ı döndür
-}
+// ─── Geriye Dönük Uyumluluk Alias'ları ─────────────────────────────────
+// Bu fonksiyonlar artık Rust built-in'lerine yönlendirir.
+// Eski kodların çalışmaya devam etmesini sağlar.
 
 başıyla_mı_başlıyor fonksiyon olsun dizgi, ön_ek alsın {
-    boy = uzunluk(ön_ek) olsun
-    i = 0 olsun
-    i < boy olduğu sürece {
-        dizgi[i] != ön_ek[i] ise { 0'ı döndür }
-        i = i + 1 olsun
-    }
-    1'i döndür
+    başlıyor_mu(dizgi, ön_ek)'i döndür
 }
 
 sonuyla_mı_bitiyor fonksiyon olsun dizgi, son_ek alsın {
-    boy = uzunluk(dizgi) olsun
-    son_boy = uzunluk(son_ek) olsun
-    i = 0 olsun
-    i < son_boy olduğu sürece {
-        dizgi[boy - son_boy + i] != son_ek[i] ise { 0'ı döndür }
-        i = i + 1 olsun
-    }
-    1'i döndür
+    bitiyor_mu(dizgi, son_ek)'i döndür
 }
 
-kırp fonksiyon olsun dizgi alsın {
-    bas = 0 olsun
-    son = uzunluk(dizgi) - 1 olsun
-    
-    (bas <= son) ve boşluk_mu(dizgi[bas]) olduğu sürece {
-        bas = bas + 1 olsun
-    }
-    
-    (son >= bas) ve boşluk_mu(dizgi[son]) olduğu sürece {
-        son = son - 1 olsun
-    }
-    
-    sonuc = "" olsun
-    i = bas olsun
-    i <= son olduğu sürece {
-        sonuc = sonuc + dizgi[i] olsun
-        i = i + 1 olsun
-    }
-    sonuc'u döndür
-}
+// NOT: Aşağıdaki fonksiyonlar Rust built-in olarak mevcuttur:
+//   - kırp(metin)              → lib versiyonu kaldırıldı (v1.1.0)
+//   - içeriyor(kaynak, aranan) → lib versiyonu kaldırıldı (v1.1.0)
+// Eğer eski kodda "içeriyor_mu" kullanıyorsanız, "içeriyor" ile değiştirin.

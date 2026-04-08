@@ -1,3 +1,14 @@
+// ═══════════════════════════════════════════════════════════════════
+// matematik.hb — Hüma Temel Matematik Kütüphanesi
+// Sürüm: 1.1.0
+// Yazar: Egehan KAHRAMAN
+// ═══════════════════════════════════════════════════════════════════
+//
+// Rust Built-in Bağımlılıklar:
+//   - karekök(n) → kare kök hesaplama (bu dosyada tanımlı değildir,
+//                  interpreter tarafından sağlanır)
+// ═══════════════════════════════════════════════════════════════════
+
 PI = 3.141592653589793 olsun
 E = 2.718281828459045 olsun
 

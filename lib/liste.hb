@@ -1,10 +1,20 @@
-// Gelişmiş Liste İşlemleri
+// ═══════════════════════════════════════════════════════════════════
+// liste.hb — Hüma Gelişmiş Liste İşlemleri
+// Sürüm: 1.1.0
+// Yazar: Egehan KAHRAMAN
+// ═══════════════════════════════════════════════════════════════════
+//
+// Rust Built-in Bağımlılıklar:
+//   - uzunluk(liste)         → eleman sayısı
+//   - listeye_ekle(l, e)     → yeni liste döndürür
+//   - içeriyor(liste, e)     → varlık kontrolü
+// ═══════════════════════════════════════════════════════════════════
 
 yazdır_liste fonksiyon olsun d alsın {
     d'yi yazdır
 }
 
-iceriyor_mu fonksiyon olsun d, eleman alsın {
+içeriyor_mu fonksiyon olsun d, eleman alsın {
     boy = uzunluk(d) olsun
     i = 0 olsun
     i < boy olduğu sürece {

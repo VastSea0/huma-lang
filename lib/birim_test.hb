@@ -1,4 +1,8 @@
-// Birim Test Çerçevesi
+// ═══════════════════════════════════════════════════════════════════
+// birim_test.hb — Hüma Birim Test Çerçevesi
+// Sürüm: 1.1.0
+// Yazar: Egehan KAHRAMAN
+// ═══════════════════════════════════════════════════════════════════
 
 __toplam_test = 0 olsun
 __başarılı_test = 0 olsun
@@ -23,8 +27,8 @@ test_raporu fonksiyon olsun {
     "-----------------------------"'yı yazdır
 }
 
-iddia_et fonksiyon olsun a, b, mesaj alsın {
-    a = b ise { 1'i döndür }
-    "  Hata: " + mesaj + " (Beklenen: " + a + ", Gelen: " + b + ")"'yi yazdır
+iddia_et fonksiyon olsun beklenen, gelen, mesaj alsın {
+    beklenen = gelen ise { 1'i döndür }
+    "  Hata: " + mesaj + " (Beklenen: " + beklenen + ", Gelen: " + gelen + ")"'yi yazdır
     0'ı döndür
 }

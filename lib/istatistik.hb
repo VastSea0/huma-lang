@@ -1,3 +1,17 @@
+// ═══════════════════════════════════════════════════════════════════
+// istatistik.hb — Hüma İstatistik Kütüphanesi
+// Sürüm: 1.1.0
+// Yazar: Egehan KAHRAMAN
+// ═══════════════════════════════════════════════════════════════════
+//
+// Bağımlılıklar:
+//   - matematik.hb → karesi() fonksiyonu
+//
+// Rust Built-in Bağımlılıklar:
+//   - karekök(n)   → kare kök hesaplama (standart_sapma için)
+//   - uzunluk(l)   → liste uzunluğu
+// ═══════════════════════════════════════════════════════════════════
+
 yükle "matematik.hb";
 
 ortalama fonksiyon olsun d alsın {

@@ -1,10 +1,19 @@
+// ═══════════════════════════════════════════════════════════════════
+// dosya.hb — Hüma Dosya İşlemleri
+// Sürüm: 1.1.0
+// Yazar: Egehan KAHRAMAN
+// ═══════════════════════════════════════════════════════════════════
+//
+// Rust Built-in Bağımlılıklar:
+//   - dosya_oku(yol)         → dosya içeriğini okur
+//   - dosya_yaz(yol, içerik) → dosyaya yazar
+//   - dosya_var_mı(yol)      → 1 veya 0 döndürür
+// ═══════════════════════════════════════════════════════════════════
+
 yükle "renkler.hb";
 
-dosya_var_mı fonksiyon olsun yol alsın {
-    icerik = dosya_oku(yol) olsun
-    tipi(icerik) = "Metin" ise { 1'i döndür }
-    0'ı döndür
-}
+// NOT: dosya_var_mı() artık Rust built-in olarak sağlanır (v1.1.0)
+// Eski lib versiyonu kaldırıldı.
 
 güvenli_oku fonksiyon olsun yol alsın {
     icerik = dosya_oku(yol) olsun
