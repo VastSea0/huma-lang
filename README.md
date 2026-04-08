@@ -31,51 +31,52 @@ Derleme sonrası çalıştırılabilir dosya `target/release/huma` konumunda ola
 
 ---
 
-## 💻 Kullanım Rehberi
+## 💻 CLI Komut Referansı
+  
+Hüma, **Çift Dilli (Bilingual) CLI** mimarisine sahiptir. Tüm komutları hem Türkçe (örn: `çalıştır`, `derle`, `güncelle`) hem de İngilizce (örn: `run`, `build`, `update`) olarak kullanabilirsiniz.
 
-### 1. Etkileşimli Mod (REPL)
+### 1. Çalıştırma ve Etkileşimli Modlar
 
-Doğrudan komut satırından kod denemek için:
+- `huma çalıştır <hedef>` (Alias: `run`)
+    - **Açıklama:** Bir `.hb` kaynak dosyasını veya `huma.json` içinde tanımlı bir betiği (script) çalıştırır.
+    - **Akıllı Mantık:** Hedef belirtilmezse dizinde `baslat` veya `start` betiği arar. Yoksa `huma.json` içindeki ana giriş dosyasını koşturur.
+- `huma kabuk` (Alias: `repl`)
+    - **Açıklama:** Kodları satır satır denemek ve hızlı prototipleme yapmak için etkileşimli REPL modunu başlatır.
+- `huma arayüz` (Alias: `ide`)
+    - **Açıklama:** Hüma'nın masaüstü geliştirme ortamını (IDE) başlatır.
 
-```bash
-huma repl
-```
+### 2. Derleme ve Bytecode İşlemleri
 
-### 2. Dosya Çalıştırma (Yorumlayıcı)
+- `huma derle <dosya>` (Alias: `build`)
+    - **Açıklama:** Kaynak kodu `.hbc` uzantılı bytecode dosyasına derler. Çıktı adını `-o` parametresi ile belirleyebilirsiniz.
+- `huma yürüt <dosya>` (Alias: `exec`)
+    - **Açıklama:** Önceden derlenmiş bir `.hbc` bytecode dosyasını Hüma VM üzerinde yüksek performansla çalıştırır.
+- `huma üret <dosya>` (Alias: `gen`)
+    - **Açıklama:** Hüma kodundan bağımsız çalışabilen, yüksek performanslı Rust kaynak kodu üretir.
 
-Bir `.hb` dosyasını çalıştırmak için (`run` veya `çalıştır`):
+### 3. Paket Yönetimi (`paket` veya `package`)
 
-```bash
-huma çalıştır program.hb
-# veya
-huma run program.hb
-```
+- `huma ilkle` (Alias: `paket ilkle`, `init`)
+    - **Açıklama:** Mevcut dizini bir Hüma projesi olarak ilklendirir, `huma.json` dosyasını oluşturur.
+- `huma yeni <isim>` (Alias: `paket yeni`, `new`)
+    - **Açıklama:** Belirtilen `<isim>` ile yeni bir klasör oluşturur ve içine bir Hüma proje şablonu yerleştirir.
+- `huma kur [isim]` (Alias: `paket kur`, `install`, `add`)
+    - **Açıklama:** `huma.json` içindeki bağımlılıkları yükler. Bir `[isim]` verilirse o paketi projeye ekler. Native modüller için `--güvenilir` (veya `--trusted`) bayrağı kullanılabilir.
+- `huma sil <isim>` (Alias: `paket sil`, `remove`)
+    - **Açıklama:** Bir paketi sistemden kaldırır ve `huma.lock` dosyasını günceller.
+- `huma liste` (Alias: `paket liste`, `list`)
+    - **Açıklama:** Projeye kurulu tüm paketleri ve versiyonlarını listeler.
+- `huma paket güncelle` (Alias: `update`)
+    - **Açıklama:** Kurulu paketlerin uzak sunucudaki yeni sürümlerini kontrol eder ve günceller.
+- `huma paket doğrula` (Alias: `verify`)
+    - **Açıklama:** Proje yapısını ve metadataları yayın öncesi kontrol ederek bütünlüğü doğrular.
 
-### 3. Bytecode Modu (Performans)
+### 4. Bakım ve Bilgi
 
-Kodunuzu önce bytecode'a derleyip (`build`/`derle`) sonra Sanal Makine üzerinde yürütebilirsiniz (`exec`/`yürüt`):
-
-```bash
-# Derle
-huma derle program.hb -o cikti.hbc
-# Yürüt
-huma yürüt cikti.hbc
-```
-
-### 4. Paket Yöneticisi ve Betikler
-
-Hüma, modern bir paket yöneticisine sahiptir (`paket` veya `package`):
-
-```bash
-# Projeyi ilklendir
-huma paket ilkle
-# Bağımlılıkları kur
-huma paket kur
-# Yeni bağımlılık ekle
-huma paket kur ag_istekleri
-# Projedeki bir betiği çalıştır (npm run gibi)
-huma çalıştır baslat
-```
+- `huma güncelle` (Alias: `update`)
+    - **Açıklama:** Hüma CLI aracını GitHub üzerinden en son sürüme yükseltir. `--check` bayrağı ile sadece kontrol yapabilirsiniz.
+- `huma sürüm` (Alias: `version`)
+    - **Açıklama:** Çalışan Hüma binary dosyasının sürüm bilgisini gösterir.
 
 ---
 

@@ -35,49 +35,52 @@ The compiled binary will be located at `target/release/huma`.
 
 ## 💻 Usage Guide
 
-### 1. Interactive Mode (REPL)
+## 💻 CLI Command Reference
 
-Try code directly in the terminal:
+Hüma features a **Bilingual CLI**, meaning you can use the English commands (e.g., `run`, `build`, `update`) or their Turkish equivalents (e.g., `çalıştır`, `derle`, `güncelle`) interchangeably.
 
-```bash
-huma repl
-```
+### 1. Execution & Interactive Modes
 
-### 2. Run a Script (Interpreter)
+- `huma run <target>` (Alias: `çalıştır`)
+    - **Description:** Run a `.hb` source file or a script defined in `huma.json`. 
+    - **Smart Logic:** If no target is provided, it looks for a script named `start` or `baslat`. If neither is found, it runs the entry file specified in `huma.json`.
+- `huma repl` (Alias: `kabuk`)
+    - **Description:** Starts the interactive Read-Eval-Print Loop for quick prototyping and testing.
+- `huma ide` (Alias: `arayüz`)
+    - **Description:** Launches the desktop Integrated Development Environment.
 
-Run a `.hb` file using the tree-walking interpreter (`run` or `çalıştır`):
+### 2. Compilation & Bytecode
 
-```bash
-huma run script.hb
-# or in Turkish
-huma çalıştır script.hb
-```
+- `huma build <file>` (Alias: `derle`)
+    - **Description:** Compiles a source file into `.hbc` bytecode. Use `-o` to specify the output filename.
+- `huma exec <file>` (Alias: `yürüt`)
+    - **Description:** Executes a pre-compiled `.hbc` bytecode file using the Hüma VM.
+- `huma gen <file>` (Alias: `üret`)
+    - **Description:** Generates standalone Rust source code from a Hüma file for native performance.
 
-### 3. Bytecode Mode (Performance)
+### 3. Package Management (`package` or `paket`)
 
-Compile to bytecode (`build`/`derle`) and execute via the VM (`exec`/`yürüt`):
+- `huma init` (Alias: `paket ilkle`)
+    - **Description:** Initializes a new Hüma project in the current directory.
+- `huma new <name>` (Alias: `paket yeni`)
+    - **Description:** Scaffolds a new Hüma project in a new directory named `<name>`.
+- `huma install [name]` (Alias: `paket kur`, `add`)
+    - **Description:** Installs dependencies from `huma.json`. If `[name]` is provided, it adds that specific package. Use `--trusted` to bypass security warnings for native modules.
+- `huma remove <name>` (Alias: `paket sil`)
+    - **Description:** Uninstalls a package and updates `huma.lock`.
+- `huma list` (Alias: `paket liste`)
+    - **Description:** Lists all installed dependencies and their versions.
+- `huma package update` (Alias: `paket güncelle`)
+    - **Description:** Checks and updates project dependencies to their latest versions.
+- `huma package verify` (Alias: `paket doğrula`)
+    - **Description:** Performs a pre-distribution check on the package structure and metadata.
 
-```bash
-# Compile to bytecode (.hbc)
-huma build script.hb -o output.hbc
-# Execute bytecode
-huma exec output.hbc
-```
+### 4. Maintenance & Information
 
-### 4. Package Manager & Scripts
-
-Hüma features a powerful package manager (`package` or `paket`):
-
-```bash
-# Initialize a project
-huma package init
-# Install all dependencies
-huma package install
-# Add a specific dependency
-huma package add ag_istekleri
-# Run a project script (like npm run)
-huma run baslat
-```
+- `huma update` (Alias: `güncelle`)
+    - **Description:** Updates the Hüma CLI binary to the latest version from GitHub. Use `--check` to check for updates without installing.
+- `huma version` (Alias: `sürüm`)
+    - **Description:** Displays the current version of the Hüma binary.
 
 ---
 
