@@ -276,7 +276,7 @@ export default async function PackageManagerPage({
               </p>
             </div>
             <Link 
-              href="https://huma-lang.org/packages" 
+              href="https://huma-lang.vercel.app/packages" 
               target="_blank"
               className="relative z-10 bg-primary text-on-primary px-10 py-5 rounded-xl font-bold text-sm hover:scale-105 transition-all shadow-xl shadow-primary/25 shrink-0"
             >
