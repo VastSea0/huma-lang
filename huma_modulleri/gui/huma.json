@@ -1,0 +1,13 @@
+{
+  "ad": "gui",
+  "surum": "0.4.0",
+  "aciklama": "Hüma Native GUI kütüphanesi. egui tabanlı yerel masaüstü arayüz oluşturma araçları.",
+  "yazar": "Egehan KAHRAMAN",
+  "giris": "gui.hb",
+  "huma_surum": ">=0.4.0",
+  "bagimliliklar": {},
+  "betikler": {},
+  "github": "VastSea0/huma-lang",
+  "lisans": "MIT",
+  "kaynak": "github.com/VastSea0/huma-lang"
+}

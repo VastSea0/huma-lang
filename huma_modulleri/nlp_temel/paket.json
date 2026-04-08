@@ -1,8 +1,0 @@
-{
-  "ad": "nlp_temel",
-  "surum": "1.0.0",
-  "aciklama": "Simüle edilmiş topluluk paketi.",
-  "yazar": "Hüma Takımı",
-  "giris": "nlp_temel.hb",
-  "huma_surum": ">=0.3.0"
-}
