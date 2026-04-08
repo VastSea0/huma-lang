@@ -8,7 +8,7 @@
     "download": "Download"
   },
   "Hero": {
-    "badge": "v0.5.0 STABLE",
+    "badge": "v0.5.2 STABLE",
     "headline": "Natural Code,",
     "subheadline": "Native Performance.",
     "description": "Hüma is a high-performance programming language featuring native Turkish syntax. Built with a Rust-backed core, it combines the expressiveness of natural language with the raw speed of a systems compiler.",
@@ -36,7 +36,7 @@
     },
     "standard_library": {
       "title": "Standard Library",
-      "description": "Built-in modules for HTTP, GUI, and system management."
+      "description": "Built-in modules for math, file handling, statistics and more."
     }
   },
   "CTA": {
@@ -48,7 +48,7 @@
   "Footer": {
     "copy": "© 2026 Hüma Foundation",
     "license": "MIT License",
-    "build": "Build v0.5.0-stable",
+    "build": "Build v0.5.2-stable",
     "github": "GitHub",
     "discord": "Discord",
     "releases": "Releases",
@@ -172,14 +172,18 @@
       "description": "Hüma's built-in API reference and helper modules.",
       "hero_title": "Standard Library Guide",
       "hero_desc": "Hüma comes with a rich set of built-in libraries to speed up your development process. Everything from mathematics to the file system is optimized.",
-      "import_info": "Use the '@kullan' directive to include a module in your project:",
+      "import_info": "Use the 'yükle' directive to include a module in your project:",
       "modules": {
         "matematik": "Modern mathematical functions and constants.",
         "renkler": "ANSI color outputs for current terminals.",
         "zaman": "Time measurement and delay tools.",
         "liste": "Advanced list operations (map, filter).",
-        "dosya": "File read, write, and existence checks.",
-        "sistem": "Environment variables and shell interaction."
+        "dosya": "File read, write, and line splitting.",
+        "sistem": "Environment variables and shell interaction.",
+        "istatistik": "Mean, variance, and standard deviation calculations.",
+        "dizgi": "Character checks and string helpers.",
+        "rastgele": "Random number generation and list shuffling.",
+        "birim_test": "Unit test framework: test_et, iddia_et, test_raporu."
       }
     },
     "compiler": {
@@ -220,7 +224,7 @@
         "desc": "The ag_istekleri library supports modern HTTP protocols (GET, POST, PUT, DELETE). v1.1.0 introduces Headers support, enabling authenticated (Bearer/Token) API communication."
       },
       "server": {
-        "title": "Hüma Server (v1.4.0)",
+        "title": "Hüma Server (v1.0.0)",
         "desc": "huma_sunucu is a low-latency, high-performance backend framework. Dynamic route parameters, CORS management, and static file serving come built-in."
       }
     },
@@ -251,6 +255,8 @@
       "scripts_desc": "You can define custom automation scripts in 'huma.json' just like in npm. Run them using 'huma paket run <name>'.",
       "verify_title": "Package Verification",
       "verify_desc": "Automatically verify if your package metadata and versioning are compliant before sharing.",
+      "security_title": "Security & Verification",
+      "security_desc": "Provides enterprise-level security via SHA-256 hash checks in huma.lock, cycle detection, and unsafe native code warnings. It also ensures package provenance using github and license metadata.",
       "platform": {
         "title": "Official Sharing Platform",
         "desc": "Browse hundreds of ready-to-use libraries and share your own solutions with the community."
@@ -294,6 +300,22 @@
       "description": "Official update history of the Hüma language and toolchain.",
       "hero_title": "What's New?",
       "hero_desc": "Hüma is constantly evolving. In every version, you can track new language features, performance improvements, and community-driven bug fixes here.",
+      "v0_5_2": {
+        "version": "v0.5.2 (Security & Standardization)",
+        "date": "April 8, 2026",
+        "changes": [
+          "Package Manager Security Hardening: closed path traversal, RCE/code injection, and command injection vulnerabilities.",
+          "SHA-256 Integrity Verification: package hash checks added to huma.lock.",
+          "Atomic File Writes: metadata and lock files now use write-then-rename for safety.",
+          "Recursive Dependency Installation: deep dependency trees with cycle detection.",
+          "Native Code Safety Warning: --güvenilir (--trusted) flag for packages with embedded Rust code.",
+          "Library Standardization: version/author/dependency headers added to all lib/*.hb files.",
+          "Function Shadowing Cleanup: resolved Rust built-in conflicts in dizgi.hb and dosya.hb.",
+          "GUI Module Migration: gui.hb is no longer built-in, now loadable from huma_modulleri/gui/.",
+          "PaketMetadata Extension: github and lisans (license) fields added.",
+          "Typo Fixes: YESIL→YEŞİL, iceriyor_mu→içeriyor_mu."
+        ]
+      },
       "v0_5_1": {
         "version": "v0.5.1 (Native Architecture)",
         "date": "April 3, 2026",

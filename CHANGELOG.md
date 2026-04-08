@@ -1,3 +1,15 @@
+## [v0.5.2] - 2026-04-08
+### Güvenlik ve Standardizasyon
+- Paket Yöneticisi Güvenlik Sertleştirmesi: Path traversal, RCE/kod enjeksiyon ve komut enjeksiyon açıkları kapatıldı.
+- SHA-256 Bütünlük Doğrulaması: huma.lock dosyasında paket hash kontrolü eklendi.
+- Atomik Dosya Yazımı: Metadata ve kilit dosyaları artık write-then-rename ile güvenli yazılıyor.
+- Özyinelemeli Bağımlılık Kurulumu: Döngü tespiti ile derin bağımlılık ağaçları destekleniyor.
+- Native Kod Güvenlik Uyarısı: yerleşik_rust içeren paketler için --güvenilir bayrağı eklendi.
+- Kütüphane Standardizasyonu: Tüm lib/*.hb dosyalarına sürüm/yazar/bağımlılık başlıkları eklendi.
+- GUI Modül Taşınması: gui.hb artık gömülü değil, huma_modulleri/gui/ altından yükleniyor.
+- PaketMetadata Genişletmesi: github ve lisans alanları eklendi.
+
+
 # Değişim Günlüğü (Changelog)
 
 Tüm önemli değişiklikler bu dosyada takip edilecektir.

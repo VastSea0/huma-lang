@@ -127,6 +127,9 @@ export default async function PackageManagerPage({
             code={`{
   "ad": "merhaba_dunya",
   "surum": "1.0.0",
+  "yazar": "Egehan KAHRAMAN",
+  "lisans": "MIT",
+  "github": "KullaniciAdi/merhaba_dunya",
   "giris": "ana.hb",
   "huma_surum": ">=0.5.0",
   "bagimliliklar": {
@@ -140,7 +143,7 @@ export default async function PackageManagerPage({
           />
         </section>
 
-        {/* Scripts & Automation */}
+        {/* Scripts & Automation & Security */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-24">
           <div className="bg-surface-container-low p-8 rounded-2xl border border-outline-variant/10">
             <h3 className="text-xl font-bold text-on-surface mb-4">
@@ -152,14 +155,26 @@ export default async function PackageManagerPage({
             <CodeBlock code={`$ huma paket run baslat`} variant="terminal" />
           </div>
           
-          <div className="bg-surface-container-low p-8 rounded-2xl border border-outline-variant/10">
-            <h3 className="text-xl font-bold text-on-surface mb-4">
-              {p.verify_title}
-            </h3>
-            <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
-              {p.verify_desc}
-            </p>
-            <CodeBlock code={`$ huma paket doğrula`} variant="terminal" />
+          <div className="flex flex-col gap-8">
+            <div className="bg-surface-container-low p-8 rounded-2xl border border-outline-variant/10">
+              <h3 className="text-xl font-bold text-on-surface mb-4">
+                {p.verify_title}
+              </h3>
+              <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
+                {p.verify_desc}
+              </p>
+              <CodeBlock code={`$ huma paket doğrula`} variant="terminal" />
+            </div>
+
+            <div className="bg-secondary/5 p-8 rounded-2xl border border-secondary/20">
+              <h3 className="text-xl font-bold text-secondary mb-4 flex items-center gap-2">
+                <span className="material-symbols-outlined text-xl">security</span>
+                {p.security_title}
+              </h3>
+              <p className="text-sm text-on-surface-variant leading-relaxed">
+                {p.security_desc}
+              </p>
+            </div>
           </div>
         </section>
 

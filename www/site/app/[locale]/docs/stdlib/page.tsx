@@ -68,7 +68,7 @@ export default async function StdlibPage({
       colorAccent: "text-primary",
       constants: [
         { name: "KIRMIZI", value: "\\x1b[31m", description: locale === "tr" ? "Kırmızı ANSI renk kodu" : "Red ANSI color code" },
-        { name: "YESIL", value: "\\x1b[32m", description: locale === "tr" ? "Yeşil ANSI renk kodu" : "Green ANSI color code" },
+        { name: "YEŞİL", value: "\\x1b[32m", description: locale === "tr" ? "Yeşil ANSI renk kodu" : "Green ANSI color code" },
         { name: "SARI", value: "\\x1b[33m", description: locale === "tr" ? "Sarı ANSI renk kodu" : "Yellow ANSI color code" },
         { name: "MAVI", value: "\\x1b[34m", description: locale === "tr" ? "Mavi ANSI renk kodu" : "Blue ANSI color code" },
       ],
@@ -87,6 +87,11 @@ export default async function StdlibPage({
           name: "hata_yaz(m)",
           signature: "hata_yaz(m: Yazı)",
           description: locale === "tr" ? "Metni kırmızı (hata stili) yazdırır" : "Prints text in red (error style)",
+        },
+        {
+          name: "uyarı_yaz(m)",
+          signature: "uyarı_yaz(m: Yazı)",
+          description: locale === "tr" ? "Metni sarı (uyarı stili) yazdırır" : "Prints text in yellow (warning style)",
         },
       ],
     },
@@ -143,6 +148,16 @@ export default async function StdlibPage({
           signature: "ters_cevir(liste: Liste) → Liste",
           description: locale === "tr" ? "Listenin ters çevrilmiş kopyasını döndürür" : "Returns a reversed copy of the list",
         },
+        {
+          name: "içeriyor_mu(liste, eleman)",
+          signature: "içeriyor_mu(liste: Liste, eleman: Değer) → Mantıksal",
+          description: locale === "tr" ? "Eleman listede mevcutsa 1 döndürür" : "Returns 1 if element exists in the list",
+        },
+        {
+          name: "dilimle(liste, baş, son)",
+          signature: "dilimle(liste: Liste, baş: Sayı, son: Sayı) → Liste",
+          description: locale === "tr" ? "Listeden alt liste alır" : "Returns a sub-list from start to end index",
+        },
       ],
     },
     {
@@ -154,19 +169,19 @@ export default async function StdlibPage({
       colorAccent: "text-primary",
       functions: [
         {
-          name: "dosya_var_mı(yol)",
-          signature: "dosya_var_mı(yol: Yazı) → Mantıksal",
-          description: locale === "tr" ? "Dosya mevcutsa doğru döndürür" : "Returns true if the file at yol exists",
-        },
-        {
           name: "güvenli_oku(yol)",
           signature: "güvenli_oku(yol: Yazı) → Yazı | hata",
           description: locale === "tr" ? "Dosyayı okur; içerik döndürür veya hata fırlatır" : "Reads file at yol; returns contents or raises an error on failure",
         },
         {
+          name: "satırlara_ayır(metin)",
+          signature: "satırlara_ayır(metin: Yazı) → Liste",
+          description: locale === "tr" ? "Metni satır satır listeye çevirir" : "Splits text into a list of lines",
+        },
+        {
           name: "dosya_oku_bayt(yol)",
           signature: "dosya_oku_bayt(yol: Yazı) → Bayt",
-          description: locale === "tr" ? "Dosyayı ikili (binary) veri olarak okur" : "Reads file at yol as binary data (Bayt)",
+          description: locale === "tr" ? "Dosyayı ikili (binary) veri olarak okur (Rust built-in)" : "Reads file as binary data — Rust built-in",
         },
       ],
     },
@@ -187,6 +202,116 @@ export default async function StdlibPage({
           name: "sistem(komut)",
           signature: "sistem(komut: Yazı) → Yazı",
           description: locale === "tr" ? "Kabuk komutu çalıştırır ve çıktıyı döndürür" : "Executes a shell command and returns its output",
+        },
+      ],
+    },
+    {
+      id: "istatistik",
+      file: "istatistik.hb",
+      icon: "analytics",
+      title: "istatistik",
+      descriptionKey: "istatistik",
+      colorAccent: "text-tertiary",
+      functions: [
+        {
+          name: "ortalama(liste)",
+          signature: "ortalama(liste: Liste) → Sayı",
+          description: locale === "tr" ? "Aritmetik ortalama hesaplar" : "Calculates arithmetic mean",
+        },
+        {
+          name: "en_büyük(liste)",
+          signature: "en_büyük(liste: Liste) → Sayı",
+          description: locale === "tr" ? "Listedeki en büyük değeri döndürür" : "Returns the maximum value in the list",
+        },
+        {
+          name: "en_küçük(liste)",
+          signature: "en_küçük(liste: Liste) → Sayı",
+          description: locale === "tr" ? "Listedeki en küçük değeri döndürür" : "Returns the minimum value in the list",
+        },
+        {
+          name: "varyans(liste)",
+          signature: "varyans(liste: Liste) → Sayı",
+          description: locale === "tr" ? "Popülasyon varyansını hesaplar" : "Calculates population variance",
+        },
+        {
+          name: "standart_sapma(liste)",
+          signature: "standart_sapma(liste: Liste) → Sayı",
+          description: locale === "tr" ? "Standart sapmayı hesaplar" : "Calculates standard deviation",
+        },
+      ],
+    },
+    {
+      id: "dizgi",
+      file: "dizgi.hb",
+      icon: "text_fields",
+      title: "dizgi",
+      descriptionKey: "dizgi",
+      colorAccent: "text-primary",
+      functions: [
+        {
+          name: "büyük_mü(karakter)",
+          signature: "büyük_mü(karakter: Yazı) → Mantıksal",
+          description: locale === "tr" ? "Karakterin büyük harf olup olmadığını kontrol eder" : "Checks if character is uppercase",
+        },
+        {
+          name: "küçük_mü(karakter)",
+          signature: "küçük_mü(karakter: Yazı) → Mantıksal",
+          description: locale === "tr" ? "Karakterin küçük harf olup olmadığını kontrol eder" : "Checks if character is lowercase",
+        },
+        {
+          name: "boşluk_mu(karakter)",
+          signature: "boşluk_mu(karakter: Yazı) → Mantıksal",
+          description: locale === "tr" ? "Karakterin boşluk, tab veya satır sonu olup olmadığını kontrol eder" : "Checks if character is whitespace",
+        },
+      ],
+    },
+    {
+      id: "rastgele",
+      file: "rastgele.hb",
+      icon: "casino",
+      title: "rastgele",
+      descriptionKey: "rastgele",
+      colorAccent: "text-secondary",
+      functions: [
+        {
+          name: "r_tamsayı(min, max)",
+          signature: "r_tamsayı(min: Sayı, max: Sayı) → Sayı",
+          description: locale === "tr" ? "Belirtilen aralıkta rastgele tam sayı üretir" : "Generates random integer in range [min, max]",
+        },
+        {
+          name: "r_seç(liste)",
+          signature: "r_seç(liste: Liste) → Değer",
+          description: locale === "tr" ? "Listeden rastgele eleman seçer" : "Picks a random element from the list",
+        },
+        {
+          name: "r_karıştır(liste)",
+          signature: "r_karıştır(liste: Liste) → Liste",
+          description: locale === "tr" ? "Listeyi rastgele sırayla karıştırır" : "Shuffles the list randomly",
+        },
+      ],
+    },
+    {
+      id: "birim_test",
+      file: "birim_test.hb",
+      icon: "bug_report",
+      title: "birim_test",
+      descriptionKey: "birim_test",
+      colorAccent: "text-tertiary",
+      functions: [
+        {
+          name: "test_et(ad, f)",
+          signature: "test_et(ad: Yazı, f: Fonksiyon) → Boş",
+          description: locale === "tr" ? "Test fonksiyonunu çalıştırır ve sonucu raporlar" : "Runs test function and reports result",
+        },
+        {
+          name: "iddia_et(beklenen, gelen, mesaj)",
+          signature: "iddia_et(beklenen: Değer, gelen: Değer, mesaj: Yazı) → Mantıksal",
+          description: locale === "tr" ? "İki değeri karşılaştırır, eşitse 1 döndürür" : "Asserts two values are equal, returns 1 if true",
+        },
+        {
+          name: "test_raporu()",
+          signature: "test_raporu() → Boş",
+          description: locale === "tr" ? "Toplam test sonuçlarının özetini yazdırır" : "Prints summary of all test results",
         },
       ],
     },
@@ -219,7 +344,7 @@ export default async function StdlibPage({
             {s.import_info}
           </p>
           <div className="bg-surface-container-lowest rounded border border-outline-variant/10 p-4 font-mono text-xs text-primary">
-            @kullan &quot;matematik.hb&quot;
+            yükle &quot;matematik.hb&quot;
           </div>
         </div>
 

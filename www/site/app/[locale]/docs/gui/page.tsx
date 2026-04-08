@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: "egui-based native interface creation tools for Hüma.",
 };
 
-const guiCode = `yükle "gui.hb";
+const guiCode = `yükle "gui";
 
 sayac = 0 olsun
 
@@ -84,7 +84,7 @@ export default async function GuiPage({
         </p>
 
         <div className="bg-primary/5 border border-primary/10 p-6 rounded-xl mb-12">
-           <div className="font-mono text-sm text-primary">yükle &quot;gui.hb&quot;;</div>
+           <div className="font-mono text-sm text-primary">yükle &quot;gui&quot;;</div>
         </div>
 
         {/* Quick Start */}
