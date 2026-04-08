@@ -95,20 +95,20 @@ const CURRENT_HUMA_VER: &str = env!("CARGO_PKG_VERSION");
 /// Hüma Dahili Paket Registry'si
 /// (paket_adı, github_repo_path, varsayılan_dal)
 const BUILTIN_REGISTRY: &[(&str, &str, &str)] = &[
-    ("nlp_temel",    "VastSea0/huma-lang", "main"),
-    ("ag_istekleri", "VastSea0/ag_istekleri", "main"),
-    ("huma_sunucu",  "VastSea0/huma-lang", "main"),
-    ("huma_sqlite",  "VastSea0/huma-lang", "main"),
-    ("gui",          "VastSea0/huma-lang", "main"),
-    ("matematik",    "VastSea0/huma-lang", "main"),
-    ("dizgi",        "VastSea0/huma-lang", "main"),
-    ("liste",        "VastSea0/huma-lang", "main"),
-    ("renkler",      "VastSea0/huma-lang", "main"),
-    ("dosya",        "VastSea0/huma-lang", "main"),
-    ("istatistik",   "VastSea0/huma-lang", "main"),
-    ("zaman",        "VastSea0/huma-lang", "main"),
-    ("rastgele",     "VastSea0/huma-lang", "main"),
-    ("birim_test",   "VastSea0/huma-lang", "main"),
+    ("nlp_temel",    "VastSea0/humapy/huma_modulleri/nlp_temel", "main"),
+    ("ag_istekleri", "VastSea0/humapy/huma_modulleri/ag_istekleri", "main"),
+    ("huma_sunucu",  "VastSea0/humapy/huma_modulleri/huma_sunucu", "main"),
+    ("huma_sqlite",  "VastSea0/humapy/huma_modulleri/huma_sqlite", "main"),
+    ("gui",          "VastSea0/humapy/huma_modulleri/gui", "main"),
+    ("matematik",    "VastSea0/humapy/lib", "main"),
+    ("dizgi",        "VastSea0/humapy/lib", "main"),
+    ("liste",        "VastSea0/humapy/lib", "main"),
+    ("renkler",      "VastSea0/humapy/lib", "main"),
+    ("dosya",        "VastSea0/humapy/lib", "main"),
+    ("istatistik",   "VastSea0/humapy/lib", "main"),
+    ("zaman",        "VastSea0/humapy/lib", "main"),
+    ("rastgele",     "VastSea0/humapy/lib", "main"),
+    ("birim_test",   "VastSea0/humapy/lib", "main"),
 ];
 
 /// Paket adları ve dosya yollarında izin verilmeyen kalıplar
@@ -351,6 +351,7 @@ fn atomic_write_str(path: &Path, content: &str) -> Result<()> {
 struct GitHubSource {
     owner: String,
     repo: String,
+    path: String,      // Repo içindeki alt dizin (isteğe bağlı)
     reference: String, // branch, tag veya commit
 }
 
@@ -373,14 +374,23 @@ fn parse_github_url(url: &str) -> Result<GitHubSource> {
     if parts.len() < 2 {
         return Err(anyhow!(
             "Geçersiz GitHub URL formatı: '{}'. \
-             Beklenen: github.com/kullanıcı/repo[@sürüm|#dal]",
+             Beklenen: github.com/kullanıcı/repo[/alt-dizin][@sürüm|#dal]",
             url
         ));
     }
 
+    let owner = parts[0].to_string();
+    let repo = parts[1].to_string();
+    let path = if parts.len() > 2 {
+        parts[2..].join("/")
+    } else {
+        "".to_string()
+    };
+
     Ok(GitHubSource {
-        owner: parts[0].to_string(),
-        repo: parts[1].to_string(),
+        owner,
+        repo,
+        path,
         reference,
     })
 }
@@ -686,10 +696,13 @@ fn install_from_github(url: &str, trusted: bool) -> Result<()> {
     );
 
     // [6] Akıllı dal tespiti: önce belirtilen referansı dene
-    let raw_base = format!(
+    let mut raw_base = format!(
         "https://raw.githubusercontent.com/{}/{}/{}",
         source.owner, source.repo, source.reference
     );
+    if !source.path.is_empty() {
+        raw_base = format!("{}/{}", raw_base, source.path);
+    }
 
     // Metadata dosyasını indir (huma.json veya paket.json dene)
     let meta_str = download_text(&format!("{}/paket.json", raw_base))
@@ -1107,10 +1120,13 @@ pub fn update_packages() -> Result<()> {
 /// Uzak paketteki sürümü kontrol eder
 fn check_remote_version(source: &str, _name: &str) -> Result<Option<String>> {
     let github_source = parse_github_url(source)?;
-    let raw_base = format!(
+    let mut raw_base = format!(
         "https://raw.githubusercontent.com/{}/{}/{}",
         github_source.owner, github_source.repo, github_source.reference
     );
+    if !github_source.path.is_empty() {
+        raw_base = format!("{}/{}", raw_base, github_source.path);
+    }
 
     let meta_str = download_text(&format!("{}/paket.json", raw_base))
         .or_else(|_| download_text(&format!("{}/huma.json", raw_base)));
