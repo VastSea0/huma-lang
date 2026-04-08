@@ -1,0 +1,13 @@
+{
+  "ad": "ag_istekleri",
+  "surum": "1.1.0",
+  "aciklama": "Hüma Programlama Dili için profesyonel ve hafif HTTP kütüphanesi. GET, POST, PUT, DELETE desteği.",
+  "yazar": "Egehan KAHRAMAN",
+  "giris": "ag_istekleri.hb",
+  "huma_surum": ">=0.5.0",
+  "bagimliliklar": {},
+  "betikler": {},
+  "github": "VastSea0/ag_istekleri",
+  "lisans": "MIT",
+  "kaynak": "github.com/VastSea0/ag_istekleri"
+}
