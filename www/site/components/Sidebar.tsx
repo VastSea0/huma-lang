@@ -93,7 +93,7 @@ export default function Sidebar({ dict, locale }: { dict: any; locale: string })
       <div className="mb-6">
         <h3 className="text-lg font-bold text-on-surface">{dict.Sidebar.title}</h3>
         <p className="text-[10px] uppercase tracking-[0.2em] text-on-surface-variant/60 font-semibold mt-0.5">
-          v0.5.1-kararlı
+          {dict.Footer.build.split(" ")[1]}
         </p>
       </div>
       <nav className="space-y-8">
