@@ -3,10 +3,18 @@ import { getDictionary } from "@/dictionaries/dictionaries";
 import CodeBlock from "@/components/CodeBlock";
 import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "Hüma Package Manager",
-  description: "Manage, update, and download Hüma libraries from the community.",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const dict = await getDictionary(locale as "en" | "tr");
+  return {
+    title: dict.Docs.package_manager.title,
+    description: dict.Docs.package_manager.description,
+  };
+}
 
 export default async function PackageManagerPage({
   params,
@@ -15,32 +23,9 @@ export default async function PackageManagerPage({
 }) {
   const { locale } = await params;
   const dict = await getDictionary(locale as "en" | "tr");
-  const p = dict.Docs.package_manager;
+  const p = dict.Docs.package_manager as any;
 
   const getPath = (path: string) => `/${locale}${path}`;
-
-  const commands = [
-    {
-      cmd: "huma paket kur",
-      desc: locale === "tr" ? "huma.json'daki tüm bağımlılıkları yükler." : "Installs all dependencies in huma.json.",
-    },
-    {
-      cmd: "huma paket kur <isim>",
-      desc: locale === "tr" ? "Belirtilen paketi yükler ve huma.json'a ekler." : "Installs specified package and adds to huma.json.",
-    },
-    {
-      cmd: "huma paket yeni <isim>",
-      desc: locale === "tr" ? "Yeni bir kütüphane şablonu oluşturur." : "Creates a new library template.",
-    },
-    {
-      cmd: "huma paket liste",
-      desc: locale === "tr" ? "Yüklü paketleri ve sürümlerini listeler." : "Lists installed packages and versions.",
-    },
-    {
-      cmd: "huma paket güncelle",
-      desc: locale === "tr" ? "Paketleri en son sürümlere yükseltir." : "Updates packages to latest versions.",
-    },
-  ];
 
   return (
     <>
@@ -63,7 +48,7 @@ export default async function PackageManagerPage({
         </p>
 
         {/* Command Reference */}
-        <section className="mb-24">
+        <section className="mb-24" id="commands">
           <h2 className="text-2xl font-bold text-on-surface mb-8 flex items-center gap-3">
              <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
               01
@@ -71,32 +56,7 @@ export default async function PackageManagerPage({
             {locale === "tr" ? "Komut Başvurusu" : "Command Reference"}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              {
-                cmd: "huma paket ilkle / init",
-                desc: locale === "tr" ? "Mevcut dizini bir Hüma projesi olarak başlatır." : "Initializes the current directory as a Hüma project.",
-              },
-              {
-                cmd: "huma paket yeni / new <ad>",
-                desc: locale === "tr" ? "Yeni bir klasör açıp proje şablonu oluşturur." : "Creates a new folder and project template.",
-              },
-              {
-                cmd: "huma paket kur / install [ad]",
-                desc: locale === "tr" ? "Tüm bağımlılıkları veya belirtilen paketi kurar." : "Installs all dependencies or a specific package.",
-              },
-              {
-                cmd: "huma paket liste / list",
-                desc: locale === "tr" ? "Kilitli sürümleriyle yüklü paketleri listeler." : "Lists installed packages with locked versions.",
-              },
-              {
-                cmd: "huma paket sil / remove <ad>",
-                desc: locale === "tr" ? "Belirtilen paketi ve dosyalarını projeden kaldırır." : "Removes a specific package and its files.",
-              },
-              {
-                cmd: "huma paket run <betik>",
-                desc: locale === "tr" ? "huma.json içinde tanımlı bir otomasyon betiğini çalıştırır." : "Executes an automation script defined in huma.json.",
-              }
-            ].map((c) => (
+            {p.commands.map((c: any) => (
               <div key={c.cmd} className="bg-surface-container-low/50 rounded-xl border border-outline-variant/10 overflow-hidden hover:border-primary/20 transition-all group">
                 <div className="px-5 py-4 border-b border-outline-variant/5">
                   <code className="font-mono text-[11px] text-primary font-bold group-hover:scale-105 transition-transform inline-block lowercase">
@@ -112,7 +72,7 @@ export default async function PackageManagerPage({
         </section>
 
         {/* Manifest (huma.json) */}
-        <section className="mb-24">
+        <section className="mb-24" id="manifest">
           <h2 className="text-2xl font-bold text-on-surface mb-8 flex items-center gap-3">
             <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
               02
@@ -166,8 +126,8 @@ export default async function PackageManagerPage({
               <CodeBlock code={`$ huma paket doğrula`} variant="terminal" />
             </div>
 
-            <div className="bg-secondary/5 p-8 rounded-2xl border border-secondary/20">
-              <h3 className="text-xl font-bold text-secondary mb-4 flex items-center gap-2">
+            <div className="bg-primary/5 p-8 rounded-2xl border border-primary/20">
+              <h3 className="text-xl font-bold text-primary mb-4 flex items-center gap-2">
                 <span className="material-symbols-outlined text-xl">security</span>
                 {p.security_title}
               </h3>
@@ -179,7 +139,7 @@ export default async function PackageManagerPage({
         </section>
 
         {/* Lock System */}
-        <section className="mb-24">
+        <section className="mb-24" id="dependencies">
           <h2 className="text-2xl font-bold text-on-surface mb-8 flex items-center gap-3">
             <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
               03
@@ -207,7 +167,7 @@ export default async function PackageManagerPage({
         </section>
 
         {/* Publishing */}
-        <section className="mb-24">
+        <section className="mb-24" id="publishing">
           <h2 className="text-2xl font-bold text-on-surface mb-8 flex items-center gap-3">
             <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
               04
@@ -219,24 +179,20 @@ export default async function PackageManagerPage({
           </p>
           <div className="bg-surface-container-lowest p-8 border border-outline-variant/10 rounded-2xl">
             <ul className="space-y-4 text-sm text-on-surface-variant">
-              <li className="flex gap-4">
-                 <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold shrink-0">1</span>
-                 {locale === "tr" ? "Kodunuzu GitHub reposuna yükleyin (huma.json projeniz olmalı)." : "Upload your code to GitHub (ensure huma.json is present)."}
-              </li>
-              <li className="flex gap-4">
-                 <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold shrink-0">2</span>
-                 {locale === "tr" ? "Geçerli bir sürüm numarası belirleyin (x.y.z)." : "Specify a valid version number (x.y.z)."}
-              </li>
-              <li className="flex gap-4">
-                 <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold shrink-0">3</span>
-                 {locale === "tr" ? "GitHub Release oluşturup v1.0.0 gibi bir etiket ekleyin." : "Create a GitHub Release with a tag like v1.0.0."}
-              </li>
+              {p.pub_steps.map((step: string, idx: number) => (
+                <li key={idx} className="flex gap-4">
+                  <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold shrink-0">
+                    {idx + 1}
+                  </span>
+                  {step}
+                </li>
+              ))}
             </ul>
           </div>
         </section>
 
         {/* Native Packages */}
-        <section className="mb-24">
+        <section className="mb-24" id="native">
           <h2 className="text-2xl font-bold text-on-surface mb-8 flex items-center gap-3">
             <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
               05
@@ -276,11 +232,11 @@ export default async function PackageManagerPage({
               </p>
             </div>
             <Link 
-              href="https://huma-lang.vercel.app/packages" 
+              href="https://github.com/VastSea0/huma-lang/discussions" 
               target="_blank"
               className="relative z-10 bg-primary text-on-primary px-10 py-5 rounded-xl font-bold text-sm hover:scale-105 transition-all shadow-xl shadow-primary/25 shrink-0"
             >
-              {locale === "tr" ? "Kütüphaneleri Keşfet" : "Explore Libraries"}
+              {p.platform.cta}
             </Link>
           </div>
         </section>
@@ -303,6 +259,31 @@ export default async function PackageManagerPage({
           </Link>
         </div>
       </main>
+
+      {/* Right TOC */}
+      <aside className="hidden xl:block w-64 sticky top-16 h-[calc(100vh-4rem)] py-12 px-8 overflow-y-auto border-l border-outline-variant/10 shrink-0">
+        <h5 className="text-[10px] font-bold text-on-surface uppercase tracking-[0.2em] mb-6 opacity-40">
+          {locale === "tr" ? "BU SAYFADA" : "ON THIS PAGE"}
+        </h5>
+        <ul className="space-y-4 text-[11px] font-bold uppercase tracking-widest">
+          {[
+            { href: "#commands", label: locale === "tr" ? "Komutlar" : "Commands" },
+            { href: "#manifest", label: "Manifest" },
+            { href: "#dependencies", label: locale === "tr" ? "Bağımlılıklar" : "Dependencies" },
+            { href: "#publishing", label: locale === "tr" ? "Yayınlama" : "Publishing" },
+            { href: "#native", label: "Native" },
+          ].map((item) => (
+            <li key={item.href}>
+              <a
+                href={item.href}
+                className="text-on-surface-variant/60 hover:text-primary transition-all block"
+              >
+                {item.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </aside>
     </>
   );
 }

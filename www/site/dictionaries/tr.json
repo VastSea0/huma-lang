@@ -5,7 +5,10 @@
     "playground": "Oyun Alanı",
     "community": "Topluluk",
     "github": "GitHub",
-    "download": "İndir"
+    "download": "İndir",
+    "install": "Yükle",
+    "copied": "Kopyalandı!",
+    "search_placeholder": "Dokümanlarda ara..."
   },
   "Hero": {
     "badge": "v0.5.2 KARARLI",
@@ -88,6 +91,7 @@
       "getting_started": "Hızlı Başlangıç",
       "introduction": "Giriş ve Felsefe",
       "syntax": "Temel Sözdizimi",
+      "cli": "CLI Referansı",
       "functions": "Fonksiyonlar ve Sınıflar",
       "lists": "Listeler ve Hatalar",
       "stdlib": "Standart Kütüphane",
@@ -164,6 +168,37 @@
       "loops": {
         "title": "Döngüler (olduğu sürece)",
         "desc": "Bir koşul sağlandığı sürece kod bloklarını 'olduğu sürece' anahtar kelimesi ile tekrarlayın."
+      }
+    },
+    "cli": {
+      "title": "CLI Referansı",
+      "description": "Tüm Hüma komut satırı araçları için kapsamlı rehber.",
+      "hero_title": "Komut Satırı Referansı",
+      "hero_desc": "Hüma, çift dilli bir CLI tasarımına sahiptir. İngilizce veya Türkçe komutları birbirinin yerine kullanabilirsiniz.",
+      "execution": {
+        "title": "Çalıştırma ve REPL",
+        "run": "huma çalıştır <hedef> — Bir kaynak dosyasını veya paket betiğini koşturur.",
+        "repl": "huma kabuk — Etkileşimli kabuğu (REPL) başlatır.",
+        "ide": "huma arayüz — Masaüstü geliştirme ortamını açar."
+      },
+      "compilation": {
+        "title": "Derleme ve VM",
+        "build": "huma derle <dosya> — Kaynak kodu .hbc bytecode'una derler.",
+        "exec": "huma yürüt <dosya> — Derlenmiş bytecode'u VM'de çalıştırır.",
+        "gen": "huma üret <dosya> — Bağımsız Rust kaynak kodu üretir."
+      },
+      "package": {
+        "title": "Paket Yönetimi",
+        "init": "huma ilkle — Mevcut dizinde proje oluşturur.",
+        "new": "huma yeni <isim> — Yeni klasörde proje oluşturur.",
+        "install": "huma kur — Bağımlılıkları huma.json'dan yükler.",
+        "list": "huma liste — Kurulu paketleri gösterir.",
+        "remove": "huma sil <isim> — Bir paketi kaldırır."
+      },
+      "maintenance": {
+        "title": "Bakım ve Bilgi",
+        "update": "huma güncelle — Hüma binary dosyasını günceller.",
+        "version": "huma sürüm — Mevcut versiyon bilgisini gösterir."
       }
     },
     "functions_classes": {
@@ -286,11 +321,23 @@
       "scripts_desc": "huma.json içinde otomasyon betikleri (npm tarzı) tanımlayabilir ve 'huma paket run <ad>' ile çalıştırabilirsiniz.",
       "verify_title": "Paket Doğrulama",
       "verify_desc": "Paylaşım öncesi paket meta verilerinin ve sürüm uyumluluğunun geçerliliğini otomatik kontrol edin.",
-      "security_title": "Güvenlik ve Doğrulama",
-      "security_desc": "huma.lock üzerinden SHA-256 hash kontrolleri, --güvenilir (trusted) onayı ve döngü tespitiyle kurumsal güvenlik sağlar. Ayrıca github ve lisans metadataları ile paketin kaynağı garanti altına alınır.",
+      "pub_steps": [
+        "Kodunuzu bir GitHub deposuna yükleyin (huma.json zorunludur).",
+        "Geçerli bir sürüm numarası belirleyin (x.y.z).",
+        "Bir GitHub Release oluşturun ve v1.0.0 gibi bir etiket ekleyin."
+      ],
+      "commands": [
+        { "cmd": "huma paket ilkle", "desc": "Mevcut dizini bir Hüma projesi olarak başlatır." },
+        { "cmd": "huma paket yeni <isim>", "desc": "Yeni bir klasör açıp proje şablonu oluşturur." },
+        { "cmd": "huma paket kur [isim]", "desc": "Tüm bağımlılıkları veya belirtilen paketi kurar." },
+        { "cmd": "huma paket liste", "desc": "Kilitli sürümleriyle yüklü paketleri listeler." },
+        { "cmd": "huma paket sil <isim>", "desc": "Belirtilen paketi ve dosyalarını projeden kaldırır." },
+        { "cmd": "huma paket run <betik>", "desc": "huma.json içinde tanımlı bir otomasyon betiğini çalıştırır." }
+      ],
       "platform": {
         "title": "Resmi Paylaşım Platformu",
-        "desc": "Yüzlerce hazır kütüphaneye göz atın ve kendi çözümünüzü toplulukla paylaşın."
+        "desc": "Yüzlerce hazır kütüphaneye göz atın ve kendi çözümünüzü toplulukla paylaşın.",
+        "cta": "Kütüphaneleri Keşfet"
       }
     },
     "guides": {

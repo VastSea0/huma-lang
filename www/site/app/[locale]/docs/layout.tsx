@@ -18,7 +18,7 @@ export default async function DocsLayout({
       <Navbar dict={dict} locale={locale} />
       <div className="max-w-[1440px] mx-auto flex pt-16 min-h-screen">
         <Sidebar dict={dict} locale={locale} />
-        <div className="flex-1 flex min-w-0">
+        <div className="flex-1 flex min-w-0 pb-24 lg:pb-0">
           {children}
         </div>
       </div>

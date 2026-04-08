@@ -5,7 +5,10 @@
     "playground": "Playground",
     "community": "Community",
     "github": "GitHub",
-    "download": "Download"
+    "download": "Download",
+    "install": "Install",
+    "copied": "Copied!",
+    "search_placeholder": "Search documentation..."
   },
   "Hero": {
     "badge": "v0.5.2 STABLE",
@@ -88,6 +91,7 @@
       "getting_started": "Getting Started",
       "introduction": "Intro & Philosophy",
       "syntax": "Basic Syntax",
+      "cli": "CLI Reference",
       "functions": "Functions & Classes",
       "lists": "Lists & Errors",
       "stdlib": "Standard Library",
@@ -164,6 +168,37 @@
       "loops": {
         "title": "Loops (olduğu sürece)",
         "desc": "Repeat blocks of code as long as a condition is met using the 'olduğu sürece' keyword."
+      }
+    },
+    "cli": {
+      "title": "CLI Reference",
+      "description": "Complete guide for all Hüma command-line interface tools.",
+      "hero_title": "Command Line Reference",
+      "hero_desc": "Hüma follows a bilingual CLI design. You can use English or Turkish commands interchangeably.",
+      "execution": {
+        "title": "Execution & REPL",
+        "run": "huma run <target> — Run a source file or a package script.",
+        "repl": "huma repl — Start the interactive shell.",
+        "ide": "huma ide — Launch the desktop developer environment."
+      },
+      "compilation": {
+        "title": "Compilation & VM",
+        "build": "huma build <file> — Compile source to .hbc bytecode.",
+        "exec": "huma exec <file> — Run compiled bytecode on the VM.",
+        "gen": "huma gen <file> — Generate standalone Rust source code."
+      },
+      "package": {
+        "title": "Package Management",
+        "init": "huma init — Initialize a new project.",
+        "new": "huma new <name> — Create a project in a new folder.",
+        "install": "huma install — Install dependencies from huma.json.",
+        "list": "huma list — Show installed packages.",
+        "remove": "huma remove <name> — Uninstall a package."
+      },
+      "maintenance": {
+        "title": "Maintenance",
+        "update": "huma update — Self-update the Hüma binary.",
+        "version": "huma version — Display current version info."
       }
     },
     "functions_classes": {
@@ -288,9 +323,23 @@
       "verify_desc": "Automatically verify if your package metadata and versioning are compliant before sharing.",
       "security_title": "Security & Verification",
       "security_desc": "Provides enterprise-level security via SHA-256 hash checks in huma.lock, cycle detection, and unsafe native code warnings. It also ensures package provenance using github and license metadata.",
+      "pub_steps": [
+        "Upload your code to a GitHub repository (must have huma.json).",
+        "Determine a valid version number (x.y.z).",
+        "Create a GitHub Release and add a tag like v1.0.0."
+      ],
+      "commands": [
+        { "cmd": "huma paket init", "desc": "Initializes the current directory as a Hüma project." },
+        { "cmd": "huma paket new <name>", "desc": "Creates a new folder and project template." },
+        { "cmd": "huma paket install [name]", "desc": "Installs all dependencies or a specific package." },
+        { "cmd": "huma paket list", "desc": "Lists installed packages with locked versions." },
+        { "cmd": "huma paket remove <name>", "desc": "Removes a specific package and its files." },
+        { "cmd": "huma paket run <script>", "desc": "Executes an automation script defined in huma.json." }
+      ],
       "platform": {
         "title": "Official Sharing Platform",
-        "desc": "Browse hundreds of ready-to-use libraries and share your own solutions with the community."
+        "desc": "Browse hundreds of ready-to-use libraries and share your own solutions with the community.",
+        "cta": "Explore Libraries"
       }
     },
     "guides": {

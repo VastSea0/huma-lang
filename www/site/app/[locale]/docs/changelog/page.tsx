@@ -49,7 +49,7 @@ export default async function ChangelogPage({
             if (!v) return null;
 
             return (
-              <section key={vKey} className="relative md:pl-12">
+              <section key={vKey} className="relative md:pl-12" id={vKey}>
                 {/* Timeline Dot */}
                 <div className="absolute left-0 top-3 w-4 h-4 rounded-full border-2 border-primary bg-surface-container-lowest z-10 hidden md:block shadow-sm" />
                 
@@ -113,7 +113,7 @@ export default async function ChangelogPage({
              return (
                <li key={vKey}>
                  <a
-                   href="#" // Would normally scroll to ID
+                   href={`#${vKey}`}
                    className="text-on-surface-variant/60 hover:text-primary transition-all block"
                  >
                    {v.version.split(" ")[0]}

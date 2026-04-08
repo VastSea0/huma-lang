@@ -3,11 +3,18 @@ import CodeBlock from "@/components/CodeBlock";
 import type { Metadata } from "next";
 import { getDictionary } from "@/dictionaries/dictionaries";
 
-export const metadata: Metadata = {
-  title: "Syntax & Variables",
-  description:
-    "Learn Hüma variable declarations, conditionals, loops, and the Turkish suffix system.",
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const dict = await getDictionary(locale as "en" | "tr");
+  return {
+    title: dict.Docs.syntax.title,
+    description: dict.Docs.syntax.description,
+  };
+}
 
 const variablesCode = `// Değişken Tanımlama (Variable Declaration)
 isim = "Hüma" olsun // 'olsun' is an assignment operator

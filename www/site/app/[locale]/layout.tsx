@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "../globals.css";
+import { DocsProvider } from "@/context/DocsContext";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -63,7 +64,9 @@ export default async function RootLayout({
         `}</style>
       </head>
       <body className="bg-surface text-on-surface font-body antialiased">
-        {children}
+        <DocsProvider>
+          {children}
+        </DocsProvider>
       </body>
     </html>
   );

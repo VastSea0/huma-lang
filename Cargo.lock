@@ -2947,7 +2947,7 @@ checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
 
 [[package]]
 name = "huma"
-version = "0.5.0"
+version = "0.5.2"
 dependencies = [
  "bincode",
  "huma-core",
@@ -2957,7 +2957,7 @@ dependencies = [
 
 [[package]]
 name = "huma-cli"
-version = "0.5.0"
+version = "0.5.2"
 dependencies = [
  "anyhow",
  "app",
@@ -2980,7 +2980,7 @@ dependencies = [
 
 [[package]]
 name = "huma-compiler"
-version = "0.5.0"
+version = "0.5.2"
 dependencies = [
  "bincode",
  "huma-core",
@@ -2991,7 +2991,7 @@ dependencies = [
 
 [[package]]
 name = "huma-core"
-version = "0.5.0"
+version = "0.5.2"
 dependencies = [
  "bincode",
  "eframe",

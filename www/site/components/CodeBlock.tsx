@@ -19,13 +19,22 @@ function tokenize(line: string): string {
     "yoksa",
     "olduğu sürece",
     "dene",
-    "hata var ise",
+    "hata",
+    "yükle",
     "döndür",
     "alsın",
-    "kendisi",
+    "bu",
+    "fonksiyon",
+    "sınıf",
   ];
-  const builtins = ["fonksiyon", "sınıf"];
-  const builtinFunctions = ["yazdır", "ekle", "çıkar"];
+  const builtinFunctions = [
+    "yazdır",
+    "ekle",
+    "çıkar",
+    "yükle",
+    "boyut",
+    "beklet",
+  ];
 
   let result = line;
 
@@ -58,38 +67,13 @@ function tokenize(line: string): string {
     '<span class="token-number">$1</span>'
   );
 
-  // Multi-word keywords first (order matters)
-  result = result.replace(
-    /\bolduğu sürece\b/g,
-    '<span class="token-keyword">olduğu sürece</span>'
-  );
-  result = result.replace(
-    /\bhata var ise\b/g,
-    '<span class="token-keyword">hata var ise</span>'
-  );
-
-  // Single keywords
-  const singleKeywords = [
-    "olsun",
-    "ise",
-    "yoksa",
-    "dene",
-    "döndür",
-    "alsın",
-    "kendisi",
-  ];
-  singleKeywords.forEach((kw) => {
+  // Keywords
+  keywords.forEach((kw) => {
+    // Escape for regex if needed, though these are all safe
+    const escapedKw = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     result = result.replace(
-      new RegExp(`\\b(${kw})\\b`, "g"),
+      new RegExp(`\\b(${escapedKw})\\b`, "g"),
       '<span class="token-keyword">$1</span>'
-    );
-  });
-
-  // Builtins (fonksiyon, sınıf)
-  builtins.forEach((kw) => {
-    result = result.replace(
-      new RegExp(`\\b(${kw})\\b`, "g"),
-      '<span class="token-builtin">$1</span>'
     );
   });
 
@@ -140,7 +124,15 @@ export default function CodeBlock({
         </div>
         <pre className="p-6 overflow-x-auto">
           <code className="font-mono text-sm leading-relaxed text-tertiary">
-            {code.trim()}
+            {code.trim().split("\n").map((line, i) => {
+              // Simple bash highlighter
+              const highlighted = line
+                .replace(/^(\$?\s*)(huma|çalıştır|derle|paket|paket)\b/g, '$1<span class="text-primary font-bold">$2</span>')
+                .replace(/(--?\w+)/g, '<span class="text-on-surface-variant/60">$1</span>');
+              return (
+                <div key={i} dangerouslySetInnerHTML={{ __html: highlighted }} />
+              );
+            })}
           </code>
         </pre>
       </div>

@@ -4,10 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import LanguageSwitcher from "./LanguageSwitcher";
+import { useDocs } from "@/context/DocsContext";
 
 export default function Navbar({ dict, locale }: { dict: any; locale: string }) {
   const pathname = usePathname();
   const [copied, setCopied] = useState(false);
+  const { toggleSidebar, isSidebarOpen } = useDocs();
 
   // Helper to get localized path
   const getPath = (path: string) => {
@@ -29,6 +31,18 @@ export default function Navbar({ dict, locale }: { dict: any; locale: string }) 
   return (
     <header className="fixed top-0 w-full z-50 bg-[#131313]/80 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
       <nav className="flex justify-between items-center h-16 px-8 max-w-[1440px] mx-auto">
+        {/* Mobile Menu Button */}
+        {isDocsPage && (
+          <button
+            onClick={toggleSidebar}
+            className="lg:hidden text-on-surface-variant p-2 mr-2"
+            aria-label="Toggle Sidebar"
+          >
+            <span className="material-symbols-outlined">
+              {isSidebarOpen ? "close" : "menu"}
+            </span>
+          </button>
+        )}
         {/* Logo + Nav Links */}
         <div className="flex items-center gap-8">
           <Link
@@ -88,7 +102,7 @@ export default function Navbar({ dict, locale }: { dict: any; locale: string }) 
               </span>
               <input
                 type="text"
-                placeholder="Search documentation..."
+                placeholder={dict.Nav.search_placeholder}
                 className="bg-surface-container-highest border border-outline-variant/10 rounded-sm pl-9 pr-4 py-1.5 text-xs w-56 focus:outline-none focus:ring-1 focus:ring-tertiary/40 transition-all placeholder:text-on-surface-variant/40 text-on-surface"
               />
             </div>
@@ -100,7 +114,7 @@ export default function Navbar({ dict, locale }: { dict: any; locale: string }) 
             onClick={handleCopy}
             className="bg-primary text-on-primary px-5 py-2 font-body text-sm font-semibold rounded-sm active:scale-95 transition-all hover:bg-primary-fixed ml-2"
           >
-            {copied ? "Copied!" : "Install"}
+            {copied ? dict.Nav.copied : dict.Nav.install}
           </button>
         </div>
       </nav>
