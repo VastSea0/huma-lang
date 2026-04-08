@@ -384,6 +384,37 @@
           "npm tarzı paket scriptleri desteği ('baslat'/'start' önceliğiyle).",
           "GUI modülleri için optimize edilmiş sözdizimi ve çizim döngüleri."
         ]
+      },
+      "v0_3_1": {
+        "version": "v0.3.1 (Modüler Yapı ve VS Code)",
+        "date": "24 Mart 2026",
+        "changes": [
+          "Çalışma Alanı (Workspace) Yapısı: Proje huma-core, huma-compiler ve huma-cli olarak modüler sandıklara ayrıldı.",
+          "VS Code Eklentisi: Hüma dili için resmi sözdizimi vurgulama ve dil desteği eklentisi başlatıldı.",
+          "Yenilenen Web Arayüzü: Vite ve React tabanlı modern dökümantasyon sitesi ve IDE.",
+          "Uluslararasılaştırma (i18n): Dökümantasyon ve site için çoklu dil desteği.",
+          "Birleşik CLI: --ide parametresi ile tüm araçların tek bir binary altında toplanması."
+        ]
+      },
+      "v0_2_0": {
+        "version": "v0.2.0 (Tauri ve NLP Devrimi)",
+        "date": "20 Mart 2026",
+        "changes": [
+          "Tauri IDE: Yerleşik dosya erişimi ve kaydetme özelliklerine sahip taşınabilir masaüstü IDE.",
+          "NLP Kütüphanesi: Metin işleme, analiz ve doğal dil işleme araçları (nlp.hb).",
+          "Sözdizimi İyileştirmeleri: Değişken atama, kontrol akışı ve fonksiyon tanımlamalarında daha esnek yapı."
+        ]
+      },
+      "v0_1_0": {
+        "version": "v0.1.0 (Rust Çekirdek ve VM)",
+        "date": "16 Mart 2026",
+        "changes": [
+          "Yeni Rust Temelli Mimari: Dil tamamen Rust ile yeniden yazıldı.",
+          "Bytecode Sanal Makine (VM): Yüksek performanslı bytecode yürütme motoru.",
+          "İkili Dosya Oluşturma: Hüma kodlarını bağımsız çalıştırılabilir dosyalara derleyebilme özelliği.",
+          "REPL: Etkileşimli kod deneme ortamı.",
+          "Modül Sistemi: 'yükle' komutu ile kütüphane desteği."
+        ]
       }
     },
     "getting_started": {

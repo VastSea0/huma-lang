@@ -384,6 +384,37 @@
           "npm-style package scripts support with 'baslat'/'start' preference.",
           "Optimized syntax and drawing loops for GUI modules."
         ]
+      },
+      "v0_3_1": {
+        "version": "v0.3.1 (Workspace & VS Code)",
+        "date": "March 24, 2026",
+        "changes": [
+          "Workspace Architecture: Project split into modular crates: huma-core, huma-compiler, and huma-cli.",
+          "VS Code Extension: Official syntax highlighting and language support extension for VS Code.",
+          "Modern Web Interface: Documentation site and IDE rebuilt with Vite and React.",
+          "Internationalization (i18n): Multi-language support for documentation and the website.",
+          "Unified CLI: consolidation of all tools under a single binary with --ide support."
+        ]
+      },
+      "v0_2_0": {
+        "version": "v0.2.0 (Tauri & NLP Revolution)",
+        "date": "March 20, 2026",
+        "changes": [
+          "Tauri IDE: Portable desktop IDE with built-in file access and saving capabilities.",
+          "NLP Library: Text processing, analysis, and natural language tools (nlp.hb).",
+          "Syntax Improvements: More flexible structures for variable assignment, control flow, and function definitions."
+        ]
+      },
+      "v0_1_0": {
+        "version": "v0.1.0 (Rust Core & VM)",
+        "date": "March 16, 2026",
+        "changes": [
+          "New Rust-Based Architecture: Complete rewrite to Rust.",
+          "Bytecode Virtual Machine (VM): High-performance execution engine.",
+          "Standalone Binary Compilation: Ability to compile scripts into native executables.",
+          "REPL: Interactive shell environment.",
+          "Module System: Library support via 'yükle' (load) command."
+        ]
       }
     },
     "getting_started": {

@@ -12,9 +12,16 @@ Tüm önemli değişiklikler bu dosyada takip edilecektir.## [v0.5.2] - 2026-04-
 - **Kod Kalitesi**: huma-core üzerindeki derleyici uyarıları temizlendi ve performans iyileştirmeleri yapıldı.
 - **SHA-256 Bütünlük Doğrulaması**: huma.lock dosyasında paket hash kontrolü eklendi.
 
+## [v0.5.1] - 2026-04-03
 
+### Doğal Mimari ve SQLite
+- **Native Paket Mimarisi**: Hüma projelerine doğrudan Rust Crates (Cargo) dahil etme desteği.
+- **Resmi SQLite Desteği**: rusqlite tabanlı, yüksek performanslı yerel veritabanı modülü (huma_sqlite).
+- **Tam Bağımsız Derleme**: 'huma gen' komutu artık tüm yerel bağımlılıkları içeren tam Cargo projeleri üretiyor.
+- **Veritabanı Nesne Eşleme**: SQL sorgu sonuçlarını otomatik olarak Hüma nesnelerine dönüştürme desteği.
+- **Hüma CLI İyileştirmeleri**: Bağımsız proje üretimi sonrası otomatik Cargo rehberliği.
 
-## [0.50] - 2026-04-02
+## [v0.5.0] - 2026-04-02
 
 ### Eklendi
 - **Modern Ağ Desteği**: `ag_istekleri` kütüphanesi ile Rust tabanlı `ureq` motoru kullanılarak HTTP istekleri yapabilme.
@@ -66,7 +73,27 @@ Tüm önemli değişiklikler bu dosyada takip edilecektir.## [v0.5.2] - 2026-04-
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [v0.5.2] - 2026-04-08
+
+### Security, Stability and Package Management
+- **Package Manager Subdirectory Support**: Ability to install packages from subfolders within GitHub repositories (Mono-repo support).
+- **Internal Registry Fixed**: Download paths and repository names for embedded modules were updated to ensure accessibility.
+- **Security Hardening**: Path traversal, atomic-write, and built-in Rust code security warnings added.
+- **Website Build Errors Resolved**: Proxy and dictionary (i18n) incompatibilities during the Next.js 16.2.1 migration were fixed.
+- **Library Standardization**: Standard library files updated to v1.1.0 with a new header format.
+- **Code Quality**: Compiler warnings on huma-core were cleaned, and performance improvements were made.
+- **SHA-256 Integrity Verification**: Package hash control added to huma.lock.
+
+## [v0.5.1] - 2026-04-03
+
+### Native Architecture and SQLite
+- **Native Package Architecture**: Direct integration of Rust Crates (Cargo) into Hüma projects.
+- **Official SQLite Support**: High-performance local database module based on rusqlite (huma_sqlite).
+- **Full Standalone Compilation**: 'huma gen' now produces full Cargo projects containing all native dependencies.
+- **Database Object Mapping**: Automatic conversion of SQL query results to Hüma objects.
+- **Hüma CLI Improvements**: Automatic Cargo guidance after standalone project generation.
+
+## [v0.5.0] - 2026-04-02
 
 ### Added
 - **Modern Networking**: HTTP request capabilities using the Rust-based `ureq` engine via the `ag_istekleri` library.
