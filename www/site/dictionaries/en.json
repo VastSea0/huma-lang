@@ -20,6 +20,29 @@
     "success_message": "Success!",
     "terminal_output": "Terminal Output"
   },
+  "IDE_Page": {
+    "badge": "AVAILABLE FOR DESKTOP",
+    "headline": "Code with Precision,",
+    "subheadline": "Hüma IDE.",
+    "description": "Hüma IDE is a high-performance, lightweight development environment designed specifically for the Hüma language. It features a custom terminal, Monaco editor integration, and native performance through Tauri.",
+    "cta_download": "Download for Desktop",
+    "cta_docs": "IDE Documentation",
+    "features_headline": "Crafted for Professional Developers",
+    "features": {
+      "monaco": {
+        "title": "Monaco Editor",
+        "desc": "The same high-performance editor that powers VS Code. Syntax highlighting, auto-completion, and native suffix support."
+      },
+      "terminal": {
+        "title": "Integrated Terminal",
+        "desc": "Run and compile your Hüma programs without leaving the editor. Instant feedback on standard output and error."
+      },
+      "tauri": {
+        "title": "Zero-Latency Core",
+        "desc": "Built with Tauri and Rust for a lightweight footprint and maximum speed. No Electron bloat, just performance."
+      }
+    }
+  },
   "Features": {
     "headline": "Advanced Features",
     "natural_syntax": {
@@ -133,6 +156,14 @@
           "nesne": "Object (Map/Hash)",
           "bos": "Null (Nil/Empty)"
         }
+      },
+      "conditionals": {
+        "title": "Conditionals (ise / yoksa)",
+        "desc": "Control the flow of your application with natural language logic. Hüma uses 'ise' (if) and 'yoksa' (else) keywords."
+      },
+      "loops": {
+        "title": "Loops (olduğu sürece)",
+        "desc": "Repeat blocks of code as long as a condition is met using the 'olduğu sürece' keyword."
       }
     },
     "functions_classes": {
@@ -162,7 +193,7 @@
         "title": "Working with Lists",
         "desc": "Hüma lists are dynamic and come with various helper functions. Manage your data easily with functions like 'ekle', 'çıkar', and 'boyut'."
       },
-      "error_handling": {
+      "errors": {
         "title": "Error Handling",
         "desc": "Provides a safe exit strategy for bottlenecks in your programs. You can exit a process in a controlled way or inform upper layers with the 'hata' keyword."
       }
@@ -394,6 +425,41 @@
         "title": "COMMUNITY & SUPPORT",
         "discord": "Developer Community",
         "issue": "Report Bug/Feature"
+      }
+    }
+  },
+  "Community": {
+    "headline": "Join the",
+    "subheadline": "Community",
+    "description": "Be a part of Hüma. Shape the roadmap, report bugs, and contribute code. Together, we can build better native performance development tools.",
+    "badge": "COMMUNITY",
+    "get_involved": "How to Get Involved?",
+    "contributing": "Contributing Guide",
+    "contributing_desc": "Contributing to the Hüma compiler is straightforward. You can clone the project, build it locally, and start working on your own additions immediately.",
+    "star_headline": "Like the Project?",
+    "star_desc": "Support us by starring the repository on GitHub or forking it to build your own version.",
+    "star_button": "Star on GitHub",
+    "fork_button": "Fork Repo",
+    "channels": {
+      "repo": {
+        "title": "Main Repository",
+        "description": "Explore the open-source codebase of Hüma and see our ongoing development.",
+        "label": "View on GitHub"
+      },
+      "bugs": {
+        "title": "Report Bugs",
+        "description": "Found a bug? Report it so we can improve the stability of Hüma.",
+        "label": "Open Issue"
+      },
+      "features": {
+        "title": "Feature Requests",
+        "description": "Discuss the features and language syntax additions you'd love to see in Hüma.",
+        "label": "Join Discussions"
+      },
+      "changelog": {
+        "title": "Changelog",
+        "description": "Follow updates, optimizations, and security patches released in every version.",
+        "label": "Read Updates"
       }
     }
   },

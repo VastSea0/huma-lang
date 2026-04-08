@@ -20,6 +20,29 @@
     "success_message": "Başarılı!",
     "terminal_output": "Terminal Çıktısı"
   },
+  "IDE_Page": {
+    "badge": "MASAÜSTÜ İÇİN HAZIR",
+    "headline": "Hassasiyetle Kodlayın,",
+    "subheadline": "Hüma IDE.",
+    "description": "Hüma IDE, Hüma dili için özel olarak tasarlanmış, yüksek performanslı ve hafif bir geliştirme ortamıdır. Özel terminal, Monaco editör entegrasyonu ve Tauri ile yerel performans sunar.",
+    "cta_download": "Masaüstü İçin İndir",
+    "cta_docs": "IDE Dokümantasyonu",
+    "features_headline": "Profesyonel Geliştiriciler İçin Tasarlandı",
+    "features": {
+      "monaco": {
+        "title": "Monaco Editör",
+        "desc": "VS Code'u güçlendiren aynı yüksek performanslı editör. Sözdizimi vurgulama, otomatik tamamlama ve yerel ek desteği."
+      },
+      "terminal": {
+        "title": "Entegre Terminal",
+        "desc": "Editörden ayrılmadan Hüma programlarınızı çalıştırın ve derleyin. Standart çıktı ve hatalar üzerinde anında geri bildirim."
+      },
+      "tauri": {
+        "title": "Sıfır Gecikmeli Çekirdek",
+        "desc": "Hafiflik ve maksimum hız için Tauri ve Rust ile inşa edildi. Electron hantallığı yok, sadece performans."
+      }
+    }
+  },
   "Features": {
     "headline": "Gelişmiş Özellikler",
     "natural_syntax": {
@@ -133,6 +156,14 @@
           "nesne": "Nesne (Map/Hash)",
           "bos": "Boş (Nil/Null)"
         }
+      },
+      "conditionals": {
+        "title": "Koşul Blokları (ise / yoksa)",
+        "desc": "Uygulamanızın akışını doğal dil mantığıyla kontrol edin. Hüma, 'ise' ve 'yoksa' anahtar kelimelerini kullanır."
+      },
+      "loops": {
+        "title": "Döngüler (olduğu sürece)",
+        "desc": "Bir koşul sağlandığı sürece kod bloklarını 'olduğu sürece' anahtar kelimesi ile tekrarlayın."
       }
     },
     "functions_classes": {
@@ -162,7 +193,7 @@
         "title": "Listelerle Çalışmak",
         "desc": "Hüma listeleri dinamiktir ve çok çeşitli yardımcı fonksiyonlarla birlikte gelir. 'ekle', 'çıkar' ve 'boyut' gibi fonksiyonlarla verilerinizi kolayca yönetin."
       },
-      "error_handling": {
+      "errors": {
         "title": "Hata Yönetimi",
         "desc": "Programlarınızın darboğazlarında güvenli bir çıkış yolu sunar. 'hata' anahtar kelimesi ile kontrollü bir şekilde süreçten çıkabilir veya üst katmanlara bilgi verebilirsiniz."
       }
@@ -394,6 +425,41 @@
         "title": "TOPLULUK VE DESTEK",
         "discord": "Geliştirici Topluluğu",
         "issue": "Hata/Özellik Bildir"
+      }
+    }
+  },
+  "Community": {
+    "headline": "Topluluğa",
+    "subheadline": "Katılın",
+    "description": "Hüma'nın bir parçası olun. Gelişmelere yön verin, hataları bildirin ve kod katkısında bulunun. Birlikte daha iyi yerel yazılım araçları inşa edebiliriz.",
+    "badge": "TOPLULUK",
+    "get_involved": "Nasıl Katkı Sağlarsınız?",
+    "contributing": "Katkı Kılavuzu",
+    "contributing_desc": "Hüma derleyicisine katkıda bulunmak çok basittir. Projeyi bilgisayarınıza klonlayıp kendi eklentilerinizi geliştirerek hemen başlayabilirsiniz.",
+    "star_headline": "Projeyi Beğendiniz mi?",
+    "star_desc": "Bize destek olmak için GitHub'da projeye yıldız verebilir veya kendi sürümünüzü oluşturabilirsiniz.",
+    "star_button": "Yıldız Ver",
+    "fork_button": "Klonla (Fork)",
+    "channels": {
+      "repo": {
+        "title": "Ana Depo",
+        "description": "Hüma'nın açık kaynaklı kaynak kodları ve geliştirme sürecini inceleyin.",
+        "label": "GitHub'a Git"
+      },
+      "bugs": {
+        "title": "Hata Bildirimi",
+        "description": "Karşılaştığınız bug'ları bildirin. Hüma'nın kararlığını artırmaya yardım edin.",
+        "label": "Hata Aç"
+      },
+      "features": {
+        "title": "Yeni Özellik",
+        "description": "Hüma'da görmek istediğiniz özellikleri ve dil eklemelerini tartışın.",
+        "label": "Tartışmalara Katıl"
+      },
+      "changelog": {
+        "title": "Sürüm Notları",
+        "description": "Her sürümde yapılan güncellemeleri, iyileştirmeleri ve güvenlik yamalarını takip edin.",
+        "label": "Güncellemeleri Oku"
       }
     }
   },
