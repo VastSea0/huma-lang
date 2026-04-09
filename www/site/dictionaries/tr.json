@@ -86,14 +86,17 @@
     "core": "Temeller",
     "language": "Dil Rehberi",
     "ecosystem": "Ekosistem",
-    "guides": "Kılavuzlar",
+    "core_libraries": "Temel Kütüphaneler",
+    "tooling": "Araçlar",
+    "community": "Topluluk",
     "items": {
       "getting_started": "Hızlı Başlangıç",
       "introduction": "Giriş ve Felsefe",
       "syntax": "Temel Sözdizimi",
+      "grammar": "Dilbilgisi ve Ekler",
       "cli": "CLI Referansı",
       "functions": "Fonksiyonlar ve Sınıflar",
-      "lists": "Listeler ve Hatalar",
+      "lists": "Veri Yapıları ve Hatalar",
       "stdlib": "Standart Kütüphane",
       "compiler": "Derleyici İç Yapısı",
       "ide": "Hüma IDE",
@@ -170,6 +173,48 @@
         "desc": "Bir koşul sağlandığı sürece kod bloklarını 'olduğu sürece' anahtar kelimesi ile tekrarlayın."
       }
     },
+    "grammar": {
+      "title": "Dilbilgisi ve Ekler",
+      "description": "Hüma'nın Türkçe doğal dil yapısı ve çalışma zamanı etkileşimi.",
+      "hero_title": "Ek Sistemi (Suffix System)",
+      "hero_desc": "Hüma, Türkçe'nin eklemeli yapısını derleyici seviyesinde optimize eder. Kesme işaretiyle (') eklenen dilbilgisi kuralları hem okunabilirliği artırır hem de performans kaybına yol açmaz.",
+      "mechanics": {
+        "title": "Sistem Nasıl Çalışıyor?",
+        "desc": "Derleyici (lexer), kaynak kodunuzu tararken kesme işaretiyle (') ayrılmış özel ekleri tespit eder ve bunları sanal makineye (VM) iletmeden önce otomatik olarak soyutlar (stripping). Bu sayede 'isim'i döndür' ile 'isim döndür' komutları bytecode seviyesinde birebir aynıdır, sıfır çalışma zamanı gecikmesi yaşanır."
+      },
+      "suffixes": {
+        "title": "Desteklenen Türkçe Ekler",
+        "desc": "Hüma aşağıdaki ismin halleri için geniş destek sunar. Kodunuzun doğal akışını bozmamak için istediğiniz eki kullanabilirsiniz.",
+        "accusative": {
+          "name": "Belirtme Durumu (-i hali)",
+          "suffixes": "'i, 'ı, 'u, 'ü, 'yi, 'yı, 'yu, 'yü",
+          "usage": "Değer atamalarında, yazdırma fonksiyonlarında ve doğrudan bir nesneyi hedef aldığınızda kullanılır.",
+          "example": "hata'yı yazdır, mesaj'ı döndür"
+        },
+        "dative": {
+          "name": "Yönelme Durumu (-e hali)",
+          "suffixes": "'e, 'a, 'ye, 'ya",
+          "usage": "Listelere veya sözlüklere yeni eleman eklerken hedef göstermek için idealdir.",
+          "example": "liste'ye ekle, sozluk'e atama_yap"
+        },
+        "ablative": {
+          "name": "Ayrılma Durumu (-den hali)",
+          "suffixes": "'den, 'dan, 'ten, 'tan",
+          "usage": "Koleksiyonlardan veri çıkarırken veya nesne özelliklerini okurken kullanılır.",
+          "example": "liste'den çıkar, hafıza'dan oku"
+        },
+        "genitive": {
+          "name": "İlgi Durumu (-nin hali)",
+          "suffixes": "'nin, 'nın, 'nun, 'nün, 'ın, 'in, 'un, 'ün",
+          "usage": "Nesneeye ait özelliklere (.) kullanmadan erişmek için kullanılır. Listelerin uzunluğunu sorgularken okunabilirliği dramatik oranda artırır.",
+          "example": "dizi'nin uzunluğu, ayar'ın değeri"
+        }
+      },
+      "best_practices": {
+        "title": "Doğru Kullanım (Best Practices)",
+        "desc": "Hüma sadece ekleri desteklemekle kalmaz, kod standartlarınızı Türkçe'nin gramer kurallarına uygun yazmanızı tavsiye eder. Değişken ve özellik adlarıyla ekleri mantıklı bir şekilde eşleştirin."
+      }
+    },
     "cli": {
       "title": "CLI Referansı",
       "description": "Tüm Hüma komut satırı araçları için kapsamlı rehber.",
@@ -203,34 +248,34 @@
     },
     "functions_classes": {
       "title": "Fonksiyonlar ve Sınıflar",
-      "description": "Modern nesne yönelimli programlama ve fonksiyonel yapılar.",
-      "hero_title": "Mantık ve Yapılandırma",
+      "description": "Hüma'nın nesne yönelimli programlama ve fonksiyonel yapısı.",
+      "hero_title": "Fonksiyonlar ve Sınıflar",
       "hero_desc": "Hüma, hem fonksiyonel hem de nesne yönelimli programlama paradigmasını destekler. Bu bölümde kodunuzu nasıl modüler hale getireceğinizi ve karmaşık veri yapılarını nasıl inşa edeceğinizi öğreneceksiniz.",
       "functions": {
         "title": "Fonksiyonlar",
-        "desc": "Fonksiyonlar, Hüma'nın temel yapı taşlarıdır. 'alsın' ve 'döndür' yapıları ile veri akışını kolayca yönetebilirsiniz."
+        "desc": "Fonksiyonlar Hüma'nın temel yapı taşlarıdır. 'alsın' ve 'döndür' yapıları ile veri akışını kolayca yönetebilirsiniz."
       },
       "classes": {
-        "title": "Sınıflar (Nesne Yönelimli)",
-        "desc": "Hüma'da sınıflar, veriyi ve davranışı bir arada tutan güçlü yapılardır. 'bu' (self) anahtar kelimesi ile nesne özelliklerine erişebilirsiniz."
+        "title": "Sınıflar (OOP)",
+        "desc": "Hüma'daki sınıflar, veri ve davranışı bir arada tutan güçlü yapılardır. 'bu' anahtar kelimesi ile nesne özelliklerine erişebilirsiniz."
       },
       "methods": {
-        "title": "Metot ve 'bu' Çağrısı",
+        "title": "Metotlar ve 'bu' Çağrısı",
         "desc": "Bir nesneye ait metodun içinde, nesnenin kendisine 'bu' anahtar kelimesi ile erişilir. Bu, nesne yönelimli programlamanın temelidir."
       }
     },
     "lists_errors": {
-      "title": "Listeler ve Hatalar",
-      "description": "Gelişmiş veri yapıları ve güvenli hata yönetimi teknikleri.",
+      "title": "Veri Yapıları ve Hatalar",
+      "description": "Gelişmiş veri yapıları (Sözlükler, Listeler) ve güvenli hata yönetimi teknikleri.",
       "hero_title": "Veri ve Güvenlik",
-      "hero_desc": "Uygulamalarınızın veri akışını yönetmek ve beklenmedik durumlarla başa çıkmak için Hüma gelişmiş araçlar sunar. Listelerle veri kümelerini işleyebilir, 'hata' yapısı ile programınızın çökmesini engelleyebilirsiniz.",
+      "hero_desc": "Uygulamalarınızın veri akışını yönetmek ve beklenmedik durumlarla başa çıkmak için Hüma gelişmiş araçlar sunar. Listeler ve Sözlüklerle veri kümelerini işleyebilir, 'dene...yakala' yapısı ile programınızın çökmesini engelleyebilirsiniz.",
       "lists": {
-        "title": "Listelerle Çalışmak",
-        "desc": "Hüma listeleri dinamiktir ve çok çeşitli yardımcı fonksiyonlarla birlikte gelir. 'ekle', 'çıkar' ve 'boyut' gibi fonksiyonlarla verilerinizi kolayca yönetin."
+        "title": "Listeler ve Sözlükler",
+        "desc": "Hüma listeleri dinamiktir. Sözlükler (Maps) ise anahtar-değer çiftlerini saklamak için optimize edilmiştir."
       },
       "errors": {
-        "title": "Hata Yönetimi",
-        "desc": "Programlarınızın darboğazlarında güvenli bir çıkış yolu sunar. 'hata' anahtar kelimesi ile kontrollü bir şekilde süreçten çıkabilir veya üst katmanlara bilgi verebilirsiniz."
+        "title": "Yapısal Hata Yönetimi",
+        "desc": "Programlarınızın darboğazlarında güvenli bir çıkış yolu sunar. 'dene...yakala' yapısı ile hataları yakalayabilir ve hataya ait mesajı bir değişkene atayabilirsiniz."
       }
     },
     "stdlib": {
@@ -378,6 +423,18 @@
       "description": "Hüma dili ve araç zinciri resmi güncelleme geçmişi.",
       "hero_title": "Neler Değişti?",
       "hero_desc": "Hüma sürekli gelişiyor. Her sürümde dile eklenen yeni özellikleri, performans iyileştirmelerini ve topluluktan gelen hata düzeltmelerini buradan takip edebilirsiniz.",
+      "v0_6_0_alfa_1": {
+        "version": "v0.6.0-alfa.1 (Bakış Açısı: Faz 1)",
+        "date": "9 Nisan 2026",
+        "changes": [
+          "Yapısal Hata Yönetimi: 'dene...yakala' blokları ile hata yakalama ve yönetme desteği.",
+          "Yerleşik Sözlük (Sözlük) Tipi: {} sözdizimi ile yüksek performanslı anahtar-değer haritaları.",
+          "Sözlük Metotları: .getir() ve .ayarla() metotları ile programatik erişim.",
+          "Sözlük Ek Sistemi: 'sozluk'ten anahtar'ı getir' şeklinde doğal dil erişim desteği.",
+          "VM Opcode Genişlemesi: TryBlockStart, TryBlockEnd ve MakeMap komutları bytecode seviyesine eklendi.",
+          "Gelişmiş JSON Sertleştirmesi: Sözlüklerin JSON serileştirme ve geri serileştirme desteği standardize edildi."
+        ]
+      },
       "v0_5_2": {
         "version": "v0.5.2 (Güvenlik ve Standardizasyon)",
         "date": "8 Nisan 2026",

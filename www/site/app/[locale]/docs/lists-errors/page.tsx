@@ -4,9 +4,9 @@ import type { Metadata } from "next";
 import { getDictionary } from "@/dictionaries/dictionaries";
 
 export const metadata: Metadata = {
-  title: "Lists & Error Handling",
+  title: "Data Structures & Error Handling",
   description:
-    "Working with lists and handling runtime errors in Hüma using dene/hata var ise.",
+    "Working with lists, dictionaries and handling runtime errors in Hüma using dene/yakala.",
 };
 
 const listsCode = `// Liste Oluşturma
@@ -22,12 +22,28 @@ sayılar'dan [0]'ı çıkar;
 // Listeyi yazdır
 sayılar'ı yazdır;`;
 
-const errorCode = `// Hata Yönetimi (dene / hata var ise)
+const errorCode = `// Hata Yönetimi (dene / yakala)
 dene {
-    sonuç = 10 / 0
-} hata var ise {
-    "Sıfıra bölünme hatası!"'nı yazdır;
+    sonuç = 10 / 0 olsun
+} yakala hata_mesajı {
+    "Hata yakalandı: " + hata_mesajı'nı yazdır;
 }`;
+
+const mapCode = `// Sözlük (Dictionary) Oluşturma
+ayarlar = {
+    "tema": "koyu",
+    "dil": "tr",
+    "sürüm": 1.0
+} olsun
+
+// Değere erişim (Ek sistemi ile)
+yazdır ayarlar'ın tema;
+
+// Değere erişim (Metot ile)
+yazdır ayarlar.getir("dil");
+
+// Değer güncelleme
+ayarlar.ayarla("sürüm", 2.0);`;
 
 const combinedCode = `// Listeler ve Hata Yönetimi Birlikte
 sayılar = [10, 20, 30] olsun
@@ -35,8 +51,8 @@ sayılar = [10, 20, 30] olsun
 dene {
     // İndeks sınır dışı olabilir
     sayılar'dan [10]'u çıkar;
-} hata var ise {
-    "İndeks sınır dışında!"'nı yazdır;
+} yakala hata {
+    "İşlem başarısız: " + hata'yı yazdır;
 }
 
 sayılar'a [99]'u ekle;
@@ -86,13 +102,21 @@ export default async function ListsErrorsPage({
           </p>
           <CodeBlock code={listsCode} filename="listeler.hb" />
 
+          <h3 className="text-lg font-bold text-on-surface mb-4 mt-8">Sözlükler (Dictionaries)</h3>
+          <p className="mb-6 text-on-surface-variant leading-relaxed text-sm">
+            {locale === "tr" 
+              ? "Sözlükler, anahtar-değer çiftlerini saklamak için kullanılır. Süslü parantez içine 'anahtar': değer formatında yazılırlar."
+              : "Dictionaries are used to store key-value pairs. They are written in 'key': value format inside curly braces."}
+          </p>
+          <CodeBlock code={mapCode} filename="sozlukler.hb" />
+
           {/* Operation table */}
           <div className="overflow-x-auto mt-8 bg-surface-container-low rounded-lg border border-outline-variant/10 p-6">
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b border-outline-variant/20">
                   <th className="text-left py-3 pr-8 text-on-surface-variant/60 font-bold text-[10px] uppercase tracking-widest">
-                    Operation
+                    {locale === "tr" ? "Veri Yapısı" : "Data Structure"}
                   </th>
                   <th className="text-left py-3 pr-8 text-on-surface-variant/60 font-bold text-[10px] uppercase tracking-widest">
                     Syntax
@@ -104,9 +128,10 @@ export default async function ListsErrorsPage({
               </thead>
               <tbody className="font-mono text-xs divide-y divide-outline-variant/10">
                 {[
-                  [locale === "tr" ? "Oluştur" : "Create", "L = [1, 2, 3] olsun", locale === "tr" ? "Yeni liste oluşturur" : "New list literal"],
-                  [locale === "tr" ? "Ekle" : "Append", "L'ye [X]'i ekle;", locale === "tr" ? "Sona eleman ekler" : "Append value"],
-                  [locale === "tr" ? "Çıkar" : "Remove", "L'den [i]'yi çıkar;", locale === "tr" ? "İndise göre siler" : "Remove by index"],
+                  ["Liste", "L = [1, 2] olsun", locale === "tr" ? "İndeks tabanlı sıralı dizi" : "Index-based ordered array"],
+                  ["Sözlük", "S = { 'a': 1 } olsun", locale === "tr" ? "Anahtar-değer tabanlı harita" : "Key-value based map"],
+                  ["Erişim (Sözlük)", "S'nin anahtar", locale === "tr" ? "Ek sistemi ile değer okuma" : "Read value via suffix"],
+                  ["Metot (Sözlük)", "S.getir('a')", locale === "tr" ? "Fonksiyon ile değer okuma" : "Read value via method"],
                 ].map(([op, syntax, desc]) => (
                   <tr key={op}>
                     <td className="py-4 pr-8 text-tertiary font-bold">{op}</td>

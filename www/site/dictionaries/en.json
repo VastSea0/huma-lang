@@ -86,14 +86,17 @@
     "core": "The Basics",
     "language": "Language Guide",
     "ecosystem": "Ecosystem",
-    "guides": "Guides",
+    "core_libraries": "Core Libraries",
+    "tooling": "Tooling",
+    "community": "Community",
     "items": {
       "getting_started": "Getting Started",
       "introduction": "Intro & Philosophy",
       "syntax": "Basic Syntax",
+      "grammar": "Grammar & Suffixes",
       "cli": "CLI Reference",
       "functions": "Functions & Classes",
-      "lists": "Lists & Errors",
+      "lists": "Data Structures & Errors",
       "stdlib": "Standard Library",
       "compiler": "Compiler Internals",
       "ide": "Hüma IDE",
@@ -170,6 +173,48 @@
         "desc": "Repeat blocks of code as long as a condition is met using the 'olduğu sürece' keyword."
       }
     },
+    "grammar": {
+      "title": "Grammar & Suffix System",
+      "description": "Understanding Hüma's Turkish natural language structure and its runtime interaction.",
+      "hero_title": "The Suffix System",
+      "hero_desc": "Hüma optimizes the agglutinative structure of Turkish at the compiler level. Grammatical suffixes added via an apostrophe (') improve readability without introducing any performance overhead.",
+      "mechanics": {
+        "title": "How it Works?",
+        "desc": "Traditional languages use separate keywords for every operation. Hüma allows you to add suffixes directly to variable names. These suffixes are extracted by the Lexer during compilation, ensuring your code remains as fast as pure Rust while reading like a book."
+      },
+      "suffixes": {
+        "title": "Standard Suffixes",
+        "desc": "Hüma supports the most common Turkish noun state suffixes. Using these instead of stand-alone keywords is the recommended 'idiomatic' way to write Hüma.",
+        "accusative": {
+          "name": "Accusative (-i, -ı)",
+          "suffixes": "'i, 'ı, 'u, 'ü",
+          "usage": "Used for printing or sending objects to functions.",
+          "example": "\"Hello\"'ı yazdır;"
+        },
+        "dative": {
+          "name": "Dative (-e, -a)",
+          "suffixes": "'e, 'a, 'ye, 'ya",
+          "usage": "Used for adding items to collections or navigating.",
+          "example": "liste'ye [10]'u ekle;"
+        },
+        "ablative": {
+          "name": "Ablative (-den, -dan)",
+          "suffixes": "'den, 'dan, 'ten, 'tan",
+          "usage": "Used for removing items or defining ranges.",
+          "example": "liste'den son_el'i çıkar;"
+        },
+        "genitive": {
+          "name": "Genitive (-nin, -ın)",
+          "suffixes": "'nin, 'ın, 'un, 'ün",
+          "usage": "Used for accessing object properties or methods.",
+          "example": "ayarlar'ın tema"
+        }
+      },
+      "best_practices": {
+        "title": "Best Practices",
+        "desc": "Suffixes are purely cosmetic at the VM level but essential for human readability. Using suffixes like 'ın or 'in for object access is preferred over dot notation."
+      }
+    },
     "cli": {
       "title": "CLI Reference",
       "description": "Complete guide for all Hüma command-line interface tools.",
@@ -220,17 +265,17 @@
       }
     },
     "lists_errors": {
-      "title": "Lists & Errors",
-      "description": "Advanced data structures and safe error handling techniques.",
+      "title": "Data Structures & Errors",
+      "description": "Advanced data structures (Dictionaries, Lists) and safe error handling techniques.",
       "hero_title": "Data & Safety",
-      "hero_desc": "Hüma offers advanced tools for managing your application's data flow and handling unexpected situations. Handle data sets with lists and prevent crashes with the 'hata' structure.",
+      "hero_desc": "Hüma offers advanced tools for managing your application's data flow and handling unexpected situations. Handle data sets with Lists and Dictionaries, and prevent crashes with the 'dene...yakala' structure.",
       "lists": {
-        "title": "Working with Lists",
-        "desc": "Hüma lists are dynamic and come with various helper functions. Manage your data easily with functions like 'ekle', 'çıkar', and 'boyut'."
+        "title": "Lists & Dictionaries",
+        "desc": "Hüma lists are dynamic. Dictionaries (Maps) are optimized for storing key-value pairs."
       },
       "errors": {
-        "title": "Error Handling",
-        "desc": "Provides a safe exit strategy for bottlenecks in your programs. You can exit a process in a controlled way or inform upper layers with the 'hata' keyword."
+        "title": "Structural Error Handling",
+        "desc": "Provides a safe exit strategy for bottlenecks in your programs. Use'dene...yakala' (try...catch) to catch errors and assign the message to a variable."
       }
     },
     "stdlib": {
@@ -380,6 +425,18 @@
       "description": "Official update history of the Hüma language and toolchain.",
       "hero_title": "What's New?",
       "hero_desc": "Hüma is constantly evolving. In every version, you can track new language features, performance improvements, and community-driven bug fixes here.",
+      "v0_6_0_alfa_1": {
+        "version": "v0.6.0-alfa.1 (Phase 1: Robustness)",
+        "date": "April 9, 2026",
+        "changes": [
+          "Structural Error Handling: Support for catching and managing errors with 'dene...yakala' blocks.",
+          "Native Dictionary (Sözlük) Type: High-performance key-value maps with {} syntax.",
+          "Dictionary Methods: Programmatic access with .getir() and .ayarla() methods.",
+          "Dictionary Suffix System: Natural language access like 'sozluk'ten key'i getir'.",
+          "VM Opcode Expansion: Added TryBlockStart, TryBlockEnd, and MakeMap to bytecode level.",
+          "Enhanced JSON Hardening: Standardized JSON serialization support for Dictionaries."
+        ]
+      },
       "v0_5_2": {
         "version": "v0.5.2 (Security & Standardization)",
         "date": "April 8, 2026",

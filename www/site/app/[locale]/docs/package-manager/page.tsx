@@ -35,7 +35,7 @@ export default async function PackageManagerPage({
             {dict.Nav.docs}
           </Link>
           <span>/</span>
-          <span className="text-on-surface-variant">{dict.Sidebar.ecosystem}</span>
+          <span className="text-on-surface-variant">{dict.Sidebar.tooling}</span>
           <span>/</span>
           <span className="text-primary">{p.title}</span>
         </nav>
@@ -49,10 +49,7 @@ export default async function PackageManagerPage({
 
         {/* Command Reference */}
         <section className="mb-24" id="commands">
-          <h2 className="text-2xl font-bold text-on-surface mb-8 flex items-center gap-3">
-             <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
-              01
-            </span>
+          <h2 className="text-2xl font-bold text-on-surface mb-8">
             {locale === "tr" ? "Komut Başvurusu" : "Command Reference"}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -73,10 +70,7 @@ export default async function PackageManagerPage({
 
         {/* Manifest (huma.json) */}
         <section className="mb-24" id="manifest">
-          <h2 className="text-2xl font-bold text-on-surface mb-8 flex items-center gap-3">
-            <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
-              02
-            </span>
+          <h2 className="text-2xl font-bold text-on-surface mb-8">
             {p.manifest_title}
           </h2>
           <p className="text-on-surface-variant mb-8 leading-relaxed">
@@ -140,10 +134,7 @@ export default async function PackageManagerPage({
 
         {/* Lock System */}
         <section className="mb-24" id="dependencies">
-          <h2 className="text-2xl font-bold text-on-surface mb-8 flex items-center gap-3">
-            <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
-              03
-            </span>
+          <h2 className="text-2xl font-bold text-on-surface mb-8">
             {p.dependencies_title}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -168,10 +159,7 @@ export default async function PackageManagerPage({
 
         {/* Publishing */}
         <section className="mb-24" id="publishing">
-          <h2 className="text-2xl font-bold text-on-surface mb-8 flex items-center gap-3">
-            <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
-              04
-            </span>
+          <h2 className="text-2xl font-bold text-on-surface mb-8">
             {p.publishing_title}
           </h2>
           <p className="text-on-surface-variant mb-8 leading-relaxed">
@@ -193,10 +181,7 @@ export default async function PackageManagerPage({
 
         {/* Native Packages */}
         <section className="mb-24" id="native">
-          <h2 className="text-2xl font-bold text-on-surface mb-8 flex items-center gap-3">
-            <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
-              05
-            </span>
+          <h2 className="text-2xl font-bold text-on-surface mb-8">
             {p.native_title}
           </h2>
           <p className="text-on-surface-variant mb-8 leading-relaxed">

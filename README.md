@@ -142,6 +142,29 @@ i < meyveler'in uzunluğu olduğu sürece {
 }
 ```
 
+### 🇹🇷 Doğal Dil ve Ek Sistemi (Suffix System)
+
+Hüma'nın en ayırt edici özelliği, Türkçe'nin eklemeli yapısını doğal bir şekilde desteklemesidir. Kesme işareti (`'`) ile ayrılan dilbilgisi ekleri, derleyici (compiler) tarafından derleme aşamasında (lexical analysis) temizlenir. Bu sayede kodun hem okunabilirliği artar hem de çalışma zamanında hiçbir performans kaybı yaşanmaz.
+
+**Desteklenen Ek Kalıpları:**
+- **Belirtme Durumu (İsmin -i Hali):** `'i`, `'ı`, `'u`, `'ü`, `'yi`, `'yı`, `'yu`, `'yü`
+  *Örnek:* `hata'yı yazdır`, `isim'i döndür`
+- **Yönelme Durumu (İsmin -e Hali):** `'e`, `'a`, `'ye`, `'ya`
+  *Örnek:* `liste'ye ekle`, `dizi'ye [10]'u ekle`
+- **Ayrılma Durumu (İsmin -den Hali):** `'den`, `'dan`, `'ten`, `'tan`
+  *Örnek:* `liste'den çıkar`, `sozluk'ten getir`
+- **İlgi Durumu (Tamlama Eki -nin):** `'nin`, `'nın`, `'nun`, `'nün`, `'ın`, `'in`, `'un`, `'ün`
+  *Örnek:* `liste'nin uzunluğu`, `ayarlar'ın sürümü`
+
+```huma
+// Ek sistemi sayesinde çok daha akıcı ve okunabilir kodlar yazılır:
+ayarlar = { "tema": "koyu" } olsun
+
+// Kötü: yazdır ayarlar.tema
+// İyi:
+yazdır ayarlar'ın tema'sı;
+```
+
 ---
 
 ## 📚 Sistem Kütüphaneleri (`lib/`)

@@ -64,7 +64,7 @@ export default async function CompilerPage({
             {dict.Nav.docs}
           </Link>
           <span>/</span>
-          <span className="text-on-surface-variant">{dict.Sidebar.ecosystem}</span>
+          <span className="text-on-surface-variant">{dict.Sidebar.tooling}</span>
           <span>/</span>
           <span className="text-primary">{c.title}</span>
         </nav>
@@ -78,10 +78,7 @@ export default async function CompilerPage({
 
         {/* Pipeline overview */}
         <section className="mb-16" id="pipeline">
-          <h2 className="text-2xl font-bold text-on-surface mb-6 flex items-center gap-3">
-            <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
-              01
-            </span>
+          <h2 className="text-2xl font-bold text-on-surface mb-6">
             {c.pipeline.title}
           </h2>
 
@@ -117,10 +114,7 @@ export default async function CompilerPage({
 
         {/* Lexer + Suffix System */}
         <section className="mb-16" id="lexer">
-          <h2 className="text-2xl font-bold text-on-surface mb-6 flex items-center gap-3">
-            <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
-              02
-            </span>
+          <h2 className="text-2xl font-bold text-on-surface mb-6">
             {c.lexer.title}
           </h2>
           <p className="mb-6 text-on-surface-variant leading-relaxed">
@@ -160,10 +154,7 @@ export default async function CompilerPage({
 
         {/* AST */}
         <section className="mb-16" id="ast">
-          <h2 className="text-2xl font-bold text-on-surface mb-6 flex items-center gap-3">
-            <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
-              03
-            </span>
+          <h2 className="text-2xl font-bold text-on-surface mb-6">
             {c.ast.title}
           </h2>
           <p className="mb-6 text-on-surface-variant leading-relaxed">
@@ -186,10 +177,7 @@ export default async function CompilerPage({
 
         {/* Build from source */}
         <section className="mb-16" id="build">
-          <h2 className="text-2xl font-bold text-on-surface mb-6 flex items-center gap-3">
-            <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
-              04
-            </span>
+          <h2 className="text-2xl font-bold text-on-surface mb-6">
             {c.build.title}
           </h2>
           <p className="mb-6 text-on-surface-variant leading-relaxed">

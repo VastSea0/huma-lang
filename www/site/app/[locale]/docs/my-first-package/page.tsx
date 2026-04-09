@@ -46,7 +46,7 @@ export default async function MyFirstPackagePage({
             {dict.Nav.docs}
           </Link>
           <span>/</span>
-          <span className="text-on-surface-variant">{dict.Sidebar.guides}</span>
+          <span className="text-on-surface-variant">{dict.Sidebar.community}</span>
           <span>/</span>
           <span className="text-primary">{g.title}</span>
         </nav>
@@ -61,10 +61,7 @@ export default async function MyFirstPackagePage({
         <div className="space-y-24">
           {/* Step 1 */}
           <section id="step-1" className="scroll-mt-24">
-            <h2 className="text-2xl font-bold text-on-surface mb-6 flex items-center gap-3">
-              <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
-                01
-              </span>
+            <h2 className="text-2xl font-bold text-on-surface mb-6">
               {locale === "tr" ? "Projeyi Başlatma" : "Initialization"}
             </h2>
             <p className="text-on-surface-variant mb-6 leading-relaxed">
@@ -77,10 +74,7 @@ export default async function MyFirstPackagePage({
 
           {/* Step 2 */}
           <section id="step-2" className="scroll-mt-24">
-            <h2 className="text-2xl font-bold text-on-surface mb-6 flex items-center gap-3">
-              <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
-                02
-              </span>
+            <h2 className="text-2xl font-bold text-on-surface mb-6">
               Metadata (paket.json)
             </h2>
             <p className="text-on-surface-variant mb-6 leading-relaxed">
@@ -93,10 +87,7 @@ export default async function MyFirstPackagePage({
 
           {/* Step 3 */}
           <section id="step-3" className="scroll-mt-24">
-            <h2 className="text-2xl font-bold text-on-surface mb-6 flex items-center gap-3">
-              <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
-                03
-              </span>
+            <h2 className="text-2xl font-bold text-on-surface mb-6">
               {locale === "tr" ? "Mantık Yazımı" : "Writing Logic"}
             </h2>
             <p className="text-on-surface-variant mb-6 leading-relaxed">
@@ -109,10 +100,7 @@ export default async function MyFirstPackagePage({
 
           {/* Step 4 */}
           <section id="step-4" className="scroll-mt-24">
-            <h2 className="text-2xl font-bold text-on-surface mb-6 flex items-center gap-3">
-              <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
-                04
-              </span>
+            <h2 className="text-2xl font-bold text-on-surface mb-6">
               {locale === "tr" ? "Yayınlama (GitHub)" : "Publishing (GitHub)"}
             </h2>
             <p className="text-on-surface-variant mb-6 leading-relaxed">

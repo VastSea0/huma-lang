@@ -146,6 +146,29 @@ i < fruits'ın uzunluğu olduğu sürece {
 }
 ```
 
+### 🇹🇷 Natural Language & Suffix System
+
+The most distinctive feature of Hüma is its built-in support for Turkish grammar and agglutination. Grammatical suffixes appended via an apostrophe (`'`) are cleanly and automatically stripped by the lexer at compile time. This drastically improves code readability and natural flow while ensuring absolutely zero runtime cost.
+
+**Supported Suffix Patterns:**
+- **Accusative Case (Direct Object / -i hali):** `'i`, `'ı`, `'u`, `'ü`, `'yi`, `'yı`, `'yu`, `'yü`
+  *Usage:* Outputting or returning values. Example: `hata'yı yazdır` (print error), `isim'i döndür` (return name)
+- **Dative Case (Direction / -e hali):** `'e`, `'a`, `'ye`, `'ya`
+  *Usage:* Adding to collections or assignments. Example: `liste'ye ekle` (append to list)
+- **Ablative Case (Origin / -den hali):** `'den`, `'dan`, `'ten`, `'tan`
+  *Usage:* Removing from collections or reading from sources. Example: `liste'den çıkar` (remove from list)
+- **Genitive Case (Possession / -nin hali):** `'nin`, `'nın`, `'nun`, `'nün`, `'ın`, `'in`, `'un`, `'ün`
+  *Usage:* Property access or lengths. Example: `liste'nin uzunluğu` (length of list), `ayarlar'ın sürümü` (version of settings)
+
+```huma
+// Writing fluid and highly readable code with suffixes:
+ayarlar = { "tema": "koyu" } olsun
+
+// Traditional: yazdır ayarlar.tema
+// Hüma style:
+yazdır ayarlar'ın tema;
+```
+
 ---
 
 ## 📚 Standard Libraries (`lib/`)

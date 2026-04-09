@@ -37,19 +37,40 @@ export default async function AgIstekleriPage({
 
   const getPath = (path: string) => `/${locale}${path}`;
 
+  const apiFunctions = [
+    {
+      fn: "getir(url, [headers])",
+      desc: locale === "tr" ? "URL'ye GET isteği gönderir." : "Sends a GET request to the URL.",
+    },
+    {
+      fn: "gönder(url, veri, [headers])",
+      desc: locale === "tr" ? "URL'ye POST isteği gönderir." : "Sends a POST request to the URL.",
+    },
+    {
+      fn: "güncelle(url, veri, [headers])",
+      desc: locale === "tr" ? "URL'ye PUT isteği gönderir." : "Sends a PUT request to the URL.",
+    },
+    {
+      fn: "sil(url, [headers])",
+      desc: locale === "tr" ? "URL'ye DELETE isteği gönderir." : "Sends a DELETE request to the URL.",
+    },
+  ];
+
   return (
     <>
       <main className="flex-1 px-8 md:px-16 py-12 max-w-4xl">
+        {/* Breadcrumb */}
         <nav className="flex gap-2 text-[10px] uppercase tracking-widest text-on-surface-variant/60 mb-4">
           <Link href={getPath("/docs")} className="hover:text-primary transition-colors">
             {dict.Nav.docs}
           </Link>
           <span>/</span>
-          <span className="text-on-surface-variant">{dict.Sidebar.ecosystem}</span>
+          <span className="text-on-surface-variant">{dict.Sidebar.core_libraries}</span>
           <span>/</span>
           <span className="text-primary">{n.requests.title}</span>
         </nav>
 
+        {/* Title & Description */}
         <h1 className="text-5xl font-extrabold text-on-surface tracking-tighter mb-6">
           {n.requests.title}
         </h1>
@@ -57,29 +78,27 @@ export default async function AgIstekleriPage({
           {n.requests.desc}
         </p>
 
-        <div className="bg-primary/5 border border-primary/10 p-6 rounded-xl mb-12 flex items-center justify-between shadow-sm">
-          <div>
-            <h3 className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mb-2 cursor-default">
-              {locale === "tr" ? "PAKET KURULUMU" : "PACKAGE INSTALLATION"}
-            </h3>
+        {/* Quick Installation */}
+        <section className="mb-16" id="installation">
+          <h2 className="text-2xl font-bold text-on-surface mb-4">
+            {locale === "tr" ? "Kurulum" : "Installation"}
+          </h2>
+          <div className="bg-primary/5 border border-primary/10 p-6 rounded-xl flex items-center justify-between">
             <code className="text-on-surface font-mono text-sm font-bold bg-surface-container-high px-3 py-1.5 rounded border border-outline-variant/10">
               huma paket kur ag_istekleri
             </code>
+            <span className="hidden sm:block text-[10px] font-bold bg-primary text-on-primary px-3 py-1 rounded-full uppercase tracking-widest">
+              v1.1.0 STABLE
+            </span>
           </div>
-          <span className="hidden sm:block text-[10px] font-bold bg-primary text-on-primary px-3 py-1 rounded-full uppercase tracking-widest shadow-sm">
-            v1.1.0 STABLE
-          </span>
-        </div>
+        </section>
 
         {/* Basic Usage */}
-        <section className="mb-16">
-          <h2 className="text-2xl font-bold text-on-surface mb-6 flex items-center gap-3">
-             <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
-              01
-            </span>
+        <section className="mb-16" id="basic-usage">
+          <h2 className="text-2xl font-bold text-on-surface mb-4">
             {locale === "tr" ? "Temel Kullanım" : "Basic Usage"}
           </h2>
-          <p className="text-on-surface-variant leading-relaxed mb-8">
+          <p className="text-on-surface-variant leading-relaxed mb-6">
             {locale === "tr"
               ? "Kütüphaneyi yükledikten sonra 'getir' (GET) ve 'gönder' (POST) gibi fonksiyonlar üzerinden API istekleri gerçekleştirebilirsiniz."
               : "After importing the library, you can perform API requests using functions like 'getir' (GET) and 'gönder' (POST)."}
@@ -87,50 +106,41 @@ export default async function AgIstekleriPage({
           <CodeBlock code={requestCode} filename="api_istek.hb" />
         </section>
 
-        {/* Reference */}
-        <section className="mb-16">
-          <h2 className="text-2xl font-bold text-on-surface mb-6 flex items-center gap-3">
-             <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
-              02
-            </span>
-            {locale === "tr" ? "Fonksiyon Referansı" : "Function Reference"}
+        {/* API Reference */}
+        <section className="mb-16" id="api-reference">
+          <h2 className="text-2xl font-bold text-on-surface mb-6">
+            {locale === "tr" ? "API Referansı" : "API Reference"}
           </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[
-              {
-                fn: "getir(url, [headers])",
-                tr: "URL'ye GET isteği gönderir.",
-                en: "Sends a GET request to the URL.",
-              },
-              {
-                fn: "gönder(url, veri, [headers])",
-                tr: "URL'ye POST isteği gönderir.",
-                en: "Sends a POST request to the URL.",
-              },
-              {
-                fn: "güncelle(url, veri, [headers])",
-                tr: "URL'ye PUT isteği gönderir.",
-                en: "Sends a PUT request to the URL.",
-              },
-              {
-                fn: "sil(url, [headers])",
-                tr: "URL'ye DELETE isteği gönderir.",
-                en: "Sends a DELETE request to the URL.",
-              },
-            ].map((item) => (
-              <div key={item.fn} className="bg-surface-container-low rounded-lg p-5 border border-outline-variant/10 hover:border-primary/20 transition-colors">
-                <code className="text-primary font-mono text-xs font-bold block mb-3 opacity-80">{item.fn}</code>
-                <p className="text-[13px] text-on-surface-variant leading-relaxed">
-                  {locale === "tr" ? item.tr : item.en}
-                </p>
-              </div>
-            ))}
+          <div className="overflow-x-auto bg-surface-container-low rounded-lg border border-outline-variant/10">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b border-outline-variant/20">
+                  <th className="text-left py-3 px-5 text-on-surface-variant/60 font-bold text-[10px] uppercase tracking-widest">
+                    {locale === "tr" ? "Fonksiyon" : "Function"}
+                  </th>
+                  <th className="text-left py-3 px-5 text-on-surface-variant/60 font-bold text-[10px] uppercase tracking-widest">
+                    {locale === "tr" ? "Açıklama" : "Description"}
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/10">
+                {apiFunctions.map((item) => (
+                  <tr key={item.fn} className="hover:bg-surface-container-lowest transition-colors">
+                    <td className="py-4 px-5">
+                      <code className="text-primary font-mono text-xs font-bold">{item.fn}</code>
+                    </td>
+                    <td className="py-4 px-5 text-on-surface-variant text-sm leading-relaxed">
+                      {item.desc}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
 
         {/* Info Box */}
-        <div className="bg-tertiary/5 border border-tertiary/20 p-8 rounded-2xl mt-12 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-tertiary/10 via-transparent to-transparent">
+        <div className="bg-tertiary/5 border-l-4 border-tertiary p-8 rounded-r-2xl">
           <div className="flex items-center gap-3 mb-4 text-tertiary">
             <span className="material-symbols-outlined text-2xl">package_2</span>
             <h3 className="text-lg font-bold">
@@ -147,15 +157,15 @@ export default async function AgIstekleriPage({
         {/* Navigation */}
         <div className="flex justify-between mt-24 pt-8 border-t border-outline-variant/10">
           <Link
-            href={getPath("/docs/compiler")}
-            className="flex items-center gap-2 text-sm text-on-surface-variant hover:text-primary transition-colors font-bold uppercase tracking-widest text-[10px]"
+            href={getPath("/docs/stdlib")}
+            className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors font-bold uppercase tracking-widest text-[10px]"
           >
             <span className="material-symbols-outlined text-base">arrow_back</span>
-            {dict.Docs.compiler.title}
+            {dict.Docs.stdlib.title}
           </Link>
           <Link
             href={getPath("/docs/huma_sunucu")}
-            className="flex items-center gap-2 text-sm text-on-surface-variant hover:text-primary transition-colors font-bold uppercase tracking-widest text-[10px]"
+            className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors font-bold uppercase tracking-widest text-[10px]"
           >
             {n.server.title}
             <span className="material-symbols-outlined text-base">arrow_forward</span>

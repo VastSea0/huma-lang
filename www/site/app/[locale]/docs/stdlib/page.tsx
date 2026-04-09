@@ -327,7 +327,7 @@ export default async function StdlibPage({
             {dict.Nav.docs}
           </Link>
           <span>/</span>
-          <span className="text-on-surface-variant">{dict.Sidebar.ecosystem}</span>
+          <span className="text-on-surface-variant">{dict.Sidebar.core_libraries}</span>
           <span>/</span>
           <span className="text-primary">{s.title}</span>
         </nav>
