@@ -4,6 +4,7 @@ members = [
     "crates/huma-core",
     "crates/huma-compiler",
     "crates/huma-cli",
+    "crates/huma-lsp",
 ]
 
 # The old monolithic library — kept temporarily for src-tauri backward compatibility.

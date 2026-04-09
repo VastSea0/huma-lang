@@ -1,7 +1,7 @@
 {
   "name": "huma-lang",
   "displayName": "Hüma Language Support",
-  "description": "Syntax highlighting and language support for Hüma programming language",
+  "description": "Syntax highlighting and LSP support for Hüma programming language",
   "version": "0.1.0",
   "publisher": "huma-lang",
   "engines": {
@@ -10,6 +10,13 @@
   "categories": [
     "Programming Languages"
   ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:huma"
+  ],
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
   "contributes": {
     "languages": [{
       "id": "huma",
@@ -21,6 +28,16 @@
       "language": "huma",
       "scopeName": "source.huma",
       "path": "./syntaxes/huma.tmLanguage.json"
-    }]
+    }],
+    "configuration": {
+      "title": "Hüma",
+      "properties": {
+        "huma.lsp.serverPath": {
+          "type": "string",
+          "default": "huma-lsp",
+          "description": "Path to the huma-lsp server binary (default: huma-lsp from PATH)."
+        }
+      }
+    }
   }
 }
