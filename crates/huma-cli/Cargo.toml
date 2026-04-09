@@ -11,6 +11,11 @@ default-run = "huma"
 name = "huma"
 path = "src/main.rs"
 
+[features]
+# Keep default CLI lean (avoid pulling Tauri IDE into builds).
+default = []
+ide = ["dep:app"]
+
 [dependencies]
 huma-core = { path = "../huma-core" }
 huma-compiler = { path = "../huma-compiler" }
@@ -21,7 +26,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 self_update = { version = "0.41", features = ["archive-tar", "archive-zip", "compression-flate2"] }
-app = { path = "../../src-tauri" }
+app = { path = "../../src-tauri", optional = true }
 indicatif = "0.17"
 colored = "2"
 ureq = "2.9"

@@ -6,6 +6,7 @@
 //! hüma exec  <dosya.hbc>             # Bytecode çalıştır
 //! hüma gen   <dosya.hb> [isim]       # Standalone Rust dosyası üret
 //! hüma repl                          # Etkileşimli REPL
+//! hüma test  [yol]                   # Testleri çalıştır (tests/ veya *_test.hb)
 //! hüma update                        # GitHub'dan son sürüme güncelle
 //! hüma version                       # Sürüm bilgisi
 //! ```
@@ -97,6 +98,13 @@ enum Commands {
     /// Etkileşimli REPL (Okuma-Değerlendirme-Yazdırma Döngüsü)
     #[command(alias = "kabuk")]
     Repl,
+
+    /// Projedeki test dosyalarını çalıştırır (birim_test.hb çıktısını raporlar)
+    #[command(alias = "test")]
+    Test {
+        /// İsteğe bağlı: tek bir .hb dosyası veya bir klasör yolu
+        target: Option<String>,
+    },
 
     /// Masaüstü IDE (Geliştirme Ortamı) uygulamasını başlat
     #[command(alias = "arayüz")]
@@ -262,6 +270,7 @@ fn run(cli: Cli) -> i32 {
         Some(Commands::Exec { file }) => commands::exec_bytecode(&file),
         Some(Commands::Gen { file, output }) => commands::generate_standalone(&file, &output),
         Some(Commands::Repl) => commands::start_repl(),
+        Some(Commands::Test { target }) => commands::run_tests(target.as_deref()),
         Some(Commands::Ide) => commands::start_ide(),
         Some(Commands::Update { check }) => {
             if check {
