@@ -29,7 +29,7 @@ Move away from simulating dictionaries via Objects.
 
 ---
 
-## 🏗 Phase 2: Modern Developer Experience (DX)
+## ✅ Phase 2: Modern Developer Experience (DX) (Completed: 2026-04-09)
 A language is only as good as its tools.
 
 ### 2.1 Hüma LSP (Language Server Protocol)
@@ -64,8 +64,9 @@ Transition from pure GitHub dependency to a structured registry.
 ## ⚡ Phase 4: High Performance & Scaling
 Hüma for the web and high-load systems.
 
-### 4.1 Asynchronous Programming (`async/await`)
+### ✅ 4.1 Asynchronous Programming (`async/await`) (Completed: 2026-04-09)
 - **Goal:** Non-blocking I/O for `huma_sunucu`.
+- **Status:** Implemented `bekle` (await) keyword and asynchronous execution engine.
 - **Detail:** Implement a "Yaprak" (Leaf/Task) executor in the VM to handle concurrent operations without blocking the main thread.
 - **Syntax:** `veri = bekle ag_istekleri.getir(url)`.
 - **Server loop:** `istek = bekle dahili_sunucu_bekle(sid)`.
@@ -89,6 +90,7 @@ Lowering the barrier to entry.
 ---
 
 ## 📅 Target Timeline
-- **v0.5.5 (Internal Beta):** Native Maps and Hata Yönetimi (Error Handling).
-- **v0.5.8 (Tooling Alpha):** First version of Hüma LSP.
-- **v0.6.0 (Stable):** Unified CLI with `test`, `doc`, and Async support.
+- **v0.5.5 (Internal Beta):** Native Maps and Hata Yönetimi (Error Handling) - **DONE**
+- **v0.5.8 (Tooling Alpha):** First version of Hüma LSP and `test` runner - **DONE**
+- **v0.6.0-alfa.1:** Unified CLI with `test`, Async support, and Grammar Polish - **DONE**
+- **v0.6.0 (Stable):** Central Registry, `doc` generator, and JIT Research integration.
