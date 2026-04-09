@@ -68,6 +68,7 @@ Hüma for the web and high-load systems.
 - **Goal:** Non-blocking I/O for `huma_sunucu`.
 - **Detail:** Implement a "Yaprak" (Leaf/Task) executor in the VM to handle concurrent operations without blocking the main thread.
 - **Syntax:** `veri = bekle ag_istekleri.getir(url)`.
+- **Server loop:** `istek = bekle dahili_sunucu_bekle(sid)`.
 
 ### 4.2 JIT (Just-In-Time) Research
 - **Goal:** Identify "Hot Loops" and compile them into machine code on the fly.

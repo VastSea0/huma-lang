@@ -346,6 +346,7 @@ impl Lexer {
             "yakala" => Token::Yakala,
             "hata" => Token::HataAnahtar,
             "var" => Token::Var,
+            "bekle" => Token::Bekle,
             _ => Token::Tanimlayici(s),
         };
 

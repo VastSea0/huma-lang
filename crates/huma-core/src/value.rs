@@ -10,6 +10,7 @@ pub enum Deger {
     Metin(String),
     Bayt(Vec<u8>),
     Liste(Rc<RefCell<Vec<Deger>>>),
+    GorevId(u64),
     Bos,
     Fonksiyon {
         parametreler: Vec<String>,
@@ -46,6 +47,7 @@ impl std::fmt::Display for Deger {
                 let p: Vec<String> = l_borrow.iter().map(|d| d.to_string()).collect();
                 write!(f, "[{}]", p.join(", "))
             }
+            Deger::GorevId(id) => write!(f, "<görev:{}>", id),
             Deger::Bos => write!(f, "Boş"),
             Deger::Nesne { sinif_adi, .. } => write!(f, "<{} nesnesi>", sinif_adi),
             Deger::Sozluk(m) => {
@@ -69,6 +71,7 @@ impl Deger {
                 let v: Vec<serde_json::Value> = l_borrow.iter().map(|d| d.to_json()).collect();
                 serde_json::Value::Array(v)
             }
+            Deger::GorevId(_) => serde_json::Value::Null,
             Deger::Bos => serde_json::Value::Null,
             Deger::Nesne { alanlar, .. } => {
                 let mut map = serde_json::Map::new();

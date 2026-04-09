@@ -24,6 +24,7 @@ pub enum OpCode {
     MakeMap(usize),
     TryBlockStart(usize),
     TryBlockEnd,
+    Await,
     Pop,
     Bos,
 }

@@ -8,6 +8,7 @@ pub enum Ifade {
     Dogru,
     Yanlis,
     Degisken(String),
+    Bekle(Box<Ifade>),
     IkiliIslem {
         sol: Box<Ifade>,
         operator: Token,

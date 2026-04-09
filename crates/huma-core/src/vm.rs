@@ -1,6 +1,9 @@
 use crate::bytecode::{OpCode, Constant, Program};
 use crate::value::Deger;
 use std::collections::HashMap;
+use tokio::runtime::{Builder, Runtime};
+use tokio::task::JoinHandle;
+use tokio::task::LocalSet;
 
 pub struct VM {
     stack: Vec<Deger>,
@@ -8,6 +11,45 @@ pub struct VM {
     program: Program,
     ip: usize,
     error_stack: Vec<usize>,
+    yaprak: YaprakExecutor,
+}
+
+struct YaprakExecutor {
+    rt: Runtime,
+    local: LocalSet,
+    next_id: u64,
+    tasks: HashMap<u64, JoinHandle<Deger>>,
+}
+
+impl YaprakExecutor {
+    fn new() -> Self {
+        Self {
+            rt: Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("tokio runtime init failed"),
+            local: LocalSet::new(),
+            next_id: 1,
+            tasks: HashMap::new(),
+        }
+    }
+
+    fn insert(&mut self, task: JoinHandle<Deger>) -> u64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.tasks.insert(id, task);
+        id
+    }
+
+    fn await_task(&mut self, id: u64) -> Deger {
+        match self.tasks.remove(&id) {
+            Some(handle) => match self.rt.block_on(self.local.run_until(handle)) {
+                Ok(v) => v,
+                Err(e) => Deger::Hata(format!("Görev hatası: {}", e)),
+            },
+            None => Deger::Hata(format!("Bilinmeyen görev: {}", id)),
+        }
+    }
 }
 
 impl VM {
@@ -18,6 +60,7 @@ impl VM {
             program,
             ip: 0,
             error_stack: Vec::new(),
+            yaprak: YaprakExecutor::new(),
         }
     }
 
@@ -111,6 +154,18 @@ impl VM {
                 }
                 OpCode::TryBlockEnd => {
                     self.error_stack.pop();
+                }
+                OpCode::Await => {
+                    let val = self.stack.pop().unwrap_or(Deger::Bos);
+                    match val {
+                        Deger::GorevId(id) => {
+                            let out = self.yaprak.await_task(id);
+                            self.stack.push(out);
+                        }
+                        other => {
+                            self.stack.push(Deger::Hata(format!("bekle: await edilemez değer: {}", other)));
+                        }
+                    }
                 }
                 _ => {}
             }

@@ -49,7 +49,7 @@ Sunucu sınıf olsun {
         "Hüma Backend Sunucusu " + (kendisi'nin port'u) + " portunda aktif!"'ı yazdır
         
         1 olduğu sürece {
-            istek = dahili_sunucu_bekle(sid)
+            istek = bekle dahili_sunucu_bekle(sid)
             
             istek != boş ise {
                 url = (istek'in url'si)

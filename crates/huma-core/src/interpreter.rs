@@ -13,11 +13,77 @@ use crate::builtin_files;
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
 use std::io::Read;
+use tokio::runtime::{Builder, Runtime};
+use tokio::task::JoinHandle;
+use tokio::task::LocalSet;
+use tokio::sync::{mpsc, oneshot};
+use futures_util::FutureExt;
+use hyper::{Body, Request, Response};
+use hyper::service::{make_service_fn, service_fn};
 
-static SUNUCULAR: Lazy<Mutex<HashMap<u64, tiny_http::Server>>> = Lazy::new(|| Mutex::new(HashMap::new()));
-static ISTEKLER: Lazy<Mutex<HashMap<u64, tiny_http::Request>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+// Async server (hyper) state
+struct IncomingRequest {
+    id: u64,
+    url: String,
+    metot: String,
+    govde: String,
+    respond_to: oneshot::Sender<Response<Body>>,
+}
+
+static SUNUCULAR: Lazy<Mutex<HashMap<u64, mpsc::UnboundedSender<IncomingRequest>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+static SUNUCU_RX: Lazy<tokio::sync::Mutex<HashMap<u64, mpsc::UnboundedReceiver<IncomingRequest>>>> =
+    Lazy::new(|| tokio::sync::Mutex::new(HashMap::new()));
+static YANITLAR: Lazy<Mutex<HashMap<u64, oneshot::Sender<Response<Body>>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
 static SQL_CONNECTIONS: Lazy<Mutex<HashMap<u64, rusqlite::Connection>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 static NEXT_ID: Lazy<Mutex<u64>> = Lazy::new(|| Mutex::new(1));
+
+struct YaprakExecutor {
+    rt: Runtime,
+    local: LocalSet,
+    next_id: u64,
+    tasks: HashMap<u64, JoinHandle<Deger>>,
+}
+
+impl YaprakExecutor {
+    fn new() -> Self {
+        Self {
+            rt: Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("tokio runtime init failed"),
+            local: LocalSet::new(),
+            next_id: 1,
+            tasks: HashMap::new(),
+        }
+    }
+
+    fn spawn<F>(&mut self, fut: F) -> Deger
+    where
+        F: std::future::Future<Output = Deger> + 'static,
+    {
+        let id = self.next_id;
+        self.next_id += 1;
+        let handle = self.local.spawn_local(fut);
+        self.tasks.insert(id, handle);
+        Deger::GorevId(id)
+    }
+
+    fn await_task(&mut self, id: u64) -> Deger {
+        match self.tasks.remove(&id) {
+            Some(handle) => match self.rt.block_on(self.local.run_until(handle)) {
+                Ok(v) => v,
+                Err(e) => Deger::Hata(format!("Görev hatası: {}", e)),
+            },
+            None => Deger::Hata(format!("Bilinmeyen görev: {}", id)),
+        }
+    }
+}
+
+thread_local! {
+    static YAPRAK: std::cell::RefCell<YaprakExecutor> = std::cell::RefCell::new(YaprakExecutor::new());
+}
 
 fn get_id() -> u64 {
     let mut id = NEXT_ID.lock().unwrap();
@@ -110,40 +176,74 @@ impl Yorumlayici {
             // dahili_sunucu_baslat(port)
         globals.insert("dahili_sunucu_baslat".to_string(), Deger::DahiliFonksiyon(|args| {
             let port = match args.first() { Some(Deger::Sayi(n)) => *n as u16, _ => 8080 };
-            match tiny_http::Server::http(format!("0.0.0.0:{}", port)) {
-                Ok(server) => {
-                    let id = get_id();
-                    SUNUCULAR.lock().unwrap().insert(id, server);
-                    Deger::Sayi(id as f64)
-                }
-                Err(_) => Deger::Bos
-            }
-        }));
-        // dahili_sunucu_bekle(id)
-        globals.insert("dahili_sunucu_bekle".to_string(), Deger::DahiliFonksiyon(|args| {
-            let id = match args.first() { Some(Deger::Sayi(n)) => *n as u64, _ => return Deger::Bos };
-            if let Some(server) = SUNUCULAR.lock().unwrap().get(&id) {
-                if let Ok(mut istek) = server.recv() {
-                    let mut govde = String::new();
-                    let _ = istek.as_reader().read_to_string(&mut govde);
-                    
-                    let i_id = get_id();
+            let sid = get_id();
 
-                    let url = istek.url().to_string();
-                    let metot = istek.method().to_string();
-                    
-                    ISTEKLER.lock().unwrap().insert(i_id, istek);
-                    
-                    let mut fields = HashMap::new();
-                    fields.insert("id".to_string(), Deger::Sayi(i_id as f64));
-                    fields.insert("url".to_string(), Deger::Metin(url));
-                    fields.insert("metot".to_string(), Deger::Metin(metot));
-                    fields.insert("gövde".to_string(), Deger::Metin(govde));
-                    
-                    return Deger::Nesne { sinif_adi: "İstek".to_string(), alanlar: Rc::new(RefCell::new(fields)) };
+            let (tx, rx) = mpsc::unbounded_channel::<IncomingRequest>();
+            SUNUCULAR.lock().unwrap().insert(sid, tx);
+            SUNUCU_RX.blocking_lock().insert(sid, rx);
+
+            // Spawn the hyper server on the Yaprak runtime.
+            let addr = ([0, 0, 0, 0], port).into();
+            let make_svc = make_service_fn(move |_conn| {
+                let sid2 = sid;
+                async move {
+                    Ok::<_, hyper::Error>(service_fn(move |req: Request<Body>| {
+                        let sid3 = sid2;
+                        async move {
+                            let url = req.uri().to_string();
+                            let metot = req.method().to_string();
+                            let bytes = hyper::body::to_bytes(req.into_body()).await.unwrap_or_default();
+                            let govde = String::from_utf8_lossy(&bytes).to_string();
+
+                            let (resp_tx, resp_rx) = oneshot::channel::<Response<Body>>();
+                            let rid = get_id();
+                            let incoming = IncomingRequest { id: rid, url, metot, govde, respond_to: resp_tx };
+
+                            if let Some(sender) = SUNUCULAR.lock().unwrap().get(&sid3) {
+                                let _ = sender.send(incoming);
+                            }
+
+                            match resp_rx.await {
+                                Ok(resp) => Ok::<_, hyper::Error>(resp),
+                                Err(_) => Ok::<_, hyper::Error>(
+                                    Response::builder().status(500).body(Body::from("handler dropped")).unwrap()
+                                ),
+                            }
+                        }
+                    }))
                 }
-            }
-            Deger::Bos
+            });
+
+            YAPRAK.with(|y| {
+                let mut y = y.borrow_mut();
+                let fut = hyper::Server::bind(&addr).serve(make_svc).map(|_| ());
+                let _ = y.local.spawn_local(fut);
+            });
+
+            Deger::Sayi(sid as f64)
+        }));
+        // dahili_sunucu_bekle(sid) -> görev (bekle ile alınır)
+        globals.insert("dahili_sunucu_bekle".to_string(), Deger::DahiliFonksiyon(|args| {
+            let sid = match args.first() { Some(Deger::Sayi(n)) => *n as u64, _ => return Deger::Bos };
+            YAPRAK.with(|y| y.borrow_mut().spawn(async move {
+                let mut guard = SUNUCU_RX.lock().await;
+                let rx = match guard.get_mut(&sid) {
+                    Some(r) => r,
+                    None => return Deger::Bos,
+                };
+                match rx.recv().await {
+                    Some(incoming) => {
+                        YANITLAR.lock().unwrap().insert(incoming.id, incoming.respond_to);
+                        let mut fields = HashMap::new();
+                        fields.insert("id".to_string(), Deger::Sayi(incoming.id as f64));
+                        fields.insert("url".to_string(), Deger::Metin(incoming.url));
+                        fields.insert("metot".to_string(), Deger::Metin(incoming.metot));
+                        fields.insert("gövde".to_string(), Deger::Metin(incoming.govde));
+                        Deger::Nesne { sinif_adi: "İstek".to_string(), alanlar: Rc::new(RefCell::new(fields)) }
+                    }
+                    None => Deger::Bos,
+                }
+            }))
         }));
         // dahili_sunucu_yanitla(i_id, icerik, durum, tip, [basliklar])
         globals.insert("dahili_sunucu_yanitla".to_string(), Deger::DahiliFonksiyon(|args| {
@@ -158,30 +258,26 @@ impl Yorumlayici {
 
             let durum = match args.get(2) { Some(Deger::Sayi(n)) => *n as u16, _ => 200 };
             let tip = match args.get(3) { Some(Deger::Metin(s)) => s.as_str(), _ => "text/html; charset=utf-8" };
-            
-            if let Some(istek) = ISTEKLER.lock().unwrap().remove(&i_id) {
-                let mut response = tiny_http::Response::new(
-                    tiny_http::StatusCode(durum),
-                    vec![tiny_http::Header::from_bytes(&b"Content-Type"[..], tip.as_bytes()).unwrap()],
-                    std::io::Cursor::new(data),
-                    Some(len),
-                    None,
-                );
-                
-                // Ek başlıkları ekle (5. argüman)
+
+            if let Some(tx) = YANITLAR.lock().unwrap().remove(&i_id) {
+                let mut builder = Response::builder()
+                    .status(durum)
+                    .header("content-type", tip);
+
                 if args.len() >= 5 {
                     if let Deger::Nesne { alanlar, .. } = &args[4] {
                         for (k, v) in alanlar.borrow().iter() {
-                            if let Ok(header) = tiny_http::Header::from_bytes(k.as_bytes(), v.to_string().as_bytes()) {
-                                response.add_header(header);
-                            }
+                            builder = builder.header(k.as_str(), v.to_string());
                         }
                     }
                 }
 
-                let _ = istek.respond(response);
+                let body = Body::from(data);
+                let resp = builder.body(body).unwrap_or_else(|_| Response::new(Body::from("response build error")));
+                let _ = tx.send(resp);
                 return Deger::Sayi(1.0);
             }
+
             Deger::Sayi(0.0)
         }));
 
@@ -196,47 +292,48 @@ impl Yorumlayici {
         globals.insert("dahili_istek".to_string(), Deger::DahiliFonksiyon(|args| {
             if args.len() < 2 { return Deger::Bos; }
             let metot = match &args[0] { Deger::Metin(s) => s.to_uppercase(), _ => "GET".to_string() };
-            let url = match &args[1] { Deger::Metin(s) => s, _ => return Deger::Bos };
+            let url = match &args[1] { Deger::Metin(s) => s.clone(), _ => return Deger::Bos };
             let govdeli = args.len() >= 3 && !matches!(args[2], Deger::Bos);
             let govde = if govdeli { match &args[2] { Deger::Metin(s) => s.clone(), _ => String::new() } } else { String::new() };
-            
-            let mut req = ureq::request(&metot, url);
-            
-            // Başlıkları ekle (4. argüman)
-            if args.len() >= 4 {
-                if let Deger::Nesne { alanlar, .. } = &args[3] {
+            let headers = if args.len() >= 4 { args[3].clone() } else { Deger::Bos };
+
+            YAPRAK.with(|y| y.borrow_mut().spawn(async move {
+                let client = reqwest::Client::new();
+                let method = metot.parse().unwrap_or(reqwest::Method::GET);
+                let mut req = client.request(method, url);
+
+                if let Deger::Nesne { alanlar, .. } = headers {
                     for (k, v) in alanlar.borrow().iter() {
-                        req = req.set(k, &v.to_string());
+                        if let Ok(hn) = reqwest::header::HeaderName::from_bytes(k.as_bytes()) {
+                            if let Ok(hv) = reqwest::header::HeaderValue::from_str(&v.to_string()) {
+                                req = req.header(hn, hv);
+                            }
+                        }
                     }
                 }
-            }
-            
-            // Eğer gövde varsa ve Content-Type belirtilmemişse varsayılan olarak JSON denebilir
-            // Ama şimdilik kullanıcıya bırakmak daha esnek.
 
-            let response = if govdeli && (metot == "POST" || metot == "PUT" || metot == "PATCH" || metot == "DELETE") {
-                req.send_string(&govde)
-            } else {
-                req.call()
-            };
+                if govdeli {
+                    req = req.body(govde);
+                }
 
-            match response {
-                Ok(res) => {
-                    let durum = res.status() as f64;
-                    let icerik = res.into_string().unwrap_or_default();
-                    let alanlar = HashMap::from([
-                        ("durum".to_string(), Deger::Sayi(durum)),
-                        ("içerik".to_string(), Deger::Metin(icerik)),
-                    ]);
-                    Deger::Nesne { sinif_adi: "İstekCevabı".to_string(), alanlar: Rc::new(RefCell::new(alanlar)) }
+                match req.send().await {
+                    Ok(res) => {
+                        let durum = res.status().as_u16() as f64;
+                        let icerik = res.text().await.unwrap_or_default();
+                        let alanlar = HashMap::from([
+                            ("durum".to_string(), Deger::Sayi(durum)),
+                            ("içerik".to_string(), Deger::Metin(icerik)),
+                        ]);
+                        Deger::Nesne { sinif_adi: "İstekCevabı".to_string(), alanlar: Rc::new(RefCell::new(alanlar)) }
+                    }
+                    Err(e) => {
+                        let mut alanlar = HashMap::new();
+                        alanlar.insert("durum".to_string(), Deger::Sayi(0.0));
+                        alanlar.insert("hata".to_string(), Deger::Metin(e.to_string()));
+                        Deger::Nesne { sinif_adi: "İstekHatası".to_string(), alanlar: Rc::new(RefCell::new(alanlar)) }
+                    }
                 }
-                Err(e) => {
-                    let mut alanlar = HashMap::new();
-                    alanlar.insert("durum".to_string(), Deger::Sayi(0.0));
-                    alanlar.insert("hata".to_string(), Deger::Metin(e.to_string()));
-                    Deger::Nesne { sinif_adi: "İstekHatası".to_string(), alanlar: Rc::new(RefCell::new(alanlar)) }
-                }
-            }
+            }))
         }));
 
         globals.insert("dosya_var_mı".to_string(), Deger::DahiliFonksiyon(|args| {
@@ -894,6 +991,13 @@ impl Yorumlayici {
 
     fn ifade_hesapla(&mut self, ifade: Ifade) -> Deger {
         match ifade {
+            Ifade::Bekle(inner) => {
+                let v = self.ifade_hesapla(*inner);
+                match v {
+                    Deger::GorevId(id) => YAPRAK.with(|y| y.borrow_mut().await_task(id)),
+                    other => Deger::Hata(format!("bekle: await edilemez değer: {}", other)),
+                }
+            }
             Ifade::Sayi(n) => Deger::Sayi(n),
             Ifade::Metin(s) => Deger::Metin(s),
             Ifade::Bos => Deger::Bos,

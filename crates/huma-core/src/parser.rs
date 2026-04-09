@@ -406,6 +406,10 @@ impl Parser {
 
     fn parse_birincil(&mut self) -> Ifade {
         match self.current_token {
+            Token::Bekle => {
+                self.next_token();
+                Ifade::Bekle(Box::new(self.parse_birincil()))
+            }
             Token::Degil => { self.next_token(); Ifade::MantıksalDegil(Box::new(self.parse_birincil())) }
             Token::Eksi => {
                 self.next_token();

@@ -89,6 +89,10 @@ impl Derleyici {
                 self.ifade_derle(*fonksiyon);
                 self.instructions.push(OpCode::Call(arg_len));
             }
+            Ifade::Bekle(e) => {
+                self.ifade_derle(*e);
+                self.instructions.push(OpCode::Await);
+            }
             Ifade::Bos => self.instructions.push(OpCode::Bos),
             Ifade::Sozluk(ciftler) => {
                 let len = ciftler.len();
