@@ -1,7 +1,18 @@
 
 # Değişim Günlüğü (Changelog)
 
-Tüm önemli değişiklikler bu dosyada takip edilecektir.## [v0.5.2] - 2026-04-08
+Tüm önemli değişiklikler bu dosyada takip edilecektir.
+
+## [v0.6.0-alfa.1] - 2026-04-09
+
+### Dil Çekirdeği ve Sağlamlık (Faz 1)
+- **Yapısal Hata Yönetimi**: `dene...yakala` blokları eklendi. Artık sıfıra bölme gibi çalışma zamanı hataları programı çökertmeden yakalanabiliyor.
+- **Yerleşik Sözlük (Sözlük) Desteği**: Süslü parantez `{}` ile tanımlanabilen yeni bir veri tipi eklendi.
+- **Sözlük Metotları**: `getir` ve `ayarla` metotları ile sözlük elemanı yönetimi ve ek sistemi (`sozluk'ten "anahtar"'ı getir`) entegrasyonu sağlandı.
+- **VM Hata Katmanı**: Bytecode seviyesinde `TryBlockStart` ve `TryBlockEnd` opcodes eklendi.
+- **Gelişmiş JSON Desteği**: Sözlük tipi doğrudan `to_json` ve `from_json` işlemlerine dahil edildi.
+
+## [v0.5.2] - 2026-04-08
 
 ### Güvenlik, Stabilite ve Paket Yönetimi
 - **Paket Yöneticisi Alt Dizin Desteği**: GitHub reposu içindeki alt klasörlerden paket yükleme özelliği eklendi (Mono-repo desteği).
@@ -72,6 +83,15 @@ Tüm önemli değişiklikler bu dosyada takip edilecektir.## [v0.5.2] - 2026-04-
 # Changelog (English)
 
 All notable changes to this project will be documented in this file.
+
+## [v0.6.0-alfa.1] - 2026-04-09
+
+### Language Core & Robustness (Phase 1)
+- **Structural Error Handling**: Added `dene...yakala` (try...catch) blocks. Runtime errors like division by zero can now be caught without crashing.
+- **Native Dictionary (Sözlük) Support**: Introduced a new data type defined via curly braces `{}`.
+- **Dictionary Methods**: Added `getir` (get) and `ayarla` (set) methods with full suffix system integration.
+- **VM Error Layer**: Implemented `TryBlockStart` and `TryBlockEnd` opcodes at the bytecode level.
+- **Enhanced JSON Support**: Native dictionary type is now fully supported in `to_json` and `from_json` operations.
 
 ## [v0.5.2] - 2026-04-08
 

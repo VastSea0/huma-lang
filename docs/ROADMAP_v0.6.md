@@ -5,8 +5,8 @@ While v0.5.2 solidified the core runtime and package management, **v0.6.0** aims
 
 ---
 
-## 🛠 Phase 1: Language Core & Robustness
-The foundation must be unbreakable before we scale.
+## ✅ Phase 1: Language Core & Robustness (Completed: 2026-04-09)
+The foundation is now stabilized.
 
 ### 1.1 Structural Error Handling (Try/Catch)
 Currently, Hüma lacks a native way to recover from runtime errors.
