@@ -12,6 +12,17 @@ Tüm önemli değişiklikler bu dosyada takip edilecektir.
 - **VM Hata Katmanı**: Bytecode seviyesinde `TryBlockStart` ve `TryBlockEnd` opcodes eklendi.
 - **Gelişmiş JSON Desteği**: Sözlük tipi doğrudan `to_json` ve `from_json` işlemlerine dahil edildi.
 
+### Gelişmiş Özellikler ve Ekosistem (Faz 2)
+- **Asenkron Programlama**: `bekle` (await) anahtar kelimesi eklendi. `ag_istekleri` ile yapılan çağrılar artık asenkron olarak yürütülebiliyor.
+- **Hüma Dil Sunucusu (LSP)**: İlk LSP sürümü yayınlandı. VS Code üzerinden sözdizimi denetimi ve geliştirme desteği altyapısı kuruldu (`crates/huma-lsp`).
+- **CLI Test Altyapısı**: `huma test` komutu ile proje içindeki test dosyalarını toplu çalıştırma desteği eklendi.
+- **Gramer Geliştirmeleri**: Türkçeye daha uygun bir sözdizimi için özellik erişimlerinde `-si/-sı` eki desteği eklendi (Örn: `nesne'nin değeri'ni`).
+- **Dökümantasyon ve UI**: 
+  - Web sitesi yan menüsü kategorize edilerek katlanabilir (collapsible) hale getirildi.
+  - README dosyasına tüm CLI komutlarını ve kullanım örneklerini içeren detaylı bir rehber eklendi.
+  - API referansları ve Türkçe dilbilgisi kuralları dökümanları güncellendi.
+- **Hata Düzeltmeleri**: Bash highlighter regex hataları ve mükerrer anahtar kelime girdileri düzeltildi.
+
 ## [v0.5.2] - 2026-04-08
 
 ### Güvenlik, Stabilite ve Paket Yönetimi
@@ -92,6 +103,17 @@ All notable changes to this project will be documented in this file.
 - **Dictionary Methods**: Added `getir` (get) and `ayarla` (set) methods with full suffix system integration.
 - **VM Error Layer**: Implemented `TryBlockStart` and `TryBlockEnd` opcodes at the bytecode level.
 - **Enhanced JSON Support**: Native dictionary type is now fully supported in `to_json` and `from_json` operations.
+
+### Advanced Features and Ecosystem (Phase 2)
+- **Asynchronous Programming**: Added the `bekle` (await) keyword. Network requests via `ag_istekleri` can now be executed asynchronously.
+- **Hüma Language Server (LSP)**: Initial LSP implementation released. Syntax checking and development support infrastructure established (`crates/huma-lsp`).
+- **CLI Test Infrastructure**: Added `huma test` command for batch execution of project tests.
+- **Grammar Enhancements**: Added support for `-si/-sı` suffixes in property access for more natural Turkish syntax (e.g., `nesne'nin değeri'ni`).
+- **Documentation and UI**: 
+  - Website sidebar restructured with collapsible categories for better navigation.
+  - Added a comprehensive CLI command reference and usage guide to the README.
+  - Updated API references and Turkish grammar rules documentation.
+- **Bug Fixes**: Fixed bash highlighter regex issues and redundant keyword entries.
 
 ## [v0.5.2] - 2026-04-08
 
