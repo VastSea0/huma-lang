@@ -100,13 +100,14 @@ enum Commands {
     Repl,
 
     /// Projedeki test dosyalarını çalıştırır (birim_test.hb çıktısını raporlar)
-    #[command(alias = "test")]
+    #[command(alias = "sına")]
     Test {
         /// İsteğe bağlı: tek bir .hb dosyası veya bir klasör yolu
         target: Option<String>,
     },
 
     /// Masaüstü IDE (Geliştirme Ortamı) uygulamasını başlat
+    #[cfg(feature = "ide")]
     #[command(alias = "arayüz")]
     Ide,
 
@@ -271,6 +272,7 @@ fn run(cli: Cli) -> i32 {
         Some(Commands::Gen { file, output }) => commands::generate_standalone(&file, &output),
         Some(Commands::Repl) => commands::start_repl(),
         Some(Commands::Test { target }) => commands::run_tests(target.as_deref()),
+        #[cfg(feature = "ide")]
         Some(Commands::Ide) => commands::start_ide(),
         Some(Commands::Update { check }) => {
             if check {

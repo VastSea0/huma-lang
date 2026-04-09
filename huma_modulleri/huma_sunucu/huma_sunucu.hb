@@ -4,19 +4,19 @@ Yanıt sınıf olsun {
     istek_id = 0 olsun
     
     metin fonksiyon olsun içerik alsın {
-        dahili_sunucu_yanitla(kendisi'nin istek_id, içerik, 200, "text/plain")
+        dahili_sunucu_yanitla(kendisi'nin istek_id'i, içerik, 200, "text/plain")
     }
 
     html fonksiyon olsun içerik alsın {
-        dahili_sunucu_yanitla(kendisi'nin istek_id, içerik, 200, "text/html; charset=utf-8")
+        dahili_sunucu_yanitla(kendisi'nin istek_id'i, içerik, 200, "text/html; charset=utf-8")
     }
     
     json fonksiyon olsun nesne alsın {
-        dahili_sunucu_yanitla(kendisi'nin istek_id, nesneden_metine(nesne), 200, "application/json")
+        dahili_sunucu_yanitla(kendisi'nin istek_id'i, nesneden_metine(nesne), 200, "application/json")
     }
 
     durum fonksiyon olsun kod alsın {
-        dahili_sunucu_yanitla(kendisi'nin istek_id, "", kod, "text/plain")
+        dahili_sunucu_yanitla(kendisi'nin istek_id'i, "", kod, "text/plain")
     }
 }
 
@@ -26,53 +26,53 @@ Sunucu sınıf olsun {
     _post_rotalari = metinden_nesneye("{}") olsun
 
     kur fonksiyon olsun p alsın {
-        kendisi'nin port = p olsun
-        kendisi'nin _get_rotalari = metinden_nesneye("{}") olsun
-        kendisi'nin _post_rotalari = metinden_nesneye("{}") olsun
+        kendisi'nin port'u = p olsun
+        kendisi'nin _get_rotalari'sı = metinden_nesneye("{}") olsun
+        kendisi'nin _post_rotalari'sı = metinden_nesneye("{}") olsun
     }
 
     getir fonksiyon olsun yol, islem alsın {
-        değer_ata(kendisi'nin _get_rotalari, yol, islem)
+        değer_ata(kendisi'nin _get_rotalari'sı, yol, islem)
     }
 
     gönder fonksiyon olsun yol, islem alsın {
-        değer_ata(kendisi'nin _post_rotalari, yol, islem)
+        değer_ata(kendisi'nin _post_rotalari'sı, yol, islem)
     }
 
     baslat fonksiyon olsun {
-        sid = dahili_sunucu_baslat(kendisi'nin port)
+        sid = dahili_sunucu_baslat(kendisi'nin port'u)
         sid == boş ise {
             "Hata: Sunucu başlatılamadı!"'ı yazdır
             döndür 0
         }
         
-        "Hüma Backend Sunucusu " + (kendisi'nin port) + " portunda aktif!"'ı yazdır
+        "Hüma Backend Sunucusu " + (kendisi'nin port'u) + " portunda aktif!"'ı yazdır
         
         1 olduğu sürece {
             istek = dahili_sunucu_bekle(sid)
             
             istek != boş ise {
-                url = (istek'in url)
-                metot = (istek'in metot)
+                url = (istek'in url'si)
+                metot = (istek'in metot'u)
                 
                 yanit = Yanıt()
-                yanit'ın istek_id = (istek'in id) olsun
+                yanit'ın istek_id'i = (istek'in id'i) olsun
                 
                 metot == "GET" ise {
-                    içeriyor(kendisi'nin _get_rotalari, url) ise {
-                        islem = değer_al(kendisi'nin _get_rotalari, url)
+                    içeriyor(kendisi'nin _get_rotalari'sı, url) ise {
+                        islem = değer_al(kendisi'nin _get_rotalari'sı, url)
                         islem(istek, yanit)
                     } yoksa {
-                        dahili_sunucu_yanitla((istek'in id), "404 Sayfa Bulunamadı", 404, "text/plain")
+                        dahili_sunucu_yanitla((istek'in id'i), "404 Sayfa Bulunamadı", 404, "text/plain")
                     }
                 }
                 
                 metot == "POST" ise {
-                    içeriyor(kendisi'nin _post_rotalari, url) ise {
-                        islem = değer_al(kendisi'nin _post_rotalari, url)
+                    içeriyor(kendisi'nin _post_rotalari'sı, url) ise {
+                        islem = değer_al(kendisi'nin _post_rotalari'sı, url)
                         islem(istek, yanit)
                     } yoksa {
-                        dahili_sunucu_yanitla((istek'in id), "404 Sayfa Bulunamadı", 404, "text/plain")
+                        dahili_sunucu_yanitla((istek'in id'i), "404 Sayfa Bulunamadı", 404, "text/plain")
                     }
                 }
             }

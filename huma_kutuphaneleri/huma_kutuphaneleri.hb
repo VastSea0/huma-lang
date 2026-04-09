@@ -5,17 +5,17 @@ yükle "huma_sqlite";
 vt = Veritabanı() olsun
 
 "Kütüphane veritabanına bağlanılıyor..."'ı yazdır
-vt'nin kur("kutuphaneler.db")
+vt'nin kur'u("kutuphaneler.db")
 
-vt'nin id == boş ise {
+vt'nin id'i == boş ise {
     "Hata: Veritabanı bağlantısı kurulamadı!"'ı yazdır
 } yoksa {
-    "Veritabanı bağlantısı başarılı (ID: " + vt'nin id + ")"'ı yazdır
+    "Veritabanı bağlantısı başarılı (ID: " + vt'nin id'i + ")"'ı yazdır
 }
 
 // Tabloyu oluştur (eğer yoksa)
 "Tablo kontrol ediliyor..."'ı yazdır
-vt'nin yürüt("CREATE TABLE IF NOT EXISTS kutuphaneler (ad TEXT PRIMARY KEY, aciklama TEXT, yazar TEXT, github TEXT, surum TEXT, durum TEXT, indirme_sayisi INTEGER)")
+vt'nin yürüt'ü("CREATE TABLE IF NOT EXISTS kutuphaneler (ad TEXT PRIMARY KEY, aciklama TEXT, yazar TEXT, github TEXT, surum TEXT, durum TEXT, indirme_sayisi INTEGER)")
 
 sunucu = Sunucu() olsun
 sunucu.kur(8080)
@@ -34,7 +34,7 @@ sunucu.getir("/ekle", fonksiyon olsun istek, cevap alsın {
 
 // 3. API - TÜM KÜTÜPHANELER
 sunucu.getir("/api/kutuphaneler", fonksiyon olsun istek, cevap alsın {
-    veriler = vt'nin sorgula("SELECT * FROM kutuphaneler") olsun
+    veriler = vt'nin sorgula'sı("SELECT * FROM kutuphaneler") olsun
     cevap.json(veriler)
 })
 
@@ -50,7 +50,7 @@ sunucu.gönder("/api/gonder", fonksiyon olsun istek, cevap alsın {
     surum = değer_al(yok, "surum") olsun
     
     sorgu = "INSERT INTO kutuphaneler (ad, aciklama, yazar, github, surum, durum, indirme_sayisi) VALUES ('" + ad + "', '" + aciklama + "', '" + yazar + "', '" + github + "', '" + surum + "', 'bekliyor', 0)" olsun
-    vt'nin yürüt(sorgu)
+    vt'nin yürüt'ü(sorgu)
     
     sonuc = metinden_nesneye("{}") olsun
     değer_ata(sonuc, "durum", "başarılı")
@@ -69,7 +69,7 @@ sunucu.gönder("/api/onayla", fonksiyon olsun istek, cevap alsın {
     hedef_ad = değer_al(body, "ad") olsun
     
     sorgu = "UPDATE kutuphaneler SET durum = 'onaylandı' WHERE ad = '" + hedef_ad + "'" olsun
-    vt'nin yürüt(sorgu)
+    vt'nin yürüt'ü(sorgu)
     
     sonuc = metinden_nesneye("{}") olsun
     değer_ata(sonuc, "durum", "başarılı")

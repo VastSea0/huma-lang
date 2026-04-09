@@ -30,11 +30,11 @@ kişi sınıf olsun {
     adı = "" olsun
     yaşı = 0 olsun
     tanıt fonksiyon olsun {
-        "Ben " + kendisi'nin adı + ", " + kendisi'nin yaşı + " yaşındayım."'nı yazdır;
+        "Ben " + kendisi'nin adı'sı + ", " + kendisi'nin yaşı'sı + " yaşındayım."'nı yazdır;
     }
 }
 
 öğrenci = kişi() olsun
-öğrenci'nin adı = "Egehan" olsun
-öğrenci'nin yaşı = 17 olsun
+öğrenci'nin adı'sı = "Egehan" olsun
+öğrenci'nin yaşı'sı = 17 olsun
 öğrenci.tanıt()

@@ -1,12 +1,14 @@
 use crate::token::Token;
 use crate::lexer::Lexer;
 use crate::ast::{Ifade, Komut};
+use crate::error::HumaError;
 
 pub struct Parser {
     lexer: Lexer,
     current_token: Token,
     peek_token: Token,
     current_pos: (usize, usize),
+    errors: Vec<HumaError>,
 }
 
 impl Parser {
@@ -14,7 +16,7 @@ impl Parser {
         let current_pos = lexer.get_pos();
         let current_token = lexer.next_token();
         let peek_token = lexer.next_token();
-        Self { lexer, current_token, peek_token, current_pos }
+        Self { lexer, current_token, peek_token, current_pos, errors: Vec::new() }
     }
 
     fn next_token(&mut self) {
@@ -23,8 +25,13 @@ impl Parser {
         self.peek_token = self.lexer.next_token();
     }
 
-    fn error(&self, msg: &str) {
+    fn error(&mut self, msg: &str) {
         eprintln!("[Hüma Hatası] Satır {}, Sütun {}: {}", self.current_pos.0, self.current_pos.1, msg);
+        self.errors.push(HumaError::SyntaxError {
+            line: self.current_pos.0,
+            col: self.current_pos.1,
+            message: msg.to_string(),
+        });
     }
 
     fn consume(&mut self, expected: Token) -> bool {
@@ -53,6 +60,14 @@ impl Parser {
             }
         }
         komutlar
+    }
+
+    /// Parse and also return any collected syntax errors.
+    /// This is intended for tooling (LSP/IDE) use.
+    pub fn parse_program_with_diagnostics(&mut self) -> (Vec<Komut>, Vec<HumaError>) {
+        let program = self.parse_program();
+        let errors = std::mem::take(&mut self.errors);
+        (program, errors)
     }
 
     fn parse_komut(&mut self) -> Option<Komut> {
@@ -418,6 +433,7 @@ impl Parser {
                     if let Token::Tanimlayici(ref s) = self.current_token {
                         let oz = s.clone();
                         self.next_token();
+                        self.consume(Token::Iyelik);
                         Ifade::KendisiErisim { ozellik: oz }
                     } else {
                         Ifade::Degisken("kendisi".to_string())
@@ -473,6 +489,7 @@ impl Parser {
                         node = Ifade::Uzunluk(Box::new(node));
                     } else if let Token::Tanimlayici(ref s) = self.current_token {
                         let oz = s.clone(); self.next_token();
+                        self.consume(Token::Iyelik);
                         node = Ifade::NesneErisim { nesne: Box::new(node), ozellik: oz };
                     } else {
                         break;

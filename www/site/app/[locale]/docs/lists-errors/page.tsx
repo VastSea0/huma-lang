@@ -37,7 +37,7 @@ ayarlar = {
 } olsun
 
 // Değere erişim (Ek sistemi ile)
-yazdır ayarlar'ın tema;
+yazdır ayarlar'ın tema'sı;
 
 // Değere erişim (Metot ile)
 yazdır ayarlar.getir("dil");
@@ -130,7 +130,7 @@ export default async function ListsErrorsPage({
                 {[
                   ["Liste", "L = [1, 2] olsun", locale === "tr" ? "İndeks tabanlı sıralı dizi" : "Index-based ordered array"],
                   ["Sözlük", "S = { 'a': 1 } olsun", locale === "tr" ? "Anahtar-değer tabanlı harita" : "Key-value based map"],
-                  ["Erişim (Sözlük)", "S'nin anahtar", locale === "tr" ? "Ek sistemi ile değer okuma" : "Read value via suffix"],
+                  ["Erişim (Sözlük)", "S'nin anahtar'ı", locale === "tr" ? "Ek sistemi ile değer okuma" : "Read value via suffix"],
                   ["Metot (Sözlük)", "S.getir('a')", locale === "tr" ? "Fonksiyon ile değer okuma" : "Read value via method"],
                 ].map(([op, syntax, desc]) => (
                   <tr key={op}>

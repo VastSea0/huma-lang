@@ -207,7 +207,7 @@
           "name": "Genitive (-nin, -ın)",
           "suffixes": "'nin, 'ın, 'un, 'ün",
           "usage": "Used for accessing object properties or methods.",
-          "example": "ayarlar'ın tema"
+          "example": "ayarlar'ın tema'sı"
         }
       },
       "best_practices": {

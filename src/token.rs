@@ -26,6 +26,7 @@ pub enum Token {
     HataAnahtar,    // hata
     Var,            // var
     Nin,            // 'nin / 'nın (kendisi'nin erişimi)
+    Iyelik,         // 'si / 'sı / 'su / 'sü (özellik iyeliği)
 
     // Tanımlayıcılar ve Literaller
     Tanimlayici(String),

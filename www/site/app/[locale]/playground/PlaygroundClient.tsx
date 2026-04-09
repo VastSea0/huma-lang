@@ -51,7 +51,7 @@ sonuç = topla(15, 20)
     ses = "Miyav" olsun
 
     konuş fonksiyon olsun {
-        kendisi'nin isim + " diyor ki: " + kendisi'nin ses'i yazdır
+        kendisi'nin isim'i + " diyor ki: " + kendisi'nin ses'i yazdır
     }
 }
 

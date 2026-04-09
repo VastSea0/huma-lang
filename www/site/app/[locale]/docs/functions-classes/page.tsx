@@ -23,7 +23,7 @@ araç sınıf olsun {
     hız = 0 olsun
 
     hızlan fonksiyon olsun miktar alsın {
-        kendisi'nin hız = kendisi'nin hız + miktar olsun
+        kendisi'nin hız'ı = kendisi'nin hız'ı + miktar olsun
     }
 
     hız_göster fonksiyon olsun {
@@ -42,7 +42,7 @@ const combinedCode = `// Fonksiyonlar ve Sınıflar Birlikte
 
     alan_hesapla fonksiyon olsun {
         // PI * r^2
-        3.14159 * kendisi'nin yarıçap * kendisi'nin yarıçap'ı döndür
+        3.14159 * kendisi'nin yarıçap'ı * kendisi'nin yarıçap'ı döndür
     }
 }
 

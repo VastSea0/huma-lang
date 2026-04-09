@@ -5,6 +5,14 @@ pub struct Lexer {
     pos: usize,
     line: usize,
     col: usize,
+    nin_state: NinState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NinState {
+    None,
+    AfterNin,
+    AfterNinProperty,
 }
 
 /// Türkçe karakter kontrolü — identifier'larda kullanılabilecek tüm Türkçe harfler
@@ -37,6 +45,7 @@ impl Lexer {
             pos: 0,
             line: 1,
             col: 1,
+            nin_state: NinState::None,
         }
     }
 
@@ -139,7 +148,7 @@ impl Lexer {
             }
             '%' => Token::Mod,
             '"' => self.read_string(),
-            '\'' => self.handle_apostrophe(),
+            '\'' | '’' => self.handle_apostrophe(),
             '0'..='9' => self.read_number(ch),
             _ if is_turkish_alpha(ch) => {
                 self.read_identifier(ch)
@@ -151,6 +160,7 @@ impl Lexer {
     /// Kesme işareti sonrası ek yönetimi.
     /// Türkçe suffix (ek) varsa strip eder ve:
     /// - 'nin/'nın → Token::Nin döndürür (nesne erişimi, kendisi'nin)
+    /// - İyelik: (X'in Y'si / Y'ı): Token::Iyelik döndürür
     /// - Diğer ekler → yutulur ve bir sonraki token'a geçilir
     fn handle_apostrophe(&mut self) -> Token {
         loop {
@@ -173,8 +183,18 @@ impl Lexer {
                 return Token::Hata("Beklenmeyen kesme işareti (ek bulunamadı)".to_string());
             }
 
+            // İyelik eki — sadece `Nin` erişiminden sonra beklenir.
+            // Örn: ayarlar'ın tema'sı  /  k1'in yas'ı
+            if self.nin_state == NinState::AfterNinProperty
+                && matches!(suffix.as_str(), "si" | "sı" | "su" | "sü" | "i" | "ı" | "u" | "ü")
+            {
+                self.nin_state = NinState::None;
+                return Token::Iyelik;
+            }
+
             // "nin", "nın", "nun", "nün", "in", "ın", "un", "ün" ekleri → Nin token döndür
             if matches!(suffix.as_str(), "nin" | "nın" | "nun" | "nün" | "in" | "ın" | "un" | "ün") {
+                self.nin_state = NinState::AfterNin;
                 return Token::Nin;
             }
 
@@ -299,7 +319,7 @@ impl Lexer {
             }
         }
         
-        match s.as_str() {
+        let tok = match s.as_str() {
             // Yeni Türkçe anahtar kelimeler
             "yazdır" | "yazdir" => Token::Yazdir,
             "olsun" => Token::Olsun,
@@ -327,6 +347,17 @@ impl Lexer {
             "hata" => Token::HataAnahtar,
             "var" => Token::Var,
             _ => Token::Tanimlayici(s),
+        };
+
+        // `X'in Y` yapısında, Nin'den sonra gelen ilk tanımlayıcı "özellik" olarak kabul edilir.
+        if self.nin_state == NinState::AfterNin {
+            if matches!(tok, Token::Tanimlayici(_)) {
+                self.nin_state = NinState::AfterNinProperty;
+            } else {
+                self.nin_state = NinState::None;
+            }
         }
+
+        tok
     }
 }

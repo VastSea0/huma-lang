@@ -411,6 +411,7 @@ impl Parser {
                     if let Token::Tanimlayici(ref s) = self.current_token {
                         let oz = s.clone();
                         self.next_token();
+                        self.consume(Token::Iyelik);
                         Ifade::KendisiErisim { ozellik: oz }
                     } else {
                         Ifade::Degisken("kendisi".to_string())
@@ -464,6 +465,7 @@ impl Parser {
                         node = Ifade::Uzunluk(Box::new(node));
                     } else if let Token::Tanimlayici(ref s) = self.current_token {
                         let oz = s.clone(); self.next_token();
+                        self.consume(Token::Iyelik);
                         node = Ifade::NesneErisim { nesne: Box::new(node), ozellik: oz };
                     } else {
                         break;

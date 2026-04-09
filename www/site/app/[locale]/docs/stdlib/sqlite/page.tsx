@@ -20,9 +20,9 @@ export default async function SqliteDocsPage({
   const getPath = (path: string) => `/${locale}${path}`;
 
   const methods = [
-    { name: "kur(yol)", desc: p.methods.kur, example: `vt'nin kur("test.db")` },
-    { name: "yürüt(sql)", desc: p.methods.yürüt, example: `vt'nin yürüt("INSERT INTO x VALUES (1)")` },
-    { name: "sorgula(sql)", desc: p.methods.sorgula, example: `liste = vt'nin sorgula("SELECT * FROM x")` },
+    { name: "kur(yol)", desc: p.methods.kur, example: `vt'nin kur'u("test.db")` },
+    { name: "yürüt(sql)", desc: p.methods.yürüt, example: `vt'nin yürüt'ü("INSERT INTO x VALUES (1)")` },
+    { name: "sorgula(sql)", desc: p.methods.sorgula, example: `liste = vt'nin sorgula'sı("SELECT * FROM x")` },
   ];
 
   return (
@@ -59,10 +59,10 @@ export default async function SqliteDocsPage({
             code={`yükle "huma_sqlite"
 
 vt = Veritabanı()
-vt'nin kur("veriler.db")
+vt'nin kur'u("veriler.db")
 
 // Tablo oluştur
-vt'nin yürüt("CREATE TABLE IF NOT EXISTS notlar (id INTEGER PRIMARY KEY, icerik TEXT)")`}
+vt'nin yürüt'ü("CREATE TABLE IF NOT EXISTS notlar (id INTEGER PRIMARY KEY, icerik TEXT)")`}
           />
         </section>
 
@@ -112,13 +112,13 @@ vt'nin yürüt("CREATE TABLE IF NOT EXISTS notlar (id INTEGER PRIMARY KEY, iceri
             {locale === "tr" ? "Örnek: Verileri Listeleme" : "Example: Listing Data"}
           </h2>
           <CodeBlock
-            code={`sonuclar = vt'nin sorgula("SELECT * FROM notlar")
+            code={`sonuclar = vt'nin sorgula'sı("SELECT * FROM notlar")
 i = 0 olsun
 u = sonuclar'ın uzunluğu
 
 i < u olduğu sürece {
     satır = sonuclar[i]
-    "Not ID: " + (satır'ın id) + ", İçerik: " + (satır'ın icerik)'i yazdır
+    "Not ID: " + (satır'ın id'i) + ", İçerik: " + (satır'ın icerik'i)'i yazdır
     i = i + 1 olsun
 }`}
           />

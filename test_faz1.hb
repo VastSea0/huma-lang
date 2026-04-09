@@ -5,8 +5,8 @@ bilgi = {
     "sürüm": 0.6
 } olsun
 
-yazdır bilgi'nin isim
-yazdır bilgi'nin tip
+yazdır bilgi'nin isim'i
+yazdır bilgi'nin tip'i
 
 // Metod testi
 yazdır bilgi.getir("sürüm")

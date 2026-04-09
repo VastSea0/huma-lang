@@ -18,7 +18,7 @@ hecele fonksiyon olsun kelime alsın {
     heceler = [] olsun
     bas = 0 olsun
     k = 0 olsun
-    unlu_sayisi = konumlar'ın uzunluğu olsun
+    unlu_sayisi = konumlar'ın uzunluğu'su olsun
 
     unlu_sayisi = 0 ise {
         [kelime]'yi döndür

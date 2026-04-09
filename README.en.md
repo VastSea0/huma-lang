@@ -166,7 +166,7 @@ ayarlar = { "tema": "koyu" } olsun
 
 // Traditional: yazdır ayarlar.tema
 // Hüma style:
-yazdır ayarlar'ın tema;
+yazdır ayarlar'ın tema'sı;
 ```
 
 ---

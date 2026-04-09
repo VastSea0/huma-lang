@@ -95,7 +95,7 @@
     "suffixes": {
       "patterns": [
         {
-          "match": "'(i|ı|u|ü|e|a|in|ın|un|ün|nin|nın|nun|nün|ye|ya|yi|yı|yu|yü|den|dan|ten|tan|de|da|te|ta|ndan|nden|nda|nde|nı|ni|nu|nü)",
+          "match": "'(i|ı|u|ü|e|a|in|ın|un|ün|nin|nın|nun|nün|si|sı|su|sü|ye|ya|yi|yı|yu|yü|den|dan|ten|tan|de|da|te|ta|ndan|nden|nda|nde|nı|ni|nu|nü)",
           "name": "keyword.other.suffix.huma"
         }
       ]

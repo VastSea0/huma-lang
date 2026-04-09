@@ -95,7 +95,7 @@ fn test_siniflar() {
         kisi sınıf olsun {
             yas = 20 olsun
             buyu fonksiyon olsun {
-                kendisi'nin yas = kendisi'nin yas + 1 olsun
+                kendisi'nin yas'ı = kendisi'nin yas'ı + 1 olsun
             }
         }
         k1 = kisi() olsun

@@ -29,7 +29,7 @@ isim'i yazdır;
 
 const usageCode = `// Nesne erişimleri (İlgi Durumu: 'nin, 'ın)
 ayarlar = { "tema": "koyu" } olsun
-yazdır ayarlar'ın tema;
+yazdır ayarlar'ın tema'sı;
 
 // Listeye ekleme (Yönelme Durumu: 'e, 'a, 'ye, 'ya)
 sayılar = [1, 2] olsun
