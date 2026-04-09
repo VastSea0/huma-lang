@@ -127,8 +127,8 @@ export default function CodeBlock({
             {code.trim().split("\n").map((line, i) => {
               // Simple bash highlighter
               const highlighted = line
-                .replace(/^(\$?\s*)(huma|çalıştır|derle|paket|paket)\b/g, '$1<span class="text-primary font-bold">$2</span>')
-                .replace(/(--?\w+)/g, '<span class="text-on-surface-variant/60">$1</span>');
+                .replace(/^(\$?\s*)(huma|çalıştır|derle|paket)\b/g, '$1<span class="text-primary font-bold">$2</span>')
+                .replace(/(^|\s)(--?\w+)/g, '$1<span class="text-on-surface-variant/60">$2</span>');
               return (
                 <div key={i} dangerouslySetInnerHTML={{ __html: highlighted }} />
               );
