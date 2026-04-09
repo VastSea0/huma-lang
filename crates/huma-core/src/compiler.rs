@@ -90,6 +90,14 @@ impl Derleyici {
                 self.instructions.push(OpCode::Call(arg_len));
             }
             Ifade::Bos => self.instructions.push(OpCode::Bos),
+            Ifade::Sozluk(ciftler) => {
+                let len = ciftler.len();
+                for (k, v) in ciftler {
+                    self.ifade_derle(k);
+                    self.ifade_derle(v);
+                }
+                self.instructions.push(OpCode::MakeMap(len));
+            }
             _ => {}
         }
     }
@@ -156,6 +164,31 @@ impl Derleyici {
             Komut::DondurKomutu(ifade) => {
                 self.ifade_derle(ifade);
                 self.instructions.push(OpCode::Return);
+            }
+            Komut::DeneKomutu { dene_govde, hata_degisken, hata_govde } => {
+                let try_start_idx = self.instructions.len();
+                self.instructions.push(OpCode::TryBlockStart(0));
+
+                for k in dene_govde { self.komut_derle(k); }
+                
+                self.instructions.push(OpCode::TryBlockEnd);
+                
+                let jump_after_idx = self.instructions.len();
+                self.instructions.push(OpCode::Jump(0));
+                
+                let catch_start = self.instructions.len();
+                self.instructions[try_start_idx] = OpCode::TryBlockStart(catch_start);
+                
+                if let Some(ad) = hata_degisken {
+                    self.instructions.push(OpCode::DefineVar(ad));
+                } else {
+                    self.instructions.push(OpCode::Pop);
+                }
+                
+                for k in hata_govde { self.komut_derle(k); }
+                
+                let end_idx = self.instructions.len();
+                self.instructions[jump_after_idx] = OpCode::Jump(end_idx);
             }
             _ => {
                 // Placeholder for unimplemented commands in bytecode

@@ -25,6 +25,8 @@ pub enum Deger {
         sinif_adi: String,
         alanlar: Rc<RefCell<HashMap<String, Deger>>>,
     },
+    Sozluk(Rc<RefCell<HashMap<String, Deger>>>),
+    Hata(String),
 }
 
 impl std::fmt::Display for Deger {
@@ -46,6 +48,12 @@ impl std::fmt::Display for Deger {
             }
             Deger::Bos => write!(f, "Boş"),
             Deger::Nesne { sinif_adi, .. } => write!(f, "<{} nesnesi>", sinif_adi),
+            Deger::Sozluk(m) => {
+                let m_borrow = m.borrow();
+                let p: Vec<String> = m_borrow.iter().map(|(k, v)| format!("\"{}\": {}", k, v)).collect();
+                write!(f, "{{{}}}", p.join(", "))
+            }
+            Deger::Hata(e) => write!(f, "Hata: {}", e),
             _ => write!(f, "<dahili>"),
         }
     }
@@ -69,6 +77,14 @@ impl Deger {
                 }
                 serde_json::Value::Object(map)
             }
+            Deger::Sozluk(m) => {
+                let mut map = serde_json::Map::new();
+                for (k, v) in m.borrow().iter() {
+                    map.insert(k.clone(), v.to_json());
+                }
+                serde_json::Value::Object(map)
+            }
+            Deger::Hata(e) => serde_json::Value::String(format!("Hata: {}", e)),
             _ => serde_json::Value::Null,
         }
     }
@@ -87,7 +103,7 @@ impl Deger {
                 for (k, v) in o.iter() {
                     map.insert(k.clone(), Deger::from_json(v));
                 }
-                Deger::Nesne { sinif_adi: "Sözlük".to_string(), alanlar: Rc::new(RefCell::new(map)) }
+                Deger::Sozluk(Rc::new(RefCell::new(map)))
             }
             _ => Deger::Bos,
         }

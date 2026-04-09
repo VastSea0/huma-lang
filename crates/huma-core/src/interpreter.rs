@@ -514,7 +514,7 @@ impl Yorumlayici {
             if args.len() < 2 { return Deger::Sayi(0.0); }
             if let (Deger::Sayi(id), Deger::Metin(sql)) = (&args[0], &args[1]) {
                 let conn_id = *id as u64;
-                let mut conns = SQL_CONNECTIONS.lock().unwrap();
+                let conns = SQL_CONNECTIONS.lock().unwrap();
                 if let Some(conn) = conns.get(&conn_id) {
                     match conn.execute(sql, []) {
                         Ok(_) => return Deger::Sayi(1.0),
@@ -748,7 +748,7 @@ impl Yorumlayici {
                 }
             }
             Komut::ListeCikar { liste, indeks } => {
-                let mut idx_val = self.ifade_hesapla(indeks);
+                let idx_val = self.ifade_hesapla(indeks);
                 let liste_val = self.ifade_hesapla(liste);
                 
                 // Eğer indeks bir listeyse (özellikle [i] syntax'ında), ilk elemanı al
@@ -768,13 +768,9 @@ impl Yorumlayici {
                     }
                 }
             }
-            Komut::DeneKomutu { dene_govde, hata_govde } => {
-                // Basit hata yönetimi — dene bloğunu çalıştır, panic olursa hata bloğunu çalıştır
-                // Rust'ta gerçek try-catch yok, bu yüzden basit bir yaklaşım:
-                // Şimdilik dene bloğunu çalıştır, hata olursa hata bloğunu çalıştır
+            Komut::DeneKomutu { dene_govde, hata_degisken, hata_govde } => {
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     let mut temp_interp = Yorumlayici::new();
-                    // Global değişkenleri kopyala
                     temp_interp.global_degiskenler = self.global_degiskenler.clone();
                     temp_interp.yerel_scopes = self.yerel_scopes.clone();
                     for k in dene_govde.clone() {
@@ -787,7 +783,13 @@ impl Yorumlayici {
                         self.global_degiskenler = temp.global_degiskenler;
                         self.yerel_scopes = temp.yerel_scopes;
                     }
-                    Err(_) => {
+                    Err(e) => {
+                        if let Some(var) = hata_degisken {
+                            let msg = if let Some(s) = e.downcast_ref::<&str>() { s.to_string() }
+                                      else if let Some(s) = e.downcast_ref::<String>() { s.clone() }
+                                      else { "Bilinmeyen hata".to_string() };
+                            self.degisken_tanimla(var, Deger::Hata(msg));
+                        }
                         for k in hata_govde { self.komut_calistir(k); if self.donus_degeri.is_some() { break; } }
                     }
                 }
@@ -823,11 +825,14 @@ impl Yorumlayici {
                                     let idx = i as usize;
                                     let mut b = l.borrow_mut();
                                     if idx < b.len() {
-                                        b[idx] = d;
+                                        b[idx] = d.clone();
                                     }
                                 }
+                                (Deger::Sozluk(m), Deger::Metin(key)) => {
+                                    m.borrow_mut().insert(key, d.clone());
+                                }
                                 (Deger::Nesne { alanlar, .. }, Deger::Metin(key)) => {
-                                    alanlar.borrow_mut().insert(key, d);
+                                    alanlar.borrow_mut().insert(key, d.clone());
                                 }
                                 _ => {}
                             }
@@ -896,12 +901,22 @@ impl Yorumlayici {
             Ifade::Yanlis => Deger::Sayi(0.0),
             Ifade::Degisken(ad) => self.get_degisken(&ad),
             Ifade::Liste(el) => Deger::Liste(Rc::new(RefCell::new(el.into_iter().map(|e| self.ifade_hesapla(e)).collect()))),
+            Ifade::Sozluk(el) => {
+                let mut map = HashMap::new();
+                for (k, v) in el {
+                    let key = self.ifade_hesapla(k).to_string();
+                    let val = self.ifade_hesapla(v);
+                    map.insert(key, val);
+                }
+                Deger::Sozluk(Rc::new(RefCell::new(map)))
+            }
             Ifade::ListeErisim { liste, indeks } => {
                 let l_val = self.ifade_hesapla(*liste);
                 let i_val = self.ifade_hesapla(*indeks);
                 match (l_val, i_val) {
                     (Deger::Liste(l), Deger::Sayi(i)) => l.borrow().get(i as usize).cloned().unwrap_or(Deger::Bos),
                     (Deger::Metin(s), Deger::Sayi(i)) => s.chars().nth(i as usize).map(|c| Deger::Metin(c.to_string())).unwrap_or(Deger::Bos),
+                    (Deger::Sozluk(m), Deger::Metin(key)) => m.borrow().get(&key).cloned().unwrap_or(Deger::Bos),
                     (Deger::Nesne { alanlar, .. }, Deger::Metin(key)) => alanlar.borrow().get(&key).cloned().unwrap_or(Deger::Bos),
                     _ => Deger::Bos
                 }
@@ -909,6 +924,7 @@ impl Yorumlayici {
             Ifade::NesneErisim { nesne, ozellik } => {
                 let inst = self.ifade_hesapla(*nesne);
                 if let Deger::Nesne { alanlar, .. } = inst { alanlar.borrow().get(&ozellik).cloned().unwrap_or(Deger::Bos) }
+                else if let Deger::Sozluk(m) = inst { m.borrow().get(&ozellik).cloned().unwrap_or(Deger::Bos) }
                 else { Deger::Bos }
             }
             Ifade::KendisiErisim { ozellik } => {
@@ -938,6 +954,22 @@ impl Yorumlayici {
                                 method_instance = Some(instance.clone());
                                 Deger::Fonksiyon { parametreler: ps.clone(), govde: bd.clone() }
                             } else { self.ifade_hesapla(*fonksiyon) }
+                        } else { self.ifade_hesapla(*fonksiyon) }
+                    } else if let Deger::Sozluk(ref m) = instance {
+                        if ozellik == "getir" {
+                            let args = argumanlar.into_iter().map(|a| self.ifade_hesapla(a)).collect::<Vec<_>>();
+                            if let Some(Deger::Metin(k)) = args.first() {
+                                return m.borrow().get(k).cloned().unwrap_or(Deger::Bos);
+                            }
+                            return Deger::Bos;
+                        } else if ozellik == "ayarla" {
+                            let args = argumanlar.into_iter().map(|a| self.ifade_hesapla(a)).collect::<Vec<_>>();
+                            if args.len() >= 2 {
+                                if let Deger::Metin(k) = &args[0] {
+                                    m.borrow_mut().insert(k.clone(), args[1].clone());
+                                }
+                            }
+                            return Deger::Bos;
                         } else { self.ifade_hesapla(*fonksiyon) }
                     } else { self.ifade_hesapla(*fonksiyon) }
                 } else { self.ifade_hesapla(*fonksiyon) };
@@ -995,6 +1027,7 @@ impl Yorumlayici {
             Deger::Sayi(n) => n != 0.0,
             Deger::Metin(s) => !s.is_empty(),
             Deger::Liste(l) => !l.borrow().is_empty(),
+            Deger::Sozluk(m) => !m.borrow().is_empty(),
             Deger::Bos => false,
             _ => true
         }

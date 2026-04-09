@@ -43,6 +43,7 @@ pub enum Ifade {
         parametreler: Vec<String>,
         govde: Vec<Komut>,
     },
+    Sozluk(Vec<(Ifade, Ifade)>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -95,6 +96,7 @@ pub enum Komut {
     /// dene { } hata var ise { }
     DeneKomutu {
         dene_govde: Vec<Komut>,
+        hata_degisken: Option<String>,
         hata_govde: Vec<Komut>,
     },
     /// Nesne alanına atama: kendisi'nin alan = değer olsun

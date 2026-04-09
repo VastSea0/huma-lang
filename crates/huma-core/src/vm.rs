@@ -7,6 +7,7 @@ pub struct VM {
     globals: HashMap<String, Deger>,
     program: Program,
     ip: usize,
+    error_stack: Vec<usize>,
 }
 
 impl VM {
@@ -16,6 +17,7 @@ impl VM {
             globals: HashMap::new(),
             program,
             ip: 0,
+            error_stack: Vec::new(),
         }
     }
 
@@ -70,7 +72,11 @@ impl VM {
                     let r = self.stack.pop().unwrap();
                     let l = self.stack.pop().unwrap();
                     if let (Deger::Sayi(a), Deger::Sayi(b)) = (l, r) {
-                        self.stack.push(Deger::Sayi(a / b));
+                        if b == 0.0 {
+                            self.hata_firlat("Sıfıra bölme hatası".to_string());
+                        } else {
+                            self.stack.push(Deger::Sayi(a / b));
+                        }
                     }
                 }
                 OpCode::Print => {
@@ -89,8 +95,34 @@ impl VM {
                 OpCode::Pop => { self.stack.pop(); }
                 OpCode::Return => break,
                 OpCode::Bos => self.stack.push(Deger::Bos),
+                OpCode::MakeMap(len) => {
+                    let mut map = HashMap::new();
+                    for _ in 0..*len {
+                        let val = self.stack.pop().unwrap();
+                        let key = self.stack.pop().unwrap();
+                        if let Deger::Metin(k) = key {
+                            map.insert(k, val);
+                        }
+                    }
+                    self.stack.push(Deger::Sozluk(std::rc::Rc::new(std::cell::RefCell::new(map))));
+                }
+                OpCode::TryBlockStart(addr) => {
+                    self.error_stack.push(*addr);
+                }
+                OpCode::TryBlockEnd => {
+                    self.error_stack.pop();
+                }
                 _ => {}
             }
+        }
+    }
+
+    fn hata_firlat(&mut self, msg: String) {
+        if let Some(handler_addr) = self.error_stack.pop() {
+            self.ip = handler_addr;
+            self.stack.push(Deger::Hata(msg));
+        } else {
+            panic!("Çalışma Zamanı Hatası: {}", msg);
         }
     }
 

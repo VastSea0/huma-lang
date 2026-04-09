@@ -23,6 +23,7 @@ pub enum Token {
     Dogru,          // doğru
     Yanlis,         // yanlış
     Dene,           // dene
+    Yakala,         // yakala
     HataAnahtar,    // hata
     Var,            // var
     Nin,            // 'nin / 'nın (kendisi'nin erişimi)
@@ -54,6 +55,7 @@ pub enum Token {
     Virgul,         // ,
     NoktaliVirgul,  // ;
     Nokta,          // .
+    IkiNokta,       // :
 
     // Kontrol
     Hata(String),

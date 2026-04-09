@@ -21,6 +21,9 @@ pub enum OpCode {
     Print,
     MakeList(usize),
     ListAccess,
+    MakeMap(usize),
+    TryBlockStart(usize),
+    TryBlockEnd,
     Pop,
     Bos,
 }

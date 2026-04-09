@@ -271,17 +271,30 @@ impl Parser {
         Some(Komut::DonguKomutu { kosul, govde })
     }
 
-    /// dene { } hata var ise { }
+    /// dene { } yakala hata { }
+    /// Veya eski: dene { } hata var ise { }
     fn parse_dene(&mut self) -> Option<Komut> {
         self.consume(Token::Dene);
         self.consume(Token::AcikSuskun);
         let dene_govde = self.parse_blok();
-        self.consume(Token::HataAnahtar);
-        self.consume(Token::Var);
-        self.consume(Token::Ise);
+        
+        let mut hata_degisken = None;
+        if self.current_token == Token::Yakala {
+            self.next_token();
+            if let Token::Tanimlayici(ref s) = self.current_token {
+                hata_degisken = Some(s.clone());
+                self.next_token();
+            }
+        } else {
+            // Geriye dönük uyumluluk: hata var ise
+            self.consume(Token::HataAnahtar);
+            self.consume(Token::Var);
+            self.consume(Token::Ise);
+        }
+
         self.consume(Token::AcikSuskun);
         let hata_govde = self.parse_blok();
-        Some(Komut::DeneKomutu { dene_govde, hata_govde })
+        Some(Komut::DeneKomutu { dene_govde, hata_degisken, hata_govde })
     }
 
     fn parse_yukle(&mut self) -> Option<Komut> {
@@ -420,6 +433,7 @@ impl Parser {
                 expr
             }
             Token::AcikKose => self.parse_liste(),
+            Token::AcikSuskun => self.parse_sozluk(),
             Token::Fonksiyon => self.parse_anonim_fonksiyon(),
             _ => { self.next_token(); Ifade::Bos }
         };
@@ -485,6 +499,22 @@ impl Parser {
         }
         self.consume(Token::KapaliKose);
         Ifade::Liste(el)
+    }
+    
+    fn parse_sozluk(&mut self) -> Ifade {
+        self.next_token(); // '{' yut
+        let mut ciftler = Vec::new();
+        if self.current_token != Token::KapaliSuskun {
+            loop {
+                let anahtar = self.parse_ifade();
+                self.consume(Token::IkiNokta);
+                let deger = self.parse_ifade();
+                ciftler.push((anahtar, deger));
+                if self.current_token == Token::Virgul { self.next_token(); } else { break; }
+            }
+        }
+        self.consume(Token::KapaliSuskun);
+        Ifade::Sozluk(ciftler)
     }
 
     fn parse_anonim_fonksiyon(&mut self) -> Ifade {

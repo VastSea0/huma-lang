@@ -89,6 +89,9 @@ pub fn generate_standalone(input_path: &str, output_name: &str) -> HumaResult<St
             OpCode::ListAccess => "OpCode::ListAccess".to_string(),
             OpCode::Pop => "OpCode::Pop".to_string(),
             OpCode::Bos => "OpCode::Bos".to_string(),
+            OpCode::MakeMap(n) => format!("OpCode::MakeMap({})", n),
+            OpCode::TryBlockStart(n) => format!("OpCode::TryBlockStart({})", n),
+            OpCode::TryBlockEnd => "OpCode::TryBlockEnd".to_string(),
         })
         .collect();
     let inst_str = format!("vec![{}]", inst_items.join(", "));
@@ -115,7 +118,7 @@ enum OpCode {{
     PushConstant(usize), LoadVar(String), StoreVar(String), DefineVar(String),
     Add, Sub, Mul, Div, Greater, Less, Equal, NotEqual,
     Jump(usize), JumpIfFalse(usize), Call(usize), Return, Print,
-    MakeList(usize), ListAccess, Pop, Bos,
+    MakeList(usize), ListAccess, MakeMap(usize), TryBlockStart(usize), TryBlockEnd, Pop, Bos,
 }}
 
 #[derive(Debug, Clone)]
@@ -127,6 +130,8 @@ enum Deger {{
     Metin(String), 
     Liste(Vec<Deger>), 
     Nesne(std::collections::HashMap<String, Deger>),
+    Sozluk(std::collections::HashMap<String, Deger>),
+    Hata(String),
     Bos 
 }}
 
@@ -142,6 +147,8 @@ impl std::fmt::Display for Deger {{
                 write!(f, "[{{}}]", p.join(", "))
             }},
             Deger::Nesne(m) => write!(f, "<Nesne>"),
+            Deger::Sozluk(m) => write!(f, "<Sözlük>"),
+            Deger::Hata(e) => write!(f, "Hata: {{}}", e),
             Deger::Bos => write!(f, "Boş"),
         }}
     }}
@@ -152,6 +159,7 @@ fn main() {{
     let cons = {};
     let mut stack: Vec<Deger> = Vec::new();
     let mut globals = std::collections::HashMap::new();
+    let mut error_stack: Vec<usize> = Vec::new();
     let mut ip = 0;
     
     while ip < inst.len() {{
@@ -179,6 +187,17 @@ fn main() {{
             }},
             OpCode::Return => break,
             OpCode::Pop => {{ stack.pop(); }},
+            OpCode::MakeMap(n) => {{
+                let mut map = std::collections::HashMap::new();
+                for _ in 0..*n {{
+                    let v = stack.pop().unwrap();
+                    let k = match stack.pop().unwrap() {{ Deger::Metin(s) => s, v => v.to_string() }};
+                    map.insert(k, v);
+                }}
+                stack.push(Deger::Sozluk(map));
+            }},
+            OpCode::TryBlockStart(a) => error_stack.push(*a),
+            OpCode::TryBlockEnd => {{ error_stack.pop(); }},
             _ => {{}}
         }}
     }}
