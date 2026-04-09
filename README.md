@@ -167,6 +167,18 @@ yazdır ayarlar'ın tema'sı;
 
 ---
 
+## 🧰 CLI (`huma`)
+
+- **Çalıştırma**: `huma run <dosya.hb>`
+- **Derleme**: `huma build <dosya.hb> -o cikti.hbc`
+- **Bytecode çalıştırma**: `huma exec <dosya.hbc>`
+- **REPL**: `huma repl`
+- **Test runner**: `huma test [yol]`
+  - `yol` verilmezse `tests/` (varsa) taranır
+  - Her test dosyası varsayılan olarak **3 saniye** içinde bitmezse hata sayılır (kilitlenmeleri engellemek için)
+
+---
+
 ## 📚 Sistem Kütüphaneleri (`lib/`)
 
 - **`matematik.hb`**: `karesi(n)`, `küpü(n)`, `kuvvet(a, b)`, `faktöriyel(n)`
