@@ -42,7 +42,10 @@ cargo build --release
 ./target/release/huma
 
 # Bir dosyayı çalıştırın:
-./target/release/huma calistir ornek.hb`;
+./target/release/huma çalıştır ornek.hb
+
+# veya İngilizce alias:
+./target/release/huma run ornek.hb`;
 
 export default async function CompilerPage({
   params,
@@ -165,12 +168,12 @@ export default async function CompilerPage({
           <div className="bg-tertiary/5 border-l-4 border-tertiary p-6 rounded-r-lg mt-8">
             <div className="flex items-center gap-3 mb-2 text-tertiary">
               <span className="material-symbols-outlined text-lg">code</span>
-              <span className="text-xs font-bold uppercase tracking-widest">Source: src/ast.rs</span>
+              <span className="text-xs font-bold uppercase tracking-widest">Source: crates/huma-core/src/ast.rs</span>
             </div>
             <p className="text-sm text-on-surface-variant leading-relaxed">
               {locale === "tr" 
-                ? "Tüm AST düğüm tanımları 'src/ast.rs' içinde yer alır. Yinelemeli inişli (recursive descent) parser ise 'src/parser.rs' içindedir."
-                : "Full AST node definitions live in 'src/ast.rs'. The recursive descent parser is in 'src/parser.rs'."}
+                ? "Tüm AST düğüm tanımları 'crates/huma-core/src/ast.rs' içinde yer alır. Yinelemeli inişli parser ise 'crates/huma-core/src/parser.rs' içindedir."
+                : "Full AST node definitions live in 'crates/huma-core/src/ast.rs'. The recursive descent parser is in 'crates/huma-core/src/parser.rs'."}
             </p>
           </div>
         </section>
@@ -258,13 +261,13 @@ export default async function CompilerPage({
             </p>
             <div className="flex flex-col gap-4 text-[11px] font-bold uppercase tracking-widest">
               <a
-                href="https://github.com/VastSea0/huma-lang/tree/main/src"
+                href="https://github.com/VastSea0/huma-lang/tree/main/crates"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 text-primary hover:text-primary-fixed transition-colors"
               >
                 <span className="material-symbols-outlined text-base">folder_open</span>
-                src/ GitHub
+                crates/ GitHub
               </a>
               <a
                 href="https://github.com/VastSea0/huma-lang/issues"

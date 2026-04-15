@@ -179,9 +179,14 @@ pub fn run_tests(target: Option<&str>) -> Result<()> {
                 }
             }
             Ok(TestOutcome::Unknown) => {
-                // If there's no birim_test report, we treat "no panic" as pass.
-                passed_files += 1;
-                println!("{}", "OK".bright_green().bold());
+                // Strict mode: tests must emit a birim_test summary.
+                failed_files += 1;
+                println!("{}", "FAIL".bright_red().bold());
+                println!(
+                    "  {} {}",
+                    "↳".bright_black(),
+                    "Test raporu algılanamadı (birim_test çıktısı bekleniyor).".bright_yellow()
+                );
             }
             Err(e) => {
                 failed_files += 1;

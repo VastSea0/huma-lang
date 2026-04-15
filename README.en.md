@@ -15,7 +15,7 @@ Hüma is a high-performance, safe, and intuitive programming language that combi
 - **Rich Standard Library:** Built-in support for mathematics, NLP, terminal coloring, time management, advanced list manipulation, and unit testing.
 - **Secure Package Management:** SHA-256 integrity verification, path traversal protection, and mono-repo (sub-directory) support (v0.5.2).
 - **Bilingual CLI (Turkish & English):** All commands work in both languages (e.g., `run` or `çalıştır`, `build` or `derle`, `package` or `paket`).
-- **Modern IDE Support:** Full-featured IDEs available in both Native (GTK) and Web/Tauri flavors.
+- **Modern CLI + LSP Support:** Strong CLI workflows with editor intelligence (completion, hover, diagnostics) via LSP.
 
 ---
 
@@ -46,8 +46,8 @@ Hüma features a **Bilingual CLI**, meaning you can use the English commands (e.
     - **Smart Logic:** If no target is provided, it looks for a script named `start` or `baslat`. If neither is found, it runs the entry file specified in `huma.json`.
 - `huma repl` (Alias: `kabuk`)
     - **Description:** Starts the interactive Read-Eval-Print Loop for quick prototyping and testing.
-- `huma ide` (Alias: `arayüz`)
-    - **Description:** Launches the desktop Integrated Development Environment.
+- `huma test [target]` (Alias: `sına`)
+    - **Description:** Runs test files in the project. If `target` is provided, runs a single file or directory scope.
 
 ### 2. Compilation & Bytecode
 
@@ -74,6 +74,8 @@ Hüma features a **Bilingual CLI**, meaning you can use the English commands (e.
     - **Description:** Checks and updates project dependencies to their latest versions.
 - `huma package verify` (Alias: `paket doğrula`)
     - **Description:** Performs a pre-distribution check on the package structure and metadata.
+- `huma package run <name>` (Alias: `çalıştır`, `betik`)
+    - **Description:** Runs a named script from `huma.json` (similar to npm run).
 
 ### 4. Maintenance & Information
 

@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 const installCode = `curl -fsSL https://raw.githubusercontent.com/VastSea0/huma-lang/main/install.sh | sh`;
 
 const versionCode = `$ huma --version
-Hüma Language Compiler v0.5.0 (build 5e12d)`;
+Hüma 0.5.2 (darwin aarch64)`;
 
 const firstProgramCode = `// Değişken tanımlayıp koşullu mantık
 puan = 85 olsun
@@ -67,9 +67,10 @@ export default async function DocsPage({
           <p className="mb-6 text-on-surface-variant">
             {d.installation.desc}
           </p>
-          <CodeBlock 
-            code={`curl -fsSL https://raw.githubusercontent.com/VastSea0/huma-lang/main/install.sh \n\n[Hüma] ${locale === "tr" ? "Sistem algılanıyor..." : "Detecting system..."} Linux x86_64\n[Hüma] v0.5.0 ${locale === "tr" ? "indiriliyor..." : "downloading..."} [##########] 100%\n[Hüma] ${locale === "tr" ? "Kurulum tamamlandı." : "Installation complete."}\n[Hüma] ${locale === "tr" ? "Yol (PATH) güncellendi." : "PATH updated."}`} 
-            variant="terminal" 
+          <CodeBlock code={installCode} variant="terminal" />
+          <CodeBlock
+            code={`$ huma --version\nHüma 0.5.2`}
+            variant="terminal"
           />
 
           {/* Info callout */}
@@ -98,10 +99,7 @@ export default async function DocsPage({
             {d.quick_start.desc}
           </p>
           <div className="space-y-4">
-            <CodeBlock 
-              code={`$ huma --${locale === "tr" ? "versiyon" : "version"}\nHüma v0.5.0 (${locale === "tr" ? "Modern Ağ Şafağı" : "Modern Network Dawn"})`} 
-              variant="terminal" 
-            />
+            <CodeBlock code={versionCode} variant="terminal" />
             <CodeBlock 
               code={`$ huma repl\n\nhüma ❯ "merhaba world"'u yazdır\nmerhaba world\nhüma ❯ çıkış`} 
               variant="terminal" 

@@ -13,7 +13,7 @@ Hüma, modern yazılım geliştirme prensiplerini Türkçe doğal dil yapısıyl
 - **Zengin Sistem Kütüphaneleri:** Matematik, NLP, terminal renklendirme, zaman yönetimi, liste araçları ve birim test çerçevesi hazırdır.
 - **Güvenli Paket Yönetimi:** SHA-256 bütünlük doğrulaması, path traversal koruması ve mono-repo (alt dizin) desteği ile güvenli modül yönetimi (v0.5.2).
 - **İki Dilli CLI (Bilingual CLI):** Tüm komutları hem Türkçe hem İngilizce olarak kullanabilirsiniz (Örn: `run` veya `çalıştır`, `build` veya `derle`).
-- **Modern IDE Desteği:** Kod yazmanız için hem Native (GTK) hem de Web tabanlı modern editörler sunulur.
+- **Modern CLI + LSP Desteği:** Güçlü CLI komut seti ve LSP entegrasyonu ile editörünüzde tamamlamalar, hover ve tanılamalar sunulur.
 
 ---
 
@@ -42,8 +42,8 @@ Hüma, **Çift Dilli (Bilingual) CLI** mimarisine sahiptir. Tüm komutları hem 
     - **Akıllı Mantık:** Hedef belirtilmezse dizinde `baslat` veya `start` betiği arar. Yoksa `huma.json` içindeki ana giriş dosyasını koşturur.
 - `huma kabuk` (Alias: `repl`)
     - **Açıklama:** Kodları satır satır denemek ve hızlı prototipleme yapmak için etkileşimli REPL modunu başlatır.
-- `huma arayüz` (Alias: `ide`)
-    - **Açıklama:** Hüma'nın masaüstü geliştirme ortamını (IDE) başlatır.
+- `huma sına [hedef]` (Alias: `test`)
+    - **Açıklama:** Projedeki test dosyalarını çalıştırır. `hedef` verilirse tek dosya veya klasör bazlı çalıştırma yapılır.
 
 ### 2. Derleme ve Bytecode İşlemleri
 
@@ -70,6 +70,8 @@ Hüma, **Çift Dilli (Bilingual) CLI** mimarisine sahiptir. Tüm komutları hem 
     - **Açıklama:** Kurulu paketlerin uzak sunucudaki yeni sürümlerini kontrol eder ve günceller.
 - `huma paket doğrula` (Alias: `verify`)
     - **Açıklama:** Proje yapısını ve metadataları yayın öncesi kontrol ederek bütünlüğü doğrular.
+- `huma paket çalıştır <ad>` (Alias: `run`, `betik`)
+    - **Açıklama:** `huma.json` içindeki tanımlı bir betiği çalıştırır (npm run benzeri).
 
 ### 4. Bakım ve Bilgi
 

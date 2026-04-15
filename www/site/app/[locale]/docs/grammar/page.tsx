@@ -100,6 +100,19 @@ export default async function GrammarPage({
           <p className="mb-10 text-xl text-on-surface-variant/80 font-medium leading-relaxed max-w-2xl">
             {g?.suffixes?.desc}
           </p>
+          <div className="bg-primary/5 border-l-4 border-primary p-6 rounded-r-lg mb-10">
+            <div className="flex items-center gap-3 mb-2 text-primary">
+              <span className="material-symbols-outlined text-lg">fact_check</span>
+              <span className="text-xs font-bold uppercase tracking-widest">
+                {locale === "tr" ? "Özellik Durumu" : "Feature Status"}
+              </span>
+            </div>
+            <p className="text-sm text-on-surface-variant leading-relaxed">
+              {locale === "tr"
+                ? "Bu sayfadaki eklerin çoğu lexer düzeyinde normalizasyon (token sadeleştirme) amaçlıdır. Yani sözdizimi akıcılığını artırır; ancak her ek bağımsız bir semantik operatör gibi davranmaz."
+                : "Most suffixes shown here are lexer-level normalization (token simplification). They improve fluency, but not every suffix behaves as an independent semantic operator."}
+            </p>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-12">
              {/* Accusative */}
@@ -117,7 +130,7 @@ export default async function GrammarPage({
                 <p className="text-on-surface-variant text-sm mb-6 leading-relaxed">Değişkeni veya nesneyi hedef alır.</p>
                 <div className="p-4 bg-surface-container rounded-xl border border-outline-variant/20 font-mono text-[11px]">
                   <span className="opacity-50"># Örnek</span><br/>
-                  sayı'yı <span className="text-primary">yazdır</span>
+                  {"sayı'yı "}<span className="text-primary">yazdır</span>
                 </div>
               </div>
             </div>
@@ -137,7 +150,7 @@ export default async function GrammarPage({
                 <p className="text-on-surface-variant text-sm mb-6 leading-relaxed">İşlemin yapılacağı hedefi belirtir.</p>
                 <div className="p-4 bg-surface-container rounded-xl border border-outline-variant/20 font-mono text-[11px]">
                   <span className="opacity-50"># Örnek</span><br/>
-                  liste'ye <span className="text-primary">ekle</span>
+                  {"liste'ye "}<span className="text-primary">ekle</span>
                 </div>
               </div>
             </div>
@@ -157,7 +170,7 @@ export default async function GrammarPage({
                 <p className="text-on-surface-variant text-sm mb-6 leading-relaxed">Özelliklere ve alt öğelere erişir.</p>
                 <div className="p-4 bg-surface-container rounded-xl border border-outline-variant/20 font-mono text-[11px]">
                   <span className="opacity-50"># Örnek</span><br/>
-                  kişi'nin <span className="text-primary">ad'ı</span>
+                  {"kişi'nin "}<span className="text-primary">{"ad'ı"}</span>
                 </div>
               </div>
             </div>
@@ -177,7 +190,7 @@ export default async function GrammarPage({
                 <p className="text-on-surface-variant text-sm mb-6 leading-relaxed">Kaynak veya uzaklaşma yönünü gösterir.</p>
                 <div className="p-4 bg-surface-container rounded-xl border border-outline-variant/20 font-mono text-[11px]">
                   <span className="opacity-50"># Örnek</span><br/>
-                  klasör'den <span className="text-primary">dosya'yı oku</span>
+                  {"klasör'den "}<span className="text-primary">{"dosya'yı oku"}</span>
                 </div>
               </div>
             </div>
@@ -197,7 +210,7 @@ export default async function GrammarPage({
                 <p className="text-on-surface-variant text-sm mb-6 leading-relaxed">Nesnenin kime ait olduğunu belirtir.</p>
                 <div className="p-4 bg-surface-container rounded-xl border border-outline-variant/20 font-mono text-[11px]">
                   <span className="opacity-50"># Örnek</span><br/>
-                  kullanıcı'nın <span className="text-primary">profil'i</span>
+                  {"kullanıcı'nın "}<span className="text-primary">{"profil'i"}</span>
                 </div>
               </div>
             </div>
@@ -217,7 +230,7 @@ export default async function GrammarPage({
                 <p className="text-on-surface-variant text-sm mb-6 leading-relaxed">Tekil öğeyi çoğul forma dönüştürür.</p>
                 <div className="p-4 bg-surface-container rounded-xl border border-outline-variant/20 font-mono text-[11px]">
                   <span className="opacity-50"># Örnek</span><br/>
-                  kullanıcı'lar'ı <span className="text-primary">listele</span>
+                  {"kullanıcı'lar'ı "}<span className="text-primary">listele</span>
                 </div>
               </div>
             </div>
@@ -234,10 +247,10 @@ export default async function GrammarPage({
                     <span key={s} className="px-2 py-1 bg-primary/10 text-primary font-mono text-xs rounded-lg">{s}</span>
                   ))}
                 </div>
-                <p className="text-on-surface-variant text-sm mb-6 leading-relaxed">Biçim veya kıyas anlamında "gibi/-casına" etkisi verir.</p>
+                <p className="text-on-surface-variant text-sm mb-6 leading-relaxed">Biçim veya kıyas anlamında {`"gibi/-casına"`} etkisi verir.</p>
                 <div className="p-4 bg-surface-container rounded-xl border border-outline-variant/20 font-mono text-[11px]">
                   <span className="opacity-50"># Örnek</span><br/>
-                  çocuk'ca <span className="text-primary">sevin</span>
+                  {"çocuk'ca "}<span className="text-primary">sevin</span>
                 </div>
               </div>
             </div>

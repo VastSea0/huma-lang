@@ -5,7 +5,7 @@
 
 use huma_core::bytecode::{Constant, OpCode};
 use huma_core::compiler::Derleyici;
-use huma_core::error::HumaResult;
+use huma_core::error::{HumaError, HumaResult};
 use huma_core::lexer::Lexer;
 use huma_core::parser::Parser;
 use std::fs;
@@ -16,10 +16,15 @@ pub fn generate_standalone(input_path: &str, output_name: &str) -> HumaResult<St
     let source = fs::read_to_string(input_path)?;
     let lexer = Lexer::new(&source);
     let mut parser = Parser::new(lexer);
-    let program = parser.parse_program();
+    let (program, diagnostics) = parser.parse_program_with_diagnostics();
+    if let Some(first) = diagnostics.into_iter().next() {
+        return Err(first);
+    }
 
     let mut compiler = Derleyici::new();
-    let bytecode = compiler.derle(program);
+    let bytecode = compiler
+        .derle_kontrollu(program)
+        .map_err(HumaError::CompileError)?;
 
     // ── Native Package Discovery ───────────────────────────────────
     let mut native_code = String::new();

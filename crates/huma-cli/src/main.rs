@@ -18,6 +18,7 @@ mod package_manager;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use tracing::error;
+use anyhow::anyhow;
 
 /// Standardised exit codes for CI/CD compatibility.
 mod exit_codes {
@@ -259,7 +260,7 @@ fn run(cli: Cli) -> i32 {
                     commands::run_file(&meta.giris)
                 } else {
                     println!("{} Ne bir .hb dosyası belirtildi ne de bir huma.json projesi bulundu.", "Hata:".bright_red());
-                    Ok(())
+                    Err(anyhow!("Ne bir .hb dosyası belirtildi ne de bir huma.json projesi bulundu."))
                 }
             }
         },

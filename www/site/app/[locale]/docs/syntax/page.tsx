@@ -104,6 +104,19 @@ export default async function SyntaxPage({
             {s.suffix_system.desc}
           </p>
         </div>
+        <div className="bg-primary/5 border-l-4 border-primary p-6 rounded-r-lg mb-12">
+          <div className="flex items-center gap-3 mb-2 text-primary">
+            <span className="material-symbols-outlined text-lg">rule</span>
+            <span className="text-xs font-bold uppercase tracking-widest">
+              {locale === "tr" ? "Sözdizimi Kapsam Notu" : "Syntax Scope Note"}
+            </span>
+          </div>
+          <p className="text-sm text-on-surface-variant leading-relaxed">
+            {locale === "tr"
+              ? "Ekli yazımların temel amacı okunabilirliktir. Çekirdek anlam, lexer sonrası normalize edilen kök tokenlar üzerinden korunur. Bu nedenle örneklerdeki doğal yazım ile normalize biçim eşdeğer kabul edilir."
+              : "Suffix-aware forms primarily improve readability. Core semantics are preserved on normalized root tokens after lexing. Natural and normalized forms in examples are therefore treated as equivalent."}
+          </p>
+        </div>
 
         {/* Variables */}
         <section className="mb-16" id="variables">
@@ -211,11 +224,11 @@ export default async function SyntaxPage({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/10">
               <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-2">Edatlı Çağrı (ile)</p>
-              <code className="text-xs font-mono bg-on-surface/5 p-2 rounded block">10 ile 20'yi topla</code>
+              <code className="text-xs font-mono bg-on-surface/5 p-2 rounded block">{"10 ile 20'yi topla"}</code>
             </div>
             <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/10">
               <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-2">Postfix Yükle</p>
-              <code className="text-xs font-mono bg-on-surface/5 p-2 rounded block">"mat.hb"'yi yükle</code>
+              <code className="text-xs font-mono bg-on-surface/5 p-2 rounded block">{`"mat.hb"'yi yükle`}</code>
             </div>
           </div>
         </section>

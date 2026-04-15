@@ -122,6 +122,53 @@ impl VM {
                         }
                     }
                 }
+                OpCode::Greater => {
+                    let r = self.stack.pop().unwrap_or(Deger::Bos);
+                    let l = self.stack.pop().unwrap_or(Deger::Bos);
+                    match (l, r) {
+                        (Deger::Sayi(a), Deger::Sayi(b)) => {
+                            self.stack.push(Deger::Sayi(if a > b { 1.0 } else { 0.0 }))
+                        }
+                        _ => self.hata_firlat("Büyüktür karşılaştırması sadece sayılarda desteklenir".to_string()),
+                    }
+                }
+                OpCode::Less => {
+                    let r = self.stack.pop().unwrap_or(Deger::Bos);
+                    let l = self.stack.pop().unwrap_or(Deger::Bos);
+                    match (l, r) {
+                        (Deger::Sayi(a), Deger::Sayi(b)) => {
+                            self.stack.push(Deger::Sayi(if a < b { 1.0 } else { 0.0 }))
+                        }
+                        _ => self.hata_firlat("Küçüktür karşılaştırması sadece sayılarda desteklenir".to_string()),
+                    }
+                }
+                OpCode::Equal => {
+                    let r = self.stack.pop().unwrap_or(Deger::Bos);
+                    let l = self.stack.pop().unwrap_or(Deger::Bos);
+                    self.stack.push(Deger::Sayi(if l == r { 1.0 } else { 0.0 }));
+                }
+                OpCode::NotEqual => {
+                    let r = self.stack.pop().unwrap_or(Deger::Bos);
+                    let l = self.stack.pop().unwrap_or(Deger::Bos);
+                    self.stack.push(Deger::Sayi(if l != r { 1.0 } else { 0.0 }));
+                }
+                OpCode::Call(arg_len) => {
+                    let callable = self.stack.pop().unwrap_or(Deger::Bos);
+                    let mut args = Vec::with_capacity(*arg_len);
+                    for _ in 0..*arg_len {
+                        args.push(self.stack.pop().unwrap_or(Deger::Bos));
+                    }
+                    args.reverse();
+
+                    match callable {
+                        Deger::DahiliFonksiyon(f) => {
+                            self.stack.push(f(args));
+                        }
+                        other => {
+                            self.hata_firlat(format!("Çağrılamayan değer: {}", other));
+                        }
+                    }
+                }
                 OpCode::Print => {
                     let val = self.stack.pop().unwrap_or(Deger::Bos);
                     println!("{}", val);
@@ -138,6 +185,30 @@ impl VM {
                 OpCode::Pop => { self.stack.pop(); }
                 OpCode::Return => break,
                 OpCode::Bos => self.stack.push(Deger::Bos),
+                OpCode::MakeList(len) => {
+                    let mut list = Vec::with_capacity(*len);
+                    for _ in 0..*len {
+                        list.push(self.stack.pop().unwrap_or(Deger::Bos));
+                    }
+                    list.reverse();
+                    self.stack
+                        .push(Deger::Liste(std::rc::Rc::new(std::cell::RefCell::new(list))));
+                }
+                OpCode::ListAccess => {
+                    let index = self.stack.pop().unwrap_or(Deger::Bos);
+                    let list = self.stack.pop().unwrap_or(Deger::Bos);
+                    match (list, index) {
+                        (Deger::Liste(items), Deger::Sayi(i)) => {
+                            let idx = i as isize;
+                            if idx < 0 || (idx as usize) >= items.borrow().len() {
+                                self.hata_firlat("Liste erişiminde indeks sınır dışında".to_string());
+                            } else {
+                                self.stack.push(items.borrow()[idx as usize].clone());
+                            }
+                        }
+                        _ => self.hata_firlat("Liste erişimi için liste ve sayısal indeks gerekir".to_string()),
+                    }
+                }
                 OpCode::MakeMap(len) => {
                     let mut map = HashMap::new();
                     for _ in 0..*len {
@@ -167,7 +238,6 @@ impl VM {
                         }
                     }
                 }
-                _ => {}
             }
         }
     }

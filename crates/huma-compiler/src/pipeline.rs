@@ -13,10 +13,15 @@ use std::fs;
 pub fn compile_source(source: &str) -> HumaResult<Program> {
     let lexer = Lexer::new(source);
     let mut parser = Parser::new(lexer);
-    let ast = parser.parse_program();
+    let (ast, diagnostics) = parser.parse_program_with_diagnostics();
+    if let Some(first) = diagnostics.into_iter().next() {
+        return Err(first);
+    }
 
     let mut compiler = Derleyici::new();
-    let program = compiler.derle(ast);
+    let program = compiler
+        .derle_kontrollu(ast)
+        .map_err(HumaError::CompileError)?;
     Ok(program)
 }
 

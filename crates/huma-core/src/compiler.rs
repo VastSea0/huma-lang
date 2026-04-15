@@ -5,6 +5,7 @@ use crate::token::Token;
 pub struct Derleyici {
     constants: Vec<Constant>,
     instructions: Vec<OpCode>,
+    errors: Vec<String>,
 }
 
 impl Derleyici {
@@ -12,16 +13,27 @@ impl Derleyici {
         Self {
             constants: Vec::new(),
             instructions: Vec::new(),
+            errors: Vec::new(),
         }
     }
 
     pub fn derle(&mut self, program: Vec<Komut>) -> Program {
+        self.errors.clear();
         for komut in program {
             self.komut_derle(komut);
         }
         Program {
             constants: self.constants.clone(),
             instructions: self.instructions.clone(),
+        }
+    }
+
+    pub fn derle_kontrollu(&mut self, program: Vec<Komut>) -> Result<Program, String> {
+        let compiled = self.derle(program);
+        if self.errors.is_empty() {
+            Ok(compiled)
+        } else {
+            Err(self.errors.join("\n"))
         }
     }
 
@@ -71,7 +83,9 @@ impl Derleyici {
                     Token::Kucuktur => self.instructions.push(OpCode::Less),
                     Token::EsitEsittir | Token::Esittir => self.instructions.push(OpCode::Equal),
                     Token::EsitDegil => self.instructions.push(OpCode::NotEqual),
-                    _ => {}
+                    other => {
+                        self.errors.push(format!("Desteklenmeyen ikili işlem operatörü: {}", other));
+                    }
                 }
             }
             Ifade::Liste(el) => {
@@ -102,7 +116,12 @@ impl Derleyici {
                 }
                 self.instructions.push(OpCode::MakeMap(len));
             }
-            _ => {}
+            unsupported => {
+                self.errors.push(format!(
+                    "Bytecode derleyici tarafından henüz desteklenmeyen ifade: {:?}",
+                    unsupported
+                ));
+            }
         }
     }
 
@@ -194,8 +213,11 @@ impl Derleyici {
                 let end_idx = self.instructions.len();
                 self.instructions[jump_after_idx] = OpCode::Jump(end_idx);
             }
-            _ => {
-                // Placeholder for unimplemented commands in bytecode
+            unsupported => {
+                self.errors.push(format!(
+                    "Bytecode derleyici tarafından henüz desteklenmeyen komut: {:?}",
+                    unsupported
+                ));
             }
         }
     }

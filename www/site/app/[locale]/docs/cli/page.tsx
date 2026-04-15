@@ -55,8 +55,10 @@ export default async function CLIPage({
             <p className="text-on-surface-variant text-sm font-medium">{cli.execution.repl}</p>
             <CodeBlock variant="terminal" code="$ huma repl" />
 
-            <p className="text-on-surface-variant text-sm font-medium">{cli.execution.ide}</p>
-            <CodeBlock variant="terminal" code="$ huma ide" />
+            <p className="text-on-surface-variant text-sm font-medium">
+              {locale === "tr" ? "Test dosyalarını çalıştır" : "Run project test files"}
+            </p>
+            <CodeBlock variant="terminal" code="$ huma test" />
           </div>
         </section>
 
@@ -93,10 +95,27 @@ export default async function CLIPage({
             <CodeBlock variant="terminal" code="$ huma paket ilkle" />
             
             <p className="text-on-surface-variant text-sm font-medium">{cli.package.install}</p>
-            <CodeBlock variant="terminal" code="$ huma paket kur" />
+            <CodeBlock variant="terminal" code="$ huma paket kur ag_istekleri" />
+
+            <p className="text-on-surface-variant text-sm font-medium">
+              {locale === "tr"
+                ? "Native kod içeren paketleri güvenilir modda kur"
+                : "Install native packages in trusted mode"}
+            </p>
+            <CodeBlock variant="terminal" code="$ huma paket kur my_pkg --güvenilir" />
+
+            <p className="text-on-surface-variant text-sm font-medium">
+              {locale === "tr" ? "Projedeki betiği çalıştır (npm run benzeri)" : "Run a project script (npm run style)"}
+            </p>
+            <CodeBlock variant="terminal" code="$ huma paket run baslat" />
 
             <p className="text-on-surface-variant text-sm font-medium">{cli.package.list}</p>
             <CodeBlock variant="terminal" code="$ huma paket liste" />
+
+            <p className="text-on-surface-variant text-sm font-medium">
+              {locale === "tr" ? "Paket bütünlüğünü yayın öncesi doğrula" : "Verify package integrity before publishing"}
+            </p>
+            <CodeBlock variant="terminal" code="$ huma paket doğrula" />
           </div>
         </section>
 

@@ -9,12 +9,14 @@ export const metadata: Metadata = {
     "A step-by-step guide to creating a Hüma library and publishing it via GitHub.",
 };
 
-const packageJsonCode = `{
+const projectManifestCode = `{
   "ad": "benim_kutuphanem",
   "surum": "1.0.0",
   "aciklama": "Hüma için ilk kütüphanem",
   "yazar": "Adınız",
-  "giris": "benim_kutuphanem.hb"
+  "giris": "benim_kutuphanem.hb",
+  "huma_surum": ">=0.5.2",
+  "bagimliliklar": {}
 }`;
 
 const myCode = `// benim_kutuphanem.hb
@@ -75,14 +77,19 @@ export default async function MyFirstPackagePage({
           {/* Step 2 */}
           <section id="step-2" className="scroll-mt-24">
             <h2 className="text-2xl font-bold text-on-surface mb-6">
-              Metadata (paket.json)
+              Metadata (huma.json)
             </h2>
             <p className="text-on-surface-variant mb-6 leading-relaxed">
               {locale === "tr"
-                ? "Oluşturulan dizine girdiğinizde bir 'paket.json' dosyası göreceksiniz. Bu dosya, kütüphanenizin kimliği ve bağımlılıklarını tutar."
-                : "When you enter the created directory, you will see a 'paket.json' file. This file holds the identity and dependencies of your library."}
+                ? "Oluşturulan proje dizininde ana manifest dosyası 'huma.json' olarak gelir. Geliştirirken bağımlılıkları ve giriş dosyasını bu dosyada yönetirsiniz."
+                : "In the generated project directory, the main manifest file is 'huma.json'. During development, manage dependencies and entry file there."}
             </p>
-            <CodeBlock code={packageJsonCode} filename="paket.json" />
+            <CodeBlock code={projectManifestCode} filename="huma.json" />
+            <div className="bg-surface-container-low border border-outline-variant/10 rounded-xl p-4 mt-4 text-sm text-on-surface-variant leading-relaxed">
+              {locale === "tr"
+                ? "'paket.json' kurulan paket klasörlerinde üretilen metadata dosyasıdır; kaynak projede esas dosya 'huma.json'dur. Kurulum sürümleri ise 'huma.lock' içinde kilitlenir."
+                : "'paket.json' is generated metadata inside installed package folders; in source projects the canonical manifest is 'huma.json'. Locked dependency versions are stored in 'huma.lock'."}
+            </div>
           </section>
 
           {/* Step 3 */}

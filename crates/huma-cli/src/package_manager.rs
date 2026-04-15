@@ -566,6 +566,7 @@ pub fn install_package(input: Option<&str>, trusted: bool) -> Result<()> {
                     return Ok(());
                 }
                 println!("{} {} bağımlılık kuruluyor...", "Hüma:".bright_cyan(), deps.len());
+                let mut failures = Vec::new();
                 for (ad, _surum) in deps {
                     if let Err(e) = install_package(Some(&ad), trusted) {
                         println!(
@@ -574,9 +575,16 @@ pub fn install_package(input: Option<&str>, trusted: bool) -> Result<()> {
                             ad,
                             e
                         );
+                        failures.push(format!("{}: {}", ad, e));
                     }
                 }
-                return Ok(());
+                if failures.is_empty() {
+                    return Ok(());
+                }
+                return Err(anyhow!(
+                    "Bazı bağımlılıklar kurulamadı:\n{}",
+                    failures.join("\n")
+                ));
             } else {
                 println!("{} Bağımlılık listesi boş.", "Bilgi:".bright_yellow());
                 return Ok(());
@@ -669,16 +677,19 @@ fn install_from_local(local_path: &Path, name: &str, trusted: bool) -> Result<()
 
     let meta_str = fs::read_to_string(&json_path)?;
     let meta: PaketMetadata = serde_json::from_str(&meta_str)?;
+    sanitize_package_name(&meta.ad)?;
+    sanitize_package_name(&meta.giris)?;
 
     // [2] Güvenlik: Native kod kontrolü
     check_native_code_safety(&meta, trusted)?;
 
     // Giriş dosyasını oku
     let entry_path = local_path.join(&meta.giris);
+    verify_path_within_boundary(&entry_path, local_path)?;
     let content = fs::read_to_string(&entry_path)
         .with_context(|| format!("Giriş dosyası okunamadı: {}", entry_path.display()))?;
 
-    save_package(meta, &content, Some("yerel"))?;
+    save_package(meta, &content, Some("yerel"), trusted)?;
 
     Ok(())
 }
@@ -736,10 +747,10 @@ fn install_from_github(url: &str, trusted: bool) -> Result<()> {
     sanitize_package_name(&meta.ad)?;
     sanitize_package_name(&meta.giris)?;
 
-    // [3] Hash doğrulaması: Zaten kurulu ve değişmemişse atla
-    let pre_hash = calculate_hash(&meta_str, &meta_str);
+    // 2. Giriş Dosyasını İndir
+    let entry_content = download_text(&format!("{}/{}", raw_base, meta.giris))?;
+    let pre_hash = calculate_hash(&entry_content, &serde_json::to_string(&meta)?);
     if let Ok(false) = verify_lock_integrity(&meta.ad, &pre_hash) {
-        // Hash uyuşuyor, sürüm de aynıysa atla
         if let Ok(lock_str) = fs::read_to_string(LOCK_FILE) {
             if let Ok(lock) = serde_json::from_str::<PaketKilit>(&lock_str) {
                 if let Some(info) = lock.paketler.get(&meta.ad) {
@@ -757,17 +768,14 @@ fn install_from_github(url: &str, trusted: bool) -> Result<()> {
         }
     }
 
-    // 2. Giriş Dosyasını İndir
-    let entry_content = download_text(&format!("{}/{}", raw_base, meta.giris))?;
-
     let source_label = format!("github.com/{}/{}", source.owner, source.repo);
-    save_package(meta, &entry_content, Some(&source_label))?;
+    save_package(meta, &entry_content, Some(&source_label), trusted)?;
 
     Ok(())
 }
 
 /// Paketi diske kaydeder, kilit dosyasını günceller ve [7] alt bağımlılıkları kurar.
-fn save_package(meta: PaketMetadata, content: &str, source: Option<&str>) -> Result<()> {
+fn save_package(meta: PaketMetadata, content: &str, source: Option<&str>, trusted: bool) -> Result<()> {
     // [1] Güvenlik: Son kez doğrula
     sanitize_package_name(&meta.ad)?;
     sanitize_package_name(&meta.giris)?;
@@ -816,7 +824,7 @@ fn save_package(meta: PaketMetadata, content: &str, source: Option<&str>) -> Res
     // [7] Özyinelemeli bağımlılık kurulumu
     if let Some(deps) = &meta.bagimliliklar {
         if !deps.is_empty() {
-            install_dependencies_recursive(deps, &mut HashSet::new())?;
+            install_dependencies_recursive(deps, &mut HashSet::new(), trusted)?;
         }
     }
 
@@ -830,7 +838,9 @@ fn save_package(meta: PaketMetadata, content: &str, source: Option<&str>) -> Res
 fn install_dependencies_recursive(
     deps: &HashMap<String, String>,
     visited: &mut HashSet<String>,
+    trusted: bool,
 ) -> Result<()> {
+    let mut failures = Vec::new();
     for (dep_name, _dep_version) in deps {
         if visited.contains(dep_name) {
             println!(
@@ -855,18 +865,24 @@ fn install_dependencies_recursive(
             dep_name.bold()
         );
 
-        // Trusted olarak kur (parent zaten onaylandı)
-        if let Err(e) = install_package(Some(dep_name), true) {
+        if let Err(e) = install_package(Some(dep_name), trusted) {
             println!(
                 "  {} Alt bağımlılık '{}' kurulamadı: {}",
                 "Uyarı:".bright_yellow(),
                 dep_name,
                 e
             );
+            failures.push(format!("{}: {}", dep_name, e));
         }
     }
-
-    Ok(())
+    if failures.is_empty() {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "Alt bağımlılık kurulumu kısmen başarısız:\n{}",
+            failures.join("\n")
+        ))
+    }
 }
 
 /// Paketin yayınlanabilirliğini doğrular
@@ -922,6 +938,20 @@ pub fn verify_package() -> Result<()> {
                 )
             })?;
         }
+
+        if Path::new(LOCK_FILE).exists() {
+            let lock_content = fs::read_to_string(LOCK_FILE)?;
+            let lock: PaketKilit = serde_json::from_str(&lock_content)
+                .with_context(|| "huma.lock parse edilemedi")?;
+            for dep_name in deps.keys() {
+                if !lock.paketler.contains_key(dep_name) {
+                    return Err(anyhow!(
+                        "Bağımlılık '{}' huma.json içinde var fakat huma.lock içinde kilitlenmemiş.",
+                        dep_name
+                    ));
+                }
+            }
+        }
     }
 
     // Lock dosyası varsa parse et ve paket bütünlüğünü doğrula
@@ -945,7 +975,10 @@ pub fn verify_package() -> Result<()> {
             let pkg_meta: PaketMetadata = serde_json::from_str(&pkg_meta_content).with_context(|| {
                 format!("Paket metadata parse edilemedi: {}", pkg_meta_path.display())
             })?;
+            sanitize_package_name(&pkg_meta.ad)?;
+            sanitize_package_name(&pkg_meta.giris)?;
             let pkg_entry_path = pkg_dir.join(&pkg_meta.giris);
+            verify_path_within_boundary(&pkg_entry_path, &pkg_dir)?;
             if !pkg_entry_path.exists() {
                 return Err(anyhow!(
                     "Kilitteki '{}' paketinin giriş dosyası eksik: {}",
