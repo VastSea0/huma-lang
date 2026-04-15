@@ -178,7 +178,7 @@
         "title": "Particle and Postfix Calls",
         "desc": "Hüma supports 'ile' (with) and 'yükle' (load) structures compatible with Turkish syntax.",
         "ile_usage": "10 ile 20'yi topla (function call)",
-        "yukle_usage": \"file.hb\"'yi yükle (module loading)"
+        "yukle_usage": "\"file.hb\"'yi yükle (module loading)"
       }
     },
     "grammar": {

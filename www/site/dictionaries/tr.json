@@ -178,7 +178,7 @@
         "title": "Edatlı ve Postfix Çağrılar",
         "desc": "Hüma, Türkçe'nin nesne-yüklem yapısına uygun 'ile' ve 'yükle' yapılarını destekler.",
         "ile_usage": "10 ile 20'yi topla (fonksiyon çağrısı)",
-        "yukle_usage": \"dosya.hb\"'yi yükle (dosya yükleme)"
+        "yukle_usage": "\"dosya.hb\"'yi yükle (dosya yükleme)"
       }
     },
     "grammar": {
