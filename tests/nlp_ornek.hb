@@ -20,7 +20,7 @@ temiz = nlp_temizle(haber_metni) olsun
 "» Temizlenmiş:"'i yazdır
 temiz'i yazdır
 tokenler = tokenize(temiz) olsun
-"» Token sayısı: " + uzunluk(tokenler)'i yazdır
+"» Token sayısı: " + tokenler'in uzunluğu'nu yazdır
 "» Tokenler:"'i yazdır
 tokenler'i yazdır
 
@@ -30,8 +30,8 @@ tokenler'i yazdır
 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"'i yazdır
 
 kalan = durak_kelime_filtrele(tokenler) olsun
-"» Öncesi : " + uzunluk(tokenler) + " token"'i yazdır
-"» Sonrası: " + uzunluk(kalan) + " token"'i yazdır
+"» Öncesi : " + tokenler'in uzunluğu + " token"'i yazdır
+"» Sonrası: " + kalan'ın uzunluğu + " token"'i yazdır
 "» Kalan  :"'i yazdır
 kalan'ı yazdır
 
@@ -43,7 +43,7 @@ kalan'ı yazdır
 test_k = ["geliyor", "gidiyorum", "çalışıyorlar", "koşarak", "üniversitesi", "algoritmaları", "geliştirilmiştir", "seviyorum"] olsun
 "» Tek tek kök bulma:"'i yazdır
 i = 0 olsun
-i < uzunluk(test_k) olduğu sürece {
+i < test_k'nin uzunluğu olduğu sürece {
     k = test_k[i] olsun
     "  " + k + "  →  " + stem(k)'i yazdır
     i = i + 1 olsun
@@ -79,9 +79,9 @@ metin_istatistik(haber_metni)
 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"'i yazdır
 
 cümleler = cümle_böl(haber_metni) olsun
-"» Bulunan cümle sayısı: " + uzunluk(cümleler)'i yazdır
+"» Bulunan cümle sayısı: " + cümleler'in uzunluğu'nu yazdır
 j = 0 olsun
-j < uzunluk(cümleler) olduğu sürece {
+j < cümleler'in uzunluğu olduğu sürece {
     "  [" + j + "] " + cümleler[j]'i yazdır
     j = j + 1 olsun
 }
@@ -90,7 +90,7 @@ soru_metni = "Bugün hava nasıl? Yarın yağmur yağacak mı! Umarım güneşli
 "» Soru/ünlem testi:"'i yazdır
 sc = cümle_böl(soru_metni) olsun
 k = 0 olsun
-k < uzunluk(sc) olduğu sürece {
+k < sc'nin uzunluğu olduğu sürece {
     "  [" + k + "] " + sc[k]'i yazdır
     k = k + 1 olsun
 }
@@ -204,7 +204,7 @@ tr_metin = "Şişlideki güzel çiçekler yağmurda büyüdü" olsun
 
 ü_test = ["okul", "güneş", "kitap", "ülke", "araba", "yüzük"] olsun
 i = 0 olsun
-i < uzunluk(ü_test) olduğu sürece {
+i < ü_test'in uzunluğu olduğu sürece {
     kw = ü_test[i] olsun
     "  " + kw + "  →  ünlü: " + kelime_ünlü_sayısı(kw) + "  son: " + son_ünlü(kw) + "  uyum: " + ünlü_uyumu_türü(kw)'u yazdır
     i = i + 1 olsun

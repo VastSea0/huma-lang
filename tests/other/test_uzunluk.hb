@@ -1,7 +1,7 @@
 s = "aeıioöuü" olsun
-("uzunluk: " + uzunluk(s)) yazdır;
+("uzunluk: " + s'in uzunluğu) yazdır;
 i = 0 olsun
-uzunluk(s) olduğu sürece {
+s'in uzunluğu olduğu sürece {
     (i + ": " + s[i]) yazdır;
     i = i + 1 olsun
 }

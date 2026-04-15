@@ -101,7 +101,7 @@ export default async function GrammarPage({
             {g?.suffixes?.desc}
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-12">
              {/* Accusative */}
              <div className="group relative bg-surface-container-lowest border border-outline-variant/10 rounded-3xl p-8 hover:bg-primary/[0.02] transition-all duration-500 overflow-hidden">
               <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
@@ -158,6 +158,86 @@ export default async function GrammarPage({
                 <div className="p-4 bg-surface-container rounded-xl border border-outline-variant/20 font-mono text-[11px]">
                   <span className="opacity-50"># Örnek</span><br/>
                   kişi'nin <span className="text-primary">ad'ı</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Ablative */}
+            <div className="group relative bg-surface-container-lowest border border-outline-variant/10 rounded-3xl p-8 hover:bg-primary/[0.02] transition-all duration-500 overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                <span className="text-6xl font-black">den</span>
+              </div>
+              <div className="relative z-10">
+                <h3 className="text-xl font-bold text-primary mb-3">Ayrılma Durumu</h3>
+                <div className="flex gap-1 mb-6">
+                  {["'den", "'dan", "'ten", "'tan"].map(s => (
+                    <span key={s} className="px-2 py-1 bg-primary/10 text-primary font-mono text-xs rounded-lg">{s}</span>
+                  ))}
+                </div>
+                <p className="text-on-surface-variant text-sm mb-6 leading-relaxed">Kaynak veya uzaklaşma yönünü gösterir.</p>
+                <div className="p-4 bg-surface-container rounded-xl border border-outline-variant/20 font-mono text-[11px]">
+                  <span className="opacity-50"># Örnek</span><br/>
+                  klasör'den <span className="text-primary">dosya'yı oku</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Possessive */}
+            <div className="group relative bg-surface-container-lowest border border-outline-variant/10 rounded-3xl p-8 hover:bg-primary/[0.02] transition-all duration-500 overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                <span className="text-6xl font-black">im</span>
+              </div>
+              <div className="relative z-10">
+                <h3 className="text-xl font-bold text-primary mb-3">İyelik Eki</h3>
+                <div className="flex gap-1 mb-6">
+                  {["'im", "'in", "'i", "'imiz", "'iniz", "'leri"].map(s => (
+                    <span key={s} className="px-2 py-1 bg-primary/10 text-primary font-mono text-xs rounded-lg">{s}</span>
+                  ))}
+                </div>
+                <p className="text-on-surface-variant text-sm mb-6 leading-relaxed">Nesnenin kime ait olduğunu belirtir.</p>
+                <div className="p-4 bg-surface-container rounded-xl border border-outline-variant/20 font-mono text-[11px]">
+                  <span className="opacity-50"># Örnek</span><br/>
+                  kullanıcı'nın <span className="text-primary">profil'i</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Plural */}
+            <div className="group relative bg-surface-container-lowest border border-outline-variant/10 rounded-3xl p-8 hover:bg-primary/[0.02] transition-all duration-500 overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                <span className="text-6xl font-black">ler</span>
+              </div>
+              <div className="relative z-10">
+                <h3 className="text-xl font-bold text-primary mb-3">Çoğul Eki</h3>
+                <div className="flex gap-1 mb-6">
+                  {["'ler", "'lar"].map(s => (
+                    <span key={s} className="px-2 py-1 bg-primary/10 text-primary font-mono text-xs rounded-lg">{s}</span>
+                  ))}
+                </div>
+                <p className="text-on-surface-variant text-sm mb-6 leading-relaxed">Tekil öğeyi çoğul forma dönüştürür.</p>
+                <div className="p-4 bg-surface-container rounded-xl border border-outline-variant/20 font-mono text-[11px]">
+                  <span className="opacity-50"># Örnek</span><br/>
+                  kullanıcı'lar'ı <span className="text-primary">listele</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Equative */}
+            <div className="group relative bg-surface-container-lowest border border-outline-variant/10 rounded-3xl p-8 hover:bg-primary/[0.02] transition-all duration-500 overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                <span className="text-6xl font-black">ce</span>
+              </div>
+              <div className="relative z-10">
+                <h3 className="text-xl font-bold text-primary mb-3">Eşitlik Durumu</h3>
+                <div className="flex gap-1 mb-6">
+                  {["'ce", "'ca"].map(s => (
+                    <span key={s} className="px-2 py-1 bg-primary/10 text-primary font-mono text-xs rounded-lg">{s}</span>
+                  ))}
+                </div>
+                <p className="text-on-surface-variant text-sm mb-6 leading-relaxed">Biçim veya kıyas anlamında "gibi/-casına" etkisi verir.</p>
+                <div className="p-4 bg-surface-container rounded-xl border border-outline-variant/20 font-mono text-[11px]">
+                  <span className="opacity-50"># Örnek</span><br/>
+                  çocuk'ca <span className="text-primary">sevin</span>
                 </div>
               </div>
             </div>

@@ -875,7 +875,8 @@ pub fn verify_package() -> Result<()> {
         return Err(anyhow!("Bu dizinde bir Hüma projesi (huma.json) bulunamadı."));
     }
 
-    let meta: PaketMetadata = serde_json::from_str(&fs::read_to_string(PROJECT_FILE)?)?;
+    let meta_content = fs::read_to_string(PROJECT_FILE)?;
+    let meta: PaketMetadata = serde_json::from_str(&meta_content)?;
 
     if meta.ad.is_empty() || meta.surum.is_empty() {
         return Err(anyhow!("Paket adı veya sürümü eksik."));
@@ -887,6 +888,95 @@ pub fn verify_package() -> Result<()> {
     // [1] Güvenlik: Paket adı doğrulaması
     sanitize_package_name(&meta.ad)?;
     sanitize_package_name(&meta.giris)?;
+
+    // Giriş dosyası var mı?
+    if !Path::new(&meta.giris).exists() {
+        return Err(anyhow!(
+            "Giriş dosyası bulunamadı: '{}'. huma.json içindeki 'giris' alanını kontrol edin.",
+            meta.giris
+        ));
+    }
+
+    // Hüma sürüm kısıtı tanımlıysa parse et ve mevcut sürümle karşılaştır
+    if let Some(req_str) = &meta.huma_surum {
+        let req = VersionReq::parse(req_str)
+            .with_context(|| format!("Geçersiz huma_surum ifadesi: '{}'", req_str))?;
+        let current = Version::parse(CURRENT_HUMA_VER)?;
+        if !req.matches(&current) {
+            return Err(anyhow!(
+                "Sürüm uyumsuzluğu: proje Hüma {} gerektiriyor, mevcut sürüm v{}.",
+                req_str,
+                CURRENT_HUMA_VER
+            ));
+        }
+    }
+
+    // Bağımlılık semver kısıtlarını doğrula
+    if let Some(deps) = &meta.bagimliliklar {
+        for (dep_name, dep_req) in deps {
+            sanitize_package_name(dep_name)?;
+            VersionReq::parse(dep_req).with_context(|| {
+                format!(
+                    "Geçersiz bağımlılık sürüm kısıtı: {} -> '{}'",
+                    dep_name, dep_req
+                )
+            })?;
+        }
+    }
+
+    // Lock dosyası varsa parse et ve paket bütünlüğünü doğrula
+    if Path::new(LOCK_FILE).exists() {
+        let lock_content = fs::read_to_string(LOCK_FILE)?;
+        let lock: PaketKilit = serde_json::from_str(&lock_content)
+            .with_context(|| "huma.lock parse edilemedi")?;
+
+        for (pkg_name, lock_info) in &lock.paketler {
+            let pkg_dir = PathBuf::from(PACKAGE_DIR).join(pkg_name);
+            let pkg_meta_path = pkg_dir.join("paket.json");
+            if !pkg_meta_path.exists() {
+                return Err(anyhow!(
+                    "Kilit dosyasında '{}' var ancak metadata dosyası eksik: {}",
+                    pkg_name,
+                    pkg_meta_path.display()
+                ));
+            }
+
+            let pkg_meta_content = fs::read_to_string(&pkg_meta_path)?;
+            let pkg_meta: PaketMetadata = serde_json::from_str(&pkg_meta_content).with_context(|| {
+                format!("Paket metadata parse edilemedi: {}", pkg_meta_path.display())
+            })?;
+            let pkg_entry_path = pkg_dir.join(&pkg_meta.giris);
+            if !pkg_entry_path.exists() {
+                return Err(anyhow!(
+                    "Kilitteki '{}' paketinin giriş dosyası eksik: {}",
+                    pkg_name,
+                    pkg_entry_path.display()
+                ));
+            }
+
+            let entry_content = fs::read_to_string(&pkg_entry_path)?;
+            let computed_hash =
+                calculate_hash(&entry_content, &serde_json::to_string(&pkg_meta)?);
+
+            if !lock_info.hash.is_empty() && lock_info.hash != computed_hash {
+                return Err(anyhow!(
+                    "Bütünlük hatası: '{}' paketinin hash değeri uyuşmuyor (lock: {}, hesaplanan: {}).",
+                    pkg_name,
+                    &lock_info.hash[..16.min(lock_info.hash.len())],
+                    &computed_hash[..16.min(computed_hash.len())]
+                ));
+            }
+
+            if lock_info.surum != pkg_meta.surum {
+                return Err(anyhow!(
+                    "Sürüm uyuşmazlığı: lock '{}' için {} diyor, paket metadata {}.",
+                    pkg_name,
+                    lock_info.surum,
+                    pkg_meta.surum
+                ));
+            }
+        }
+    }
 
     println!(
         "{} Paket '{}' v{} yayına hazır.",

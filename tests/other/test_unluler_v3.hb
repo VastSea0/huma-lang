@@ -10,7 +10,7 @@ i < boy olduğu sürece {
     // Inline içeriyor_mu logic
     bulundu = 0 olsun
     j = 0 olsun
-    unlu_boy = uzunluk(ünlüler) olsun
+    unlu_boy = ünlüler'in uzunluğu olsun
     j < unlu_boy olduğu sürece {
         ünlüler[j] = char ise {
             bulundu = 1 olsun

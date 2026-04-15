@@ -1,5 +1,5 @@
 my_iceriyor_mu fonksiyon olsun dizgi, aranan alsın {
-    boy = uzunluk(dizgi) olsun
+    boy = dizgi'nin uzunluğu olsun
     i = 0 olsun
     i < boy olduğu sürece {
         dizgi[i] = aranan ise { 1'i döndür }

@@ -9,14 +9,14 @@
 //
 // Rust Built-in Bağımlılıklar:
 //   - karekök(n)   → kare kök hesaplama (standart_sapma için)
-//   - uzunluk(l)   → liste uzunluğu
+//   - l'in uzunluğu → liste uzunluğu
 // ═══════════════════════════════════════════════════════════════════
 
 yükle "matematik.hb";
 
 ortalama fonksiyon olsun d alsın {
     toplam = 0 olsun
-    boy = uzunluk(d) olsun
+    boy = d'nin uzunluğu olsun
     boy = 0 ise { 0'ı döndür }
     
     i = 0 olsun
@@ -28,7 +28,7 @@ ortalama fonksiyon olsun d alsın {
 }
 
 en_büyük fonksiyon olsun d alsın {
-    boy = uzunluk(d) olsun
+    boy = d'nin uzunluğu olsun
     boy = 0 ise { 0'ı döndür }
     eb = d[0] olsun
     i = 1 olsun
@@ -40,7 +40,7 @@ en_büyük fonksiyon olsun d alsın {
 }
 
 en_küçük fonksiyon olsun d alsın {
-    boy = uzunluk(d) olsun
+    boy = d'nin uzunluğu olsun
     boy = 0 ise { 0'ı döndür }
     ek = d[0] olsun
     i = 1 olsun
@@ -54,7 +54,7 @@ en_küçük fonksiyon olsun d alsın {
 varyans fonksiyon olsun d alsın {
     ort = ortalama(d) olsun
     toplam_kare_fark = 0 olsun
-    boy = uzunluk(d) olsun
+    boy = d'nin uzunluğu olsun
     
     i = 0 olsun
     i < boy olduğu sürece {

@@ -1,7 +1,7 @@
 içeriyor_mu fonksiyon olsun dizgi, aranan alsın {
     i = 0 olsun
-    boy = uzunluk(dizgi) olsun
-    aranan_boy = uzunluk(aranan) olsun
+    boy = dizgi'nin uzunluğu olsun
+    aranan_boy = aranan'ın uzunluğu olsun
     
     i <= (boy - aranan_boy) olduğu sürece {
         j = 0 olsun

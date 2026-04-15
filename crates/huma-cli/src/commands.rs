@@ -327,17 +327,6 @@ fn is_test_file(path: &Path) -> bool {
     path.components().any(|c| c.as_os_str() == "tests")
 }
 
-/// Launch the Tauri Desktop IDE.
-#[cfg(feature = "ide")]
-pub fn start_ide() -> Result<()> {
-    println!(
-        "\n  {}",
-        "🚀 Hüma IDE başlatılıyor…".bright_cyan().bold()
-    );
-    app::run();
-    Ok(())
-}
-
 /// Helper: lex → parse → interpret.
 fn execute_source(source: &str, interp: &mut Yorumlayici) {
     let lexer = Lexer::new(source);
