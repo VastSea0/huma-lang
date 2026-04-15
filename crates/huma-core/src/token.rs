@@ -30,6 +30,7 @@ pub enum Token {
     Iyelik,         // 'si / 'sı / 'su / 'sü (özellik iyeliği)
     Kadar,          // kadar
     Mi,             // mi / mı / mu / mü
+    Ile,            // ile
     Bekle,          // bekle (await)
 
     // Tanımlayıcılar ve Literaller
