@@ -1068,13 +1068,30 @@ impl Yorumlayici {
                 let mut method_instance = None;
                 let f = if let Ifade::NesneErisim { nesne, ozellik } = *fonksiyon.clone() {
                     let instance = self.ifade_hesapla(*nesne);
-                    if let Deger::Nesne { ref sinif_adi, .. } = instance {
+                    if let Deger::Nesne { ref sinif_adi, ref alanlar } = instance {
+                        // 1. Önce sınıf metotlarını kontrol et
                         if let Some(Deger::Sinif { metotlar, .. }) = self.global_degiskenler.get(sinif_adi) {
                             if let Some((ps, bd)) = metotlar.get(&ozellik) {
                                 method_instance = Some(instance.clone());
                                 Deger::Fonksiyon { parametreler: ps.clone(), govde: bd.clone() }
+                            } else {
+                                // 2. Sınıf metodu yoksa alanlara bak
+                                if let Some(field_val) = alanlar.borrow().get(&ozellik) {
+                                    if matches!(field_val, Deger::Fonksiyon { .. } | Deger::DahiliFonksiyon(_)) {
+                                        method_instance = Some(instance.clone());
+                                    }
+                                    field_val.clone()
+                                } else { self.ifade_hesapla(*fonksiyon) }
+                            }
+                        } else {
+                            // 3. Sınıf yoksa (düz nesne) alanlara bak
+                            if let Some(field_val) = alanlar.borrow().get(&ozellik) {
+                                if matches!(field_val, Deger::Fonksiyon { .. } | Deger::DahiliFonksiyon(_)) {
+                                    method_instance = Some(instance.clone());
+                                }
+                                field_val.clone()
                             } else { self.ifade_hesapla(*fonksiyon) }
-                        } else { self.ifade_hesapla(*fonksiyon) }
+                        }
                     } else if let Deger::Sozluk(ref m) = instance {
                         if ozellik == "getir" {
                             let args = argumanlar.into_iter().map(|a| self.ifade_hesapla(a)).collect::<Vec<_>>();
