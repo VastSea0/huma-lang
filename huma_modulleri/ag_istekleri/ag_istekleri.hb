@@ -1,45 +1,39 @@
 // ═══════════════════════════════════════════════════════════════════
 // ag_istekleri.hb — Hüma HTTP İstek Kütüphanesi
-// Sürüm: 1.1.0
-// Yazar: Egehan KAHRAMAN
-// GitHub: https://github.com/VastSea0/ag_istekleri
-// ═══════════════════════════════════════════════════════════════════
-//
-// Rust Built-in Bağımlılıklar:
-//   - dahili_istek(metot, url, veri, basliklar) → HTTP istek gönderir
+// Sürüm: 2.0.0 (Modern Syntax Edition)
 // ═══════════════════════════════════════════════════════════════════
 
 getir fonksiyon olsun url, basliklar alsın {
-    dahili_istek("GET", url, boş, basliklar)'ı döndür
+    "GET" ile url ve boş ve basliklar'ı dahili_istek'i döndür
 }
 
 gönder fonksiyon olsun url, veri, basliklar alsın {
-    dahili_istek("POST", url, veri, basliklar)'ı döndür
+    "POST" ile url ve veri ve basliklar'ı dahili_istek'i döndür
 }
 
 güncelle fonksiyon olsun url, veri, basliklar alsın {
-    dahili_istek("PUT", url, veri, basliklar)'ı döndür
+    "PUT" ile url ve veri ve basliklar'ı dahili_istek'i döndür
 }
 
 sil fonksiyon olsun url, basliklar alsın {
-    dahili_istek("DELETE", url, boş, basliklar)'ı döndür
+    "DELETE" ile url ve boş ve basliklar'ı dahili_istek'i döndür
 }
 
 // Nesne tabanlı gelişmiş kullanım
 Agİstekleri sınıf olsun {
     getir fonksiyon olsun url, basliklar alsın {
-        dahili_istek("GET", url, boş, basliklar)'ı döndür
+         "GET" ile url ve boş ve basliklar'ı dahili_istek'i döndür
     }
     
     gönder fonksiyon olsun url, veri, basliklar alsın {
-        dahili_istek("POST", url, veri, basliklar)'ı döndür
+        "POST" ile url ve veri ve basliklar'ı dahili_istek'i döndür
     }
     
     güncelle fonksiyon olsun url, veri, basliklar alsın {
-        dahili_istek("PUT", url, veri, basliklar)'ı döndür
+        "PUT" ile url ve veri ve basliklar'ı dahili_istek'i döndür
     }
     
     sil fonksiyon olsun url, basliklar alsın {
-        dahili_istek("DELETE", url, boş, basliklar)'ı döndür
+        "DELETE" ile url ve boş ve basliklar'ı dahili_istek'i döndür
     }
 }

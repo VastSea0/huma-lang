@@ -233,17 +233,36 @@ impl LanguageServer for Backend {
     }
 
     async fn completion(&self, _params: CompletionParams) -> LspResult<Option<CompletionResponse>> {
+        let mut items = Vec::new();
+
+        // 1) Keywords
+        let keywords = vec![
+            "yazdır", "olsun", "alsın", "fonksiyon", "sınıf", "ise", "yoksa",
+            "olduğu", "sürece", "döndür", "ve", "veya", "değil", "yükle",
+            "liste", "ekle", "çıkar", "uzunluğu", "kendisi", "doğru", "yanlış",
+            "dene", "yakala", "hata", "var", "kadar", "mi", "ile", "bekle", "çağır"
+        ];
+        
+        for kw in keywords {
+            items.push(CompletionItem {
+                label: kw.to_string(),
+                kind: Some(CompletionItemKind::KEYWORD),
+                detail: Some("Hüma Anahtar Kelimesi".to_string()),
+                ..Default::default()
+            });
+        }
+
+        // 2) Built-in Functions
         let names = Self::collect_builtin_function_names();
-        let items = names
-            .into_iter()
-            .map(|n| CompletionItem {
+        for n in names {
+            items.push(CompletionItem {
                 label: n.clone(),
                 kind: Some(CompletionItemKind::FUNCTION),
-                detail: Some("stdlib".to_string()),
+                detail: Some("Standart Kütüphane".to_string()),
                 insert_text: Some(n),
                 ..Default::default()
-            })
-            .collect::<Vec<_>>();
+            });
+        }
 
         Ok(Some(CompletionResponse::Array(items)))
     }

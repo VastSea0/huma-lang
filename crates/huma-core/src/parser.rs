@@ -37,7 +37,7 @@ impl Parser {
     fn consume(&mut self, expected: Token) -> bool {
         if self.current_token == expected { self.next_token(); true }
         else {
-            let msg = format!("{:?} bekleniyordu ama {:?} geldi", expected, self.current_token);
+            let msg = format!("{} bekleniyordu ama {} geldi", expected, self.current_token);
             self.error(&msg);
             // Hata durumunda ilerlemezsek sonsuz döngü olabilir. 
             // Eğer mevcut token beklenen değilse, onu yutalım ki döngü kırılabilsin.
