@@ -146,15 +146,20 @@ i < meyveler'in uzunluğu olduğu sürece {
 
 Hüma'nın en ayırt edici özelliği, Türkçe'nin eklemeli yapısını doğal bir şekilde desteklemesidir. Kesme işareti (`'`) ile ayrılan dilbilgisi ekleri, derleyici (compiler) tarafından derleme aşamasında (lexical analysis) temizlenir. Bu sayede kodun hem okunabilirliği artar hem de çalışma zamanında hiçbir performans kaybı yaşanmaz.
 
-**Desteklenen Ek Kalıpları:**
-- **Belirtme Durumu (İsmin -i Hali):** `'i`, `'ı`, `'u`, `'ü`, `'yi`, `'yı`, `'yu`, `'yü`
-  *Örnek:* `hata'yı yazdır`, `isim'i döndür`
-- **Yönelme Durumu (İsmin -e Hali):** `'e`, `'a`, `'ye`, `'ya`
-  *Örnek:* `liste'ye ekle`, `dizi'ye [10]'u ekle`
-- **Ayrılma Durumu (İsmin -den Hali):** `'den`, `'dan`, `'ten`, `'tan`
-  *Örnek:* `liste'den çıkar`, `sozluk'ten getir`
-- **İlgi Durumu (Tamlama Eki -nin):** `'nin`, `'nın`, `'nun`, `'nün`, `'ın`, `'in`, `'un`, `'ün`
-  *Örnek:* `liste'nin uzunluğu`, `ayarlar'ın sürümü`
+**Desteklenen Dilbilgisi Ekleri ve Kullanım Şablonları:**
+
+| Durum / Ek Grubu | Desteklenen Tüm Varyasyonlar | Örnek Yazım | Açıklama |
+| :--- | :--- | :--- | :--- |
+| **Belirtme (-i Hali)** | `'i`, `'ı`, `'u`, `'ü`, `'yi`, `'yı`, `'yu`, `'yü`, `'ni`, `'nı`, `'nu`, `'nü` | `hata'yı yazdır` | Nesneyi vurgular. |
+| **Yönelme (-e Hali)** | `'e`, `'a`, `'ye`, `'ya` | `liste'ye ekle` | Hedef veya yön belirtir. |
+| **Bulunma (-de Hali)** | `'de`, `'da`, `'te`, `'ta` | `bellek'te tut` | Durum veya konum belirtir. |
+| **Ayrılma (-den Hali)** | `'den`, `'dan`, `'ten`, `'tan` | `liste'den çıkar` | Kaynak veya ayrılma bildirir. |
+| **İlgi / Tamlama (-nin)** | `'nin`, `'nın`, `'nun`, `'nün`, `'ın`, `'in`, `'un`, `'ün` | `ayarlar'ın sürümü` | Nesne özelliklerine erişim. |
+| **Vasıta (-le Hali)** | `'le`, `'la`, `'yle`, `'yla` | `hız'la çalıştır` | Araç veya yöntem belirtir. |
+| **İyelik (-si Eki)** | `'si`, `'sı`, `'su`, `'sü`, `'i`, `'ı`, `'u`, `'ü` | `kullanıcı'nın adı` | Sahiplik/aidiyet bildirir. |
+| **Sıfat Yapan (-ki)** | `'deki`, `'daki`, `'teki`, `'taki` | `dosya'daki veri` | Nitelik veya konum belirtir. |
+
+
 
 ```huma
 // Ek sistemi sayesinde çok daha akıcı ve okunabilir kodlar yazılır:

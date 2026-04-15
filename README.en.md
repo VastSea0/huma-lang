@@ -150,15 +150,19 @@ i < fruits'ın uzunluğu olduğu sürece {
 
 The most distinctive feature of Hüma is its built-in support for Turkish grammar and agglutination. Grammatical suffixes appended via an apostrophe (`'`) are cleanly and automatically stripped by the lexer at compile time. This drastically improves code readability and natural flow while ensuring absolutely zero runtime cost.
 
-**Supported Suffix Patterns:**
-- **Accusative Case (Direct Object / -i hali):** `'i`, `'ı`, `'u`, `'ü`, `'yi`, `'yı`, `'yu`, `'yü`
-  *Usage:* Outputting or returning values. Example: `hata'yı yazdır` (print error), `isim'i döndür` (return name)
-- **Dative Case (Direction / -e hali):** `'e`, `'a`, `'ye`, `'ya`
-  *Usage:* Adding to collections or assignments. Example: `liste'ye ekle` (append to list)
-- **Ablative Case (Origin / -den hali):** `'den`, `'dan`, `'ten`, `'tan`
-  *Usage:* Removing from collections or reading from sources. Example: `liste'den çıkar` (remove from list)
-- **Genitive Case (Possession / -nin hali):** `'nin`, `'nın`, `'nun`, `'nün`, `'ın`, `'in`, `'un`, `'ün`
-  *Usage:* Property access or lengths. Example: `liste'nin uzunluğu` (length of list), `ayarlar'ın sürümü` (version of settings)
+**Supported Grammatical Suffixes and Usage Patterns:**
+| Grammatical Case | Supported Variations | Example Usage | Description |
+| :--- | :--- | :--- | :--- |
+| **Accusative (-i)** | `'i`, `'ı`, `'u`, `'ü`, `'yi`, `'yı`, `'yu`, `'yü`, `'ni`, `'nı`, `'nu`, `'nü` | `hata'yı yazdır` | Marks the direct object. |
+| **Dative (-e)** | `'e`, `'a`, `'ye`, `'ya` | `liste'ye ekle` | Indicates direction or target. |
+| **Locative (-de)** | `'de`, `'da`, `'te`, `'ta` | `bellek'te tut` | Indicates location or state. |
+| **Ablative (-den)** | `'den`, `'dan`, `'ten`, `'tan` | `liste'den çıkar` | Indicates source or departure. |
+| **Genitive (-nin)** | `'nin`, `'nın`, `'nun`, `'nün`, `'ın`, `'in`, `'un`, `'ün` | `ayarlar'ın sürümü` | Indicates possession or property access. |
+| **Instrumental (-le)** | `'le`, `'la`, `'yle`, `'yla` | `hız'la çalıştır` | Indicates instrument or method. |
+| **Possessive (-si)** | `'si`, `'sı`, `'su`, `'sü`, `'i`, `'ı`, `'u`, `'ü` | `kullanıcı'nın adı` | Indicates ownership/belonging. |
+| **Relatival (-ki)** | `'deki`, `'daki`, `'teki`, `'taki` | `dosya'daki veri` | Derives adjectives of position or time. |
+
+
 
 ```huma
 // Writing fluid and highly readable code with suffixes:
