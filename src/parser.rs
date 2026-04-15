@@ -154,10 +154,30 @@ impl Parser {
             if self.current_token == Token::NoktaliVirgul { self.next_token(); }
             return Some(Komut::DondurKomutu(ifade));
         }
+        // Postfix: soru eki (mi / mı / mu / mü)
+        if self.current_token == Token::Mi {
+            self.next_token();
+        }
 
         // ifade ise { gövde } [yoksa { gövde }]
         if self.current_token == Token::Ise {
             return self.parse_ise_komutu(ifade);
+        }
+
+        // i = 0'dan 10'a kadar { ... }
+        // Mevcut durumda 'ifade' i = 0 atamasıdır. 
+        // Arkasından 'bitiş' değeri ve 'kadar' geliyorsa bu bir aralık döngüsüdür.
+        if self.peek_token == Token::Kadar {
+            let bitis = self.parse_ifade();
+            self.consume(Token::Kadar);
+            self.consume(Token::AcikSuskun);
+            let govde = self.parse_blok();
+            
+            if let Ifade::IkiliIslem { sol, operator: Token::Esittir, sag } = ifade {
+                if let Ifade::Degisken(ad) = *sol {
+                    return Some(Komut::AralikDongusu { degisken: ad, baslangic: *sag, bitis, govde });
+                }
+            }
         }
 
         // ifade olduğu sürece { gövde }

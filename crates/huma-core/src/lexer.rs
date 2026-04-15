@@ -29,9 +29,12 @@ fn is_turkish_suffix(s: &str) -> bool {
     matches!(s,
         "i" | "ı" | "u" | "ü" | "yi" | "yı" | "yu" | "yü" |
         "ni" | "nı" | "nu" | "nü" |
+        "si" | "sı" | "su" | "sü" |
         "a" | "e" | "ya" | "ye" |
         "dan" | "den" | "tan" | "ten" |
         "da" | "de" | "ta" | "te" |
+        "lar" | "ler" |
+        "ca" | "ce" | "ça" | "çe" |
         "nin" | "nın" | "nun" | "nün" | "in" | "ın" | "un" | "ün" |
         "daki" | "deki" | "taki" | "teki" |
         "la" | "le" | "yla" | "yle"
@@ -186,7 +189,7 @@ impl Lexer {
             // İyelik eki — sadece `Nin` erişiminden sonra beklenir.
             // Örn: ayarlar'ın tema'sı  /  k1'in yas'ı
             if self.nin_state == NinState::AfterNinProperty
-                && matches!(suffix.as_str(), "si" | "sı" | "su" | "sü" | "i" | "ı" | "u" | "ü")
+                && matches!(suffix.as_str(), "si" | "sı" | "su" | "sü" | "i" | "ı" | "u" | "ü" | "ni" | "nı" | "nu" | "nü")
             {
                 self.nin_state = NinState::None;
                 return Token::Iyelik;
@@ -346,6 +349,8 @@ impl Lexer {
             "yakala" => Token::Yakala,
             "hata" => Token::HataAnahtar,
             "var" => Token::Var,
+            "kadar" => Token::Kadar,
+            "mi" | "mı" | "mu" | "mü" => Token::Mi,
             "bekle" => Token::Bekle,
             _ => Token::Tanimlayici(s),
         };

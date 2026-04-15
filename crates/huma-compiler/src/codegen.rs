@@ -92,6 +92,7 @@ pub fn generate_standalone(input_path: &str, output_name: &str) -> HumaResult<St
             OpCode::MakeMap(n) => format!("OpCode::MakeMap({})", n),
             OpCode::TryBlockStart(n) => format!("OpCode::TryBlockStart({})", n),
             OpCode::TryBlockEnd => "OpCode::TryBlockEnd".to_string(),
+            OpCode::Await => "OpCode::Await".to_string(),
         })
         .collect();
     let inst_str = format!("vec![{}]", inst_items.join(", "));

@@ -105,6 +105,11 @@ i < 5 olduğu sürece {
     "Sıra: " + i'yi yazdır;
     i = i + 1 olsun
 }
+
+// Aralık Döngüsü (kadar)
+j = 1'den 5'e kadar {
+    "Sayı: " + j'yi yazdır
+}
 ```
 
 ### Fonksiyonlar ve Sınıflar
@@ -152,12 +157,15 @@ Hüma'nın en ayırt edici özelliği, Türkçe'nin eklemeli yapısını doğal 
 | :--- | :--- | :--- | :--- |
 | **Belirtme (-i Hali)** | `'i`, `'ı`, `'u`, `'ü`, `'yi`, `'yı`, `'yu`, `'yü`, `'ni`, `'nı`, `'nu`, `'nü` | `hata'yı yazdır` | Nesneyi vurgular. |
 | **Yönelme (-e Hali)** | `'e`, `'a`, `'ye`, `'ya` | `liste'ye ekle` | Hedef veya yön belirtir. |
-| **Bulunma (-de Hali)** | `'de`, `'da`, `'te`, `'ta` | `bellek'te tut` | Durum veya konum belirtir. |
-| **Ayrılma (-den Hali)** | `'den`, `'dan`, `'ten`, `'tan` | `liste'den çıkar` | Kaynak veya ayrılma bildirir. |
+| **Bulunma (-de Hali)** | `'de`, `'da`, `'te`, `'ta` | `bellek'te tut` | Konum veya durum belirtir. |
+| **Ayrılma (-den Hali)** | `'den`, `'dan`, `'ten`, `'tan` | `liste'den çıkar` | Kaynak bildirir. |
+| **Çoğul Eki (-lar)** | `'lar`, `'ler` | `sayılar'ı yazdır` | Çokluk belirtir. |
 | **İlgi / Tamlama (-nin)** | `'nin`, `'nın`, `'nun`, `'nün`, `'ın`, `'in`, `'un`, `'ün` | `ayarlar'ın sürümü` | Nesne özelliklerine erişim. |
+| **Eşitlik Hali (-ce)** | `'ce`, `'ca`, `'çe`, `'ça` | `Türkçe'ce yaz` | "Gibi / olarak" anlamı katar. |
 | **Vasıta (-le Hali)** | `'le`, `'la`, `'yle`, `'yla` | `hız'la çalıştır` | Araç veya yöntem belirtir. |
-| **İyelik (-si Eki)** | `'si`, `'sı`, `'su`, `'sü`, `'i`, `'ı`, `'u`, `'ü` | `kullanıcı'nın adı` | Sahiplik/aidiyet bildirir. |
-| **Sıfat Yapan (-ki)** | `'deki`, `'daki`, `'teki`, `'taki` | `dosya'daki veri` | Nitelik veya konum belirtir. |
+| **İyelik (-si Eki)** | `'si`, `'sı`, `'su`, `'sü`, `'i`, `'ı`, `'u`, `'ü` | `tema'sı`, `adı` | Aitlik/iyelik bildirir. |
+| **Sıfat Yapan (-ki)** | `'deki`, `'daki`, `'teki`, `'taki` | `kod'daki hata` | Nitelik belirtir. |
+| **Soru Eki (-mi)** | `mi`, `mı`, `mu`, `mü` | `bayrak mi ise` | Koşullarda soru vurgusu. |
 
 
 

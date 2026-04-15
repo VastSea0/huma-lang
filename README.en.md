@@ -157,10 +157,13 @@ The most distinctive feature of Hüma is its built-in support for Turkish gramma
 | **Dative (-e)** | `'e`, `'a`, `'ye`, `'ya` | `liste'ye ekle` | Indicates direction or target. |
 | **Locative (-de)** | `'de`, `'da`, `'te`, `'ta` | `bellek'te tut` | Indicates location or state. |
 | **Ablative (-den)** | `'den`, `'dan`, `'ten`, `'tan` | `liste'den çıkar` | Indicates source or departure. |
+| **Plural (-lar)** | `'lar`, `'ler` | `sayılar'ı yazdır` | Marks plural nouns. |
 | **Genitive (-nin)** | `'nin`, `'nın`, `'nun`, `'nün`, `'ın`, `'in`, `'un`, `'ün` | `ayarlar'ın sürümü` | Indicates possession or property access. |
+| **Equality (-ce)** | `'ce`, `'ca`, `'çe`, `'ça` | `Türkçe'ce yaz` | "As / in the manner of". |
 | **Instrumental (-le)** | `'le`, `'la`, `'yle`, `'yla` | `hız'la çalıştır` | Indicates instrument or method. |
-| **Possessive (-si)** | `'si`, `'sı`, `'su`, `'sü`, `'i`, `'ı`, `'u`, `'ü` | `kullanıcı'nın adı` | Indicates ownership/belonging. |
-| **Relatival (-ki)** | `'deki`, `'daki`, `'teki`, `'taki` | `dosya'daki veri` | Derives adjectives of position or time. |
+| **Possessive (-si)** | `'si`, `'sı`, `'su`, `'sü`, `'i`, `'ı`, `'u`, `'ü` | `tema'sı`, `adı` | Indicates ownership/belonging. |
+| **Relatival (-ki)** | `'deki`, `'daki`, `'teki`, `'taki` | `kod'daki hata` | Derives adjectives of position or time. |
+| **Question (-mi)** | `mi`, `mı`, `mu`, `mü` | `bayrak mi ise` | Question particle for conditions. |
 
 
 

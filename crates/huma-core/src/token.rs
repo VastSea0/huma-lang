@@ -28,6 +28,8 @@ pub enum Token {
     Var,            // var
     Nin,            // 'nin / 'nın (kendisi'nin erişimi)
     Iyelik,         // 'si / 'sı / 'su / 'sü (özellik iyeliği)
+    Kadar,          // kadar
+    Mi,             // mi / mı / mu / mü
     Bekle,          // bekle (await)
 
     // Tanımlayıcılar ve Literaller

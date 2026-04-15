@@ -439,6 +439,22 @@ impl Yorumlayici {
                     }
                 }
             }
+            Komut::AralikDongusu { degisken, baslangic, bitis, govde } => {
+                let start_val = self.ifade_hesapla(baslangic);
+                let end_val = self.ifade_hesapla(bitis);
+                if let (Deger::Sayi(s), Deger::Sayi(e)) = (start_val, end_val) {
+                    let mut i = s;
+                    while i <= e {
+                        self.degisken_ata(degisken.clone(), Deger::Sayi(i));
+                        for k in &govde {
+                            self.komut_calistir(k.clone());
+                            if self.donus_degeri.is_some() { break; }
+                        }
+                        if self.donus_degeri.is_some() { break; }
+                        i += 1.0;
+                    }
+                }
+            }
             Komut::NesneAlaniAtama { nesne, ozellik, deger } => {
                 let deger_val = self.ifade_hesapla(deger);
                 let nesne_val = self.ifade_hesapla(nesne);

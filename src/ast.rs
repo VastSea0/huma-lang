@@ -98,4 +98,11 @@ pub enum Komut {
         ozellik: String,
         deger: Ifade,
     },
+    /// Aralik döngüsü: i = 0'dan 10'a kadar { ... }
+    AralikDongusu {
+        degisken: String,
+        baslangic: Ifade,
+        bitis: Ifade,
+        govde: Vec<Komut>,
+    },
 }

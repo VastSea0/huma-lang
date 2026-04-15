@@ -27,6 +27,8 @@ pub enum Token {
     Var,            // var
     Nin,            // 'nin / 'nın (kendisi'nin erişimi)
     Iyelik,         // 'si / 'sı / 'su / 'sü (özellik iyeliği)
+    Kadar,          // kadar (döngü ve menzil için)
+    Mi,             // mi / mı / mu / mü (soru eki)
 
     // Tanımlayıcılar ve Literaller
     Tanimlayici(String),
