@@ -9,4 +9,4 @@
 // pos_etiketle, cümle_böl, vb.) bu yükleme ile kullanılabilir hale gelir.
 // ═══════════════════════════════════════════════════════════════════
 
-yükle "nlp.hb";
+"nlp.hb"'yi yükle;

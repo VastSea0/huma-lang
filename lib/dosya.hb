@@ -10,15 +10,15 @@
 //   - dosya_var_mı(yol)      → 1 veya 0 döndürür
 // ═══════════════════════════════════════════════════════════════════
 
-yükle "renkler.hb";
+"renkler.hb"'yi yükle
 
 // NOT: dosya_var_mı() artık Rust built-in olarak sağlanır (v1.1.0)
 // Eski lib versiyonu kaldırıldı.
 
 güvenli_oku fonksiyon olsun yol alsın {
-    icerik = dosya_oku(yol) olsun
+    icerik = yol'u dosya_oku olsun
     tipi(icerik) = "Boş" ise {
-        hata_yaz("Dosya okunamadı: " + yol)
+        "Dosya okunamadı: " + yol'u hata_yaz
         ""'yi döndür
     }
     icerik'i döndür
@@ -27,21 +27,19 @@ güvenli_oku fonksiyon olsun yol alsın {
 satırlara_ayır fonksiyon olsun metin alsın {
     satırlar = [] olsun
     gecici = "" olsun
-    i = 0 olsun
-    boy = uzunluk(metin) olsun
+    boy = metin'in uzunluğu olsun
     
-    i < boy olduğu sürece {
+    i = 0'dan boy'a kadar {
         c = metin[i] olsun
         (c = "\n") ise {
-            satırlar = listeye_ekle(satırlar, gecici) olsun
+            satırlar'a gecici'yi ekle
             gecici = "" olsun
         } yoksa {
             gecici = gecici + c olsun
         }
-        i = i + 1 olsun
     }
-    uzunluk(gecici) > 0 ise {
-        satırlar = listeye_ekle(satırlar, gecici) olsun
+    gecici'nin uzunluğu > 0 ise {
+        satırlar'a gecici'yi ekle
     }
     satırlar'ı döndür
 }

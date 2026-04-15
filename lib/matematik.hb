@@ -18,10 +18,8 @@ mutlak fonksiyon olsun n alsın { n < 0 ise { n * -1'i döndür } n'i döndür }
 
 kuvvet fonksiyon olsun a, b alsın {
     sonuc = 1 olsun
-    i = 0 olsun
-    i < b olduğu sürece {
+    i = 0'dan b'ye kadar {
         sonuc = sonuc * a olsun
-        i = i + 1 olsun
     }
     sonuc'u döndür
 }
