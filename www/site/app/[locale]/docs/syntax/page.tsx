@@ -39,25 +39,26 @@ sayaç = 0 olsun
 
 sayaç < 5 olduğu sürece {
     "Sıra: " + sayaç'ı yazdır;
-    sayaç = sayaç + 1 olsun // Update the loop variable
-}`;
-
-const fullExampleCode = `// Tam örnek: değişkenler + koşullar + döngüler
-isim = "Hüma" olsun
-sayı = 10 olsun
-isim'i yazdır;
-
-puan = 85 olsun
-puan > 50 ise {
-    "Başarılı!"'yı yazdır;
-} yoksa {
-    "Tekrar dene."'i yazdır;
+    sayaç = sayaç + 1 olsun
 }
 
-sayaç = 0 olsun
-sayaç < 5 olduğu sürece {
-    "Adım: " + sayaç'ı yazdır;
-    sayaç = sayaç + 1 olsun
+// Aralık Döngüleri (Range Loops)
+i = 0'dan 5'e kadar {
+    "Adım: " + i'yi yazdır;
+}`;
+
+// Tam örnek: değişkenler + aralık döngüleri + edatlı çağrılar
+veriler = [10, 20, 30] olsun
+
+topla = fonksiyon olsun a, b alsın {
+    a + b döndür
+}
+
+i = 0'dan 2'ye kadar {
+    sayı = veriler[i] olsun
+    sayı > 15 ise {
+        10 ile sayı'yı topla'yı yazdır;
+    }
 }`;
 
 export default async function SyntaxPage({
@@ -139,6 +140,7 @@ export default async function SyntaxPage({
                   ["olsun", "let / var", locale === "tr" ? "Değişken tanımla veya güncelle" : "Declare or update a variable"],
                   ["yazdır", "print()", locale === "tr" ? "Değeri standart çıktıya bas" : "Output a value to stdout"],
                   ["döndür", "return", locale === "tr" ? "Fonksiyondan değer döndür" : "Return from a function"],
+                  ["ile", "with", locale === "tr" ? "Edatlı fonksiyon çağrısı (infix-call)" : "Particle-based function call"],
                 ].map(([huma, eq, desc]) => (
                   <tr key={huma} className="group">
                     <td className="py-4 pr-8 text-primary font-bold">{huma}</td>
@@ -196,6 +198,29 @@ export default async function SyntaxPage({
           </div>
         </section>
 
+        {/* Particle / Postfix Calls */}
+        <section className="mb-16" id="postfix">
+          <h2 className="text-2xl font-bold text-on-surface mb-6 flex items-center gap-3">
+            <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
+              04
+            </span>
+            {s.postfix_calls.title}
+          </h2>
+          <p className="mb-6 text-on-surface-variant leading-relaxed">
+            {s.postfix_calls.desc}
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/10">
+              <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-2">Edatlı Çağrı (ile)</p>
+              <code className="text-xs font-mono bg-on-surface/5 p-2 rounded block">10 ile 20'yi topla</code>
+            </div>
+            <div className="bg-surface-container-low p-4 rounded-xl border border-outline-variant/10">
+              <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-2">Postfix Yükle</p>
+              <code className="text-xs font-mono bg-on-surface/5 p-2 rounded block">"mat.hb"'yi yükle</code>
+            </div>
+          </div>
+        </section>
+
         {/* Navigation */}
         <div className="flex justify-between mt-16 pt-8 border-t border-outline-variant/10">
           <Link
@@ -229,6 +254,7 @@ export default async function SyntaxPage({
             { href: "#variables", label: s.variables.title },
             { href: "#conditionals", label: s.conditionals.title },
             { href: "#loops", label: s.loops.title },
+            { href: "#postfix", label: s.postfix_calls.title },
           ].map((item) => (
             <li key={item.href}>
               <a

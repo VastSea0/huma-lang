@@ -8,8 +8,8 @@ topla = fonksiyon olsun a, b alsın {
     a + b döndür
 }
 
-sonuc = 10 ile 20'yi topla olsun
-"10 ile 20'nin toplamı: " + sonuc'u yazdır
+sonuc = 10 ile 20'yi topla'yı çağır olsun
+"10 ile 20'nin toplamı (çağır ile): " + sonuc'u yazdır
 
 "--- Option C (Nesne Metodu) Çağrı Testi ---" 'yi yazdır
 araba = {

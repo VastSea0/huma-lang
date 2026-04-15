@@ -353,6 +353,7 @@ impl Lexer {
             "mi" | "mı" | "mu" | "mü" => Token::Mi,
             "ile" => Token::Ile,
             "bekle" => Token::Bekle,
+            "çağır" => Token::Cagir,
             _ => Token::Tanimlayici(s),
         };
 

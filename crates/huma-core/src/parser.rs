@@ -523,6 +523,8 @@ impl Parser {
                         if let Token::Tanimlayici(ref s) = self.current_token {
                             let oz = s.clone(); self.next_token();
                             if self.current_token == Token::Iyelik { self.next_token(); }
+                            // Opsiyonel "çağır"
+                            if self.current_token == Token::Cagir { self.next_token(); }
                             // Nesne erişimini bir çağrıya dönüştür
                             node = Ifade::Cagri {
                                 fonksiyon: Box::new(Ifade::NesneErisim { nesne: Box::new(node), ozellik: oz }),
@@ -557,6 +559,8 @@ impl Parser {
                     if let Token::Tanimlayici(ref s) = self.current_token {
                         let ad = s.clone();
                         self.next_token();
+                        // Opsiyonel "çağır"
+                        if self.current_token == Token::Cagir { self.next_token(); }
                         node = Ifade::Cagri {
                             fonksiyon: Box::new(Ifade::Degisken(ad)),
                             argumanlar: args,

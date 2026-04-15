@@ -133,9 +133,10 @@
       "why_huma": {
         "title": "Neden Hüma?",
         "points": [
+          "huma_turkce_dilbilgisi_raporu.md: Tam uyumluluk raporu",
           "Rust tabanlı güvenlik mimarisi",
           "Düşük bellek kullanımı ve yüksek hız",
-          "Yerel ek sistemi desteği (Türkçe kökenli)",
+          "Genişletilmiş ek sistemi (İyelik, Çoğul, Belirtme)",
           "Dahili paket yöneticisi ve web desteği"
         ]
       }
@@ -169,8 +170,15 @@
         "desc": "Uygulamanızın akışını doğal dil mantığıyla kontrol edin. Hüma, 'ise' ve 'yoksa' anahtar kelimelerini kullanır."
       },
       "loops": {
-        "title": "Döngüler (olduğu sürece)",
-        "desc": "Bir koşul sağlandığı sürece kod bloklarını 'olduğu sürece' anahtar kelimesi ile tekrarlayın."
+        "title": "Döngüler (olduğu sürece / aralık)",
+        "desc": "Koşullu döngüler için 'olduğu sürece', sayısal aralıklar için 'dan ... e kadar' yapısını kullanın.",
+        "range_loop": "Örn: i = 0'dan 10'a kadar { i'yi yazdır }"
+      },
+      "postfix_calls": {
+        "title": "Edatlı ve Postfix Çağrılar",
+        "desc": "Hüma, Türkçe'nin nesne-yüklem yapısına uygun 'ile' ve 'yükle' yapılarını destekler.",
+        "ile_usage": "10 ile 20'yi topla (fonksiyon çağrısı)",
+        "yukle_usage": \"dosya.hb\"'yi yükle (dosya yükleme)"
       }
     },
     "grammar": {
@@ -206,8 +214,26 @@
         "genitive": {
           "name": "İlgi Durumu (-nin hali)",
           "suffixes": "'nin, 'nın, 'nun, 'nün, 'ın, 'in, 'un, 'ün",
-          "usage": "Nesneeye ait özelliklere (.) kullanmadan erişmek için kullanılır. Listelerin uzunluğunu sorgularken okunabilirliği dramatik oranda artırır.",
-          "example": "dizi'nin uzunluğu, ayar'ın değeri"
+          "usage": "Nesneye ait özelliklere erişmek için kullanılır. Artık sondaki iyelik eki (hızı'ı) opsiyoneldir.",
+          "example": "araba'nın hızı, ayar'ın değeri"
+        },
+        "possessive": {
+          "name": "İyelik Ekleri",
+          "suffixes": "'si, 'sı, 'su, 'sü",
+          "usage": "Nesne özelliklerini daha doğal ifade etmek için kullanılır.",
+          "example": "kendisi'nin hızı'sı"
+        },
+        "plural": {
+          "name": "Çoğul Ekleri",
+          "suffixes": "'lar, 'ler",
+          "usage": "Listeler veya çoklu nesneler üzerinde işlem yaparken kullanılır.",
+          "example": "sayılar'ı yazdır"
+        },
+        "equality": {
+          "name": "Eşitlik Durumu (-ce hali)",
+          "suffixes": "'ca, 'ce, 'ça, 'çe",
+          "usage": "Bakımından veya tarzında anlamı katmak için kullanılır.",
+          "example": "yavaş'ça hızlan"
         }
       },
       "best_practices": {
@@ -423,6 +449,18 @@
       "description": "Hüma dili ve araç zinciri resmi güncelleme geçmişi.",
       "hero_title": "Neler Değişti?",
       "hero_desc": "Hüma sürekli gelişiyor. Her sürümde dile eklenen yeni özellikleri, performans iyileştirmelerini ve topluluktan gelen hata düzeltmelerini buradan takip edebilirsiniz.",
+      "v0_6_0_alfa_2": {
+        "version": "v0.6.0-alfa.2 (Dilbilgisi Devrimi)",
+        "date": "15 Nisan 2026",
+        "changes": [
+          "Postfix Yükle: \"dosya.hb\"'yi yükle yapısı ile daha doğal modül yükleme.",
+          "Edatlı Çağrı: '10 ile 20'yi topla' gibi Türkçe cümle yapısına uygun fonksiyon çağrısı.",
+          "Genişletilmiş Ekler: İyelik ('si), Çoğul ('lar), Eşitlik ('ce) ve Belirtme ('ni) ekleri Lexer'a eklendi.",
+          "Aralık Döngüsü: x = 0'dan 10'a kadar { ... } sözdizimi eklendi.",
+          "Nesne Metot Bağlamı: Düz nesnelerde metot çağrılırken 'kendisi' bağlamı otomatik hale getirildi.",
+          "Opsiyonel İyelik: 'nin' erişimlerinde sondaki 'si/ı' ekinin zorunluluğu kaldırıldı."
+        ]
+      },
       "v0_6_0_alfa_1": {
         "version": "v0.6.0-alfa.1 (Bakış Açısı: Faz 1)",
         "date": "9 Nisan 2026",

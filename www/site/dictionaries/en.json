@@ -133,9 +133,10 @@
       "why_huma": {
         "title": "Why Hüma?",
         "points": [
+          "huma_turkce_dilbilgisi_raporu.md: Full compatibility report",
           "Safety Built on Top of Rust",
           "Low Memory & High Execution Speed",
-          "Native Suffix Support",
+          "Extended Suffix System (Possessive, Plural, Accusative)",
           "Built-in Package Manager & Web Support"
         ]
       }
@@ -169,8 +170,15 @@
         "desc": "Control the flow of your application with natural language logic. Hüma uses 'ise' (if) and 'yoksa' (else) keywords."
       },
       "loops": {
-        "title": "Loops (olduğu sürece)",
-        "desc": "Repeat blocks of code as long as a condition is met using the 'olduğu sürece' keyword."
+        "title": "Loops (olduğu sürece / range)",
+        "desc": "Use 'olduğu sürece' for conditional loops, and 'dan ... e kadar' for numerical ranges.",
+        "range_loop": "Ex: i = 0'dan 10'a kadar { i'yi yazdır }"
+      },
+      "postfix_calls": {
+        "title": "Particle and Postfix Calls",
+        "desc": "Hüma supports 'ile' (with) and 'yükle' (load) structures compatible with Turkish syntax.",
+        "ile_usage": "10 ile 20'yi topla (function call)",
+        "yukle_usage": \"file.hb\"'yi yükle (module loading)"
       }
     },
     "grammar": {
@@ -206,8 +214,26 @@
         "genitive": {
           "name": "Genitive (-nin, -ın)",
           "suffixes": "'nin, 'ın, 'un, 'ün",
-          "usage": "Used for accessing object properties or methods.",
-          "example": "ayarlar'ın tema'sı"
+          "usage": "Used for accessing object properties or methods. The trailing possessive suffix (hızı'ı) is now optional.",
+          "example": "araba'nin hızı, ayar'ın değeri"
+        },
+        "possessive": {
+          "name": "Possessive Suffixes",
+          "suffixes": "'si, 'sı, 'su, 'sü",
+          "usage": "Used to express object properties more naturally.",
+          "example": "kendisi'nin hızı'sı"
+        },
+        "plural": {
+          "name": "Plural Suffixes",
+          "suffixes": "'lar, 'ler",
+          "usage": "Used when operating on lists or multiple objects.",
+          "example": "sayılar'ı yazdır"
+        },
+        "equality": {
+          "name": "Equality Case (-ce)",
+          "suffixes": "'ca, 'ce, 'ça, 'çe",
+          "usage": "Used to add meaning of perspective or style.",
+          "example": "yavaş'ça hızlan"
         }
       },
       "best_practices": {
@@ -425,6 +451,30 @@
       "description": "Official update history of the Hüma language and toolchain.",
       "hero_title": "What's New?",
       "hero_desc": "Hüma is constantly evolving. In every version, you can track new language features, performance improvements, and community-driven bug fixes here.",
+      "v0_6_0_alfa_2": {
+        "version": "v0.6.0-alfa.2 (Grammar Revolution)",
+        "date": "April 15, 2026",
+        "changes": [
+          "Postfix Load: \"file.hb\"'yi yükle syntax for more natural module loading.",
+          "Particle Call: '10 ile 20'yi topla' style function calls matching Turkish sentence structure.",
+          "Extended Suffixes: Possessive ('si), Plural ('lar), Equality ('ce), and Accusative ('ni) suffixes added to Lexer.",
+          "Range Loop: x = 0'dan 10'a kadar { ... } syntax added.",
+          "Object Method Context: 'kendisi' context is now automatic when calling methods on plain objects.",
+          "Optional Possessive: Removed mandatory trailing 'si/ı' suffix for 'nin' access."
+        ]
+      },
+      "v0_6_0_alfa_2": {
+        "version": "v0.6.0-alfa.2 (Grammar Revolution)",
+        "date": "April 15, 2026",
+        "changes": [
+          "Postfix Load: \"file.hb\"'yi yükle syntax for more natural module loading.",
+          "Particle Call: '10 ile 20'yi topla' style function calls matching Turkish sentence structure.",
+          "Extended Suffixes: Possessive ('si), Plural ('lar), Equality ('ce), and Accusative ('ni) suffixes added to Lexer.",
+          "Range Loop: x = 0'dan 10'a kadar { ... } syntax added.",
+          "Object Method Context: 'kendisi' context is now automatic when calling methods on plain objects.",
+          "Optional Possessive: Removed mandatory trailing 'si/ı' suffix for 'nin' access."
+        ]
+      },
       "v0_6_0_alfa_1": {
         "version": "v0.6.0-alfa.1 (Phase 1: Robustness)",
         "date": "April 9, 2026",

@@ -35,11 +35,13 @@ yazdır ayarlar'ın tema'sı;
 sayılar = [1, 2] olsun
 sayılar'a [3]'ü ekle;
 
-// Çıkarma (Ayrılma Durumu: 'den, 'dan, 'ten, 'tan)
-sayılar'dan [0]'ı çıkar;
+// Edatlı Çağrı ve Postfix Yükle
+"matematik.hb"'yi yükle
+10 ile 20'yi topla'yı yazdır;
 
-// Nesneyi hedef alma (Belirtme Durumu: 'i, 'ı, 'u, 'ü)
-"İşlem Tamam"'ı yazdır;`;
+// Nesneyi hedef alma (Belirtme Durumu: 'ni, 'nı, 'nu, 'nü)
+dosya_adı = "huma.txt" olsun
+dosya_adı'nı yazdır;`;
 
 export default async function GrammarPage({
   params,
@@ -138,6 +140,36 @@ export default async function GrammarPage({
               </p>
               <p className="text-sm text-on-surface-variant mb-4">{g?.suffixes?.genitive?.usage}</p>
               <p className="text-xs font-mono text-on-surface/80">» {g?.suffixes?.genitive?.example}</p>
+            </div>
+
+            {/* Possessive */}
+            <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-2xl p-6 hover:border-primary/30 transition-colors">
+              <h3 className="text-lg font-bold text-primary mb-2">{g?.suffixes?.possessive?.name}</h3>
+              <p className="text-xs font-mono text-tertiary mb-4 bg-tertiary/10 inline-block px-2 py-1 rounded">
+                {g?.suffixes?.possessive?.suffixes}
+              </p>
+              <p className="text-sm text-on-surface-variant mb-4">{g?.suffixes?.possessive?.usage}</p>
+              <p className="text-xs font-mono text-on-surface/80">» {g?.suffixes?.possessive?.example}</p>
+            </div>
+
+            {/* Plural */}
+            <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-2xl p-6 hover:border-primary/30 transition-colors">
+              <h3 className="text-lg font-bold text-primary mb-2">{g?.suffixes?.plural?.name}</h3>
+              <p className="text-xs font-mono text-tertiary mb-4 bg-tertiary/10 inline-block px-2 py-1 rounded">
+                {g?.suffixes?.plural?.suffixes}
+              </p>
+              <p className="text-sm text-on-surface-variant mb-4">{g?.suffixes?.plural?.usage}</p>
+              <p className="text-xs font-mono text-on-surface/80">» {g?.suffixes?.plural?.example}</p>
+            </div>
+
+            {/* Equality */}
+            <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-2xl p-6 hover:border-primary/30 transition-colors">
+              <h3 className="text-lg font-bold text-primary mb-2">{g?.suffixes?.equality?.name}</h3>
+              <p className="text-xs font-mono text-tertiary mb-4 bg-tertiary/10 inline-block px-2 py-1 rounded">
+                {g?.suffixes?.equality?.suffixes}
+              </p>
+              <p className="text-sm text-on-surface-variant mb-4">{g?.suffixes?.equality?.usage}</p>
+              <p className="text-xs font-mono text-on-surface/80">» {g?.suffixes?.equality?.example}</p>
             </div>
           </div>
 

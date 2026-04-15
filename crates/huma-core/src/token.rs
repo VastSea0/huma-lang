@@ -32,6 +32,7 @@ pub enum Token {
     Mi,             // mi / mı / mu / mü
     Ile,            // ile
     Bekle,          // bekle (await)
+    Cagir,          // çağır
 
     // Tanımlayıcılar ve Literaller
     Tanimlayici(String),

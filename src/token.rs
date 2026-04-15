@@ -31,7 +31,7 @@ pub enum Token {
     Iyelik,         // 'si / 'sı / 'su / 'sü (özellik iyeliği)
     Kadar,          // kadar (döngü ve menzil için)
     Mi,             // mi / mı / mu / mü (soru eki)
-    Ile,            // ile
+    Cagir,          // çağır
 
     // Tanımlayıcılar ve Literaller
     Tanimlayici(String),
