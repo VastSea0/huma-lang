@@ -72,9 +72,6 @@ impl Parser {
 
     fn parse_komut(&mut self) -> Option<Komut> {
         match self.current_token.clone() {
-            // yükle "dosya.hb"
-            Token::Yukle => self.parse_yukle(),
-
             // dene { } hata var ise { }
             Token::Dene => self.parse_dene(),
 
@@ -169,6 +166,17 @@ impl Parser {
             if self.current_token == Token::NoktaliVirgul { self.next_token(); }
             return Some(Komut::DondurKomutu(ifade));
         }
+
+        // Postfix: yükle
+        if self.current_token == Token::Yukle {
+            self.next_token();
+            if self.current_token == Token::NoktaliVirgul { self.next_token(); }
+            if let Ifade::Metin(yol) = ifade {
+                return Some(Komut::YukleKomutu(yol));
+            }
+            return None;
+        }
+
         // Postfix: soru eki (mi / mı / mu / mü)
         if self.current_token == Token::Mi {
             self.next_token();
@@ -331,15 +339,6 @@ impl Parser {
         Some(Komut::DeneKomutu { dene_govde, hata_degisken, hata_govde })
     }
 
-    fn parse_yukle(&mut self) -> Option<Komut> {
-        self.next_token();
-        if let Token::Metin(ref s) = self.current_token {
-            let yol = s.clone();
-            self.next_token();
-            if self.current_token == Token::NoktaliVirgul { self.next_token(); }
-            Some(Komut::YukleKomutu(yol))
-        } else { None }
-    }
 
     fn parse_blok(&mut self) -> Vec<Komut> {
         let mut komutlar = Vec::new();
@@ -450,13 +449,13 @@ impl Parser {
             Token::Dogru => { self.next_token(); Ifade::Dogru }
             Token::Yanlis => { self.next_token(); Ifade::Yanlis }
             Token::Kendisi => {
-                self.next_token();
+                self.consume(Token::Kendisi);
                 if self.current_token == Token::Nin {
                     self.next_token();
                     if let Token::Tanimlayici(ref s) = self.current_token {
                         let oz = s.clone();
                         self.next_token();
-                        self.consume(Token::Iyelik);
+                        if self.current_token == Token::Iyelik { self.next_token(); }
                         Ifade::KendisiErisim { ozellik: oz }
                     } else {
                         Ifade::Degisken("kendisi".to_string())
@@ -510,9 +509,31 @@ impl Parser {
                     if self.current_token == Token::Uzunlugu {
                         self.next_token();
                         node = Ifade::Uzunluk(Box::new(node));
+                    } else if self.current_token == Token::AcikParantez {
+                        // Metot çağrısı: nesne'nin (arg1, arg2) metot'u
+                        self.next_token();
+                        let mut args = Vec::new();
+                        if self.current_token != Token::KapaliParantez {
+                            loop {
+                                args.push(self.parse_ifade());
+                                if self.current_token == Token::Virgul { self.next_token(); } else { break; }
+                            }
+                        }
+                        self.consume(Token::KapaliParantez);
+                        if let Token::Tanimlayici(ref s) = self.current_token {
+                            let oz = s.clone(); self.next_token();
+                            if self.current_token == Token::Iyelik { self.next_token(); }
+                            // Nesne erişimini bir çağrıya dönüştür
+                            node = Ifade::Cagri {
+                                fonksiyon: Box::new(Ifade::NesneErisim { nesne: Box::new(node), ozellik: oz }),
+                                argumanlar: args,
+                            };
+                        } else {
+                            break;
+                        }
                     } else if let Token::Tanimlayici(ref s) = self.current_token {
                         let oz = s.clone(); self.next_token();
-                        self.consume(Token::Iyelik);
+                        if self.current_token == Token::Iyelik { self.next_token(); }
                         node = Ifade::NesneErisim { nesne: Box::new(node), ozellik: oz };
                     } else {
                         break;
@@ -521,6 +542,28 @@ impl Parser {
                 Token::Uzunlugu => {
                     self.next_token();
                     node = Ifade::Uzunluk(Box::new(node));
+                }
+                Token::Ile => {
+                    self.next_token();
+                    let mut args = vec![node.clone()];
+                    loop {
+                        args.push(self.parse_ifade());
+                        if self.current_token == Token::Ile {
+                            self.next_token();
+                        } else {
+                            break;
+                        }
+                    }
+                    if let Token::Tanimlayici(ref s) = self.current_token {
+                        let ad = s.clone();
+                        self.next_token();
+                        node = Ifade::Cagri {
+                            fonksiyon: Box::new(Ifade::Degisken(ad)),
+                            argumanlar: args,
+                        };
+                    } else {
+                        break;
+                    }
                 }
                 _ => break,
             }
