@@ -13,6 +13,8 @@ pub enum Token {
     Dondur,         // döndür
     Ve,             // ve
     Veya,           // veya
+    Ile,            // ile
+    Bekle,          // bekle
     Degil,          // değil
     Yukle,          // yükle
     ListeAnahtar,   // liste
@@ -29,6 +31,7 @@ pub enum Token {
     Iyelik,         // 'si / 'sı / 'su / 'sü (özellik iyeliği)
     Kadar,          // kadar (döngü ve menzil için)
     Mi,             // mi / mı / mu / mü (soru eki)
+    Ile,            // ile
 
     // Tanımlayıcılar ve Literaller
     Tanimlayici(String),

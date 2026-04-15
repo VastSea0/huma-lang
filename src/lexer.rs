@@ -348,6 +348,7 @@ impl Lexer {
             "var" => Token::Var,
             "kadar" => Token::Kadar,
             "mi" | "mı" | "mu" | "mü" => Token::Mi,
+            "ile" => Token::Ile,
             _ => Token::Tanimlayici(s),
         };
 
