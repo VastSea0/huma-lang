@@ -46,8 +46,7 @@ sayaç < 5 olduğu sürece {
 i = 0'dan 5'e kadar {
     "Adım: " + i'yi yazdır;
 }`;
-
-// Tam örnek: değişkenler + aralık döngüleri + edatlı çağrılar
+const fullExampleCode = `// Tam örnek: değişkenler + aralık döngüleri + edatlı çağrılar
 veriler = [10, 20, 30] olsun
 
 topla = fonksiyon olsun a, b alsın {
