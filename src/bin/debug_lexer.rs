@@ -1,1 +1,0 @@
-use huma::lexer::Lexer; fn main() { let code = std::fs::read_to_string("tests/test_liste_dongu.hb").unwrap(); let mut lexer = Lexer::new(&code); loop { let t = lexer.next_token(); println!("{:?}", t); if t == huma::token::Token::Son { break; } } }

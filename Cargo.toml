@@ -6,27 +6,3 @@ members = [
     "crates/huma-cli",
     "crates/huma-lsp",
 ]
-
-# The old monolithic library — kept temporarily for src-tauri backward compatibility.
-# It will be a thin re-export shim pointing at huma-core.
-[package]
-name = "huma"
-version = "0.5.2"
-description = "A high-performance, safe, and intuitive programming language with Turkish syntax, featuring a bytecode VM."
-authors = ["VastSea0 <vastseaoffical0@outlook.com>"]
-license = "MIT"
-edition = "2021"
-
-[lib]
-name = "huma"
-path = "src/lib.rs"
-
-[[bin]]
-name = "debug_parse"
-path = "src/bin/debug_parse.rs"
-
-[dependencies]
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-bincode = "1.3"
-huma-core = { path = "crates/huma-core" }
