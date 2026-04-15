@@ -23,10 +23,6 @@ struct Backend {
 }
 
 impl Backend {
-    fn uri_to_path(uri: &Url) -> Option<PathBuf> {
-        uri.to_file_path().ok()
-    }
-
     fn scan_hb_files(root: &Path) -> Vec<PathBuf> {
         WalkDir::new(root)
             .into_iter()
@@ -95,7 +91,6 @@ impl Backend {
     }
 
     fn collect_builtin_function_names() -> Vec<String> {
-        // Very simple heuristic: find "<name> fonksiyon olsun" in builtin lib files.
         let re = Regex::new(r#"(?m)^\s*([A-Za-z_ÇĞİÖŞÜçğıöşü][\wÇĞİÖŞÜçğıöşü]*)\s+fonksiyon\s+olsun"#).ok();
         let mut out = Vec::new();
         if let Some(re) = re {
@@ -110,6 +105,36 @@ impl Backend {
         out.sort();
         out.dedup();
         out
+    }
+
+    /// Returns a Turkish documentation string for known Hüma keywords.
+    fn keyword_hover(word: &str) -> Option<String> {
+        let doc = match word {
+            "yazdır"    => "**yazdır** — Bir değeri ekrana yazar.\n\n```hüma\n\"Merhaba\"'yı yazdır\n```",
+            "olsun"     => "**olsun** — Değişken tanımlar veya değer atar.\n\n```hüma\nisim = \"Hüma\" olsun\n```",
+            "fonksiyon" => "**fonksiyon** — Yeni bir fonksiyon tanımlar.\n\n```hüma\nselamla fonksiyon olsun isim alsın {\n    \"Merhaba \" + isim'i yazdır\n}\n```",
+            "ise"       => "**ise** — Koşul ifadesi (if).\n\n```hüma\nx > 0 ise { \"Pozitif\"'i yazdır }\n```",
+            "yoksa"     => "**yoksa** — Koşul karşılanmadığında çalışır (else).",
+            "döndür"    => "**döndür** — Fonksiyondan değer döndürür.\n\n```hüma\nsonuç'u döndür\n```",
+            "yükle"     => "**yükle** — Bir kütüphane veya modülü yükler (postfix).\n\n```hüma\n\"matematik.hb\"'yi yükle\n```",
+            "ile"       => "**ile** — Fonksiyon argümanlarını bağlar (with).\n\n```hüma\n10 ile 20'yi topla\n```",
+            "çağır"     => "**çağır** — Bir fonksiyonu doğrudan çağırır.\n\n```hüma\nçağır hesapla(5)\n```",
+            "bekle"     => "**bekle** — Asenkron işlem sonucunu bekler (await).",
+            "kadar"     => "**kadar** — Aralık döngüsü üst sınırını belirtir.\n\n```hüma\n0'dan 10'a kadar i alsın { ... }\n```",
+            "dene"      => "**dene** — Hata yakalama bloğu başlatır (try).",
+            "yakala"    => "**yakala** — Dene bloğundaki hatayı yakalar (catch).",
+            "sınıf"     => "**sınıf** — Yeni bir sınıf tanımlar.\n\n```hüma\nKişi sınıf olsun { ... }\n```",
+            "liste"     => "**liste** — Boş bir liste oluşturur.\n\n```hüma\nsayılar liste olsun\n```",
+            "ekle"      => "**ekle** — Listeye eleman ekler.\n\n```hüma\nsayılar'a 5'i ekle\n```",
+            "kendisi"   => "**kendisi** — Sınıf içinde mevcut örneğe erişir (self/this).",
+            "doğru"     => "**doğru** — Boolean true değeri.",
+            "yanlış"    => "**yanlış** — Boolean false değeri.",
+            "ve"        => "**ve** — Mantıksal VE (AND) operatörü.",
+            "veya"      => "**veya** — Mantıksal VEYA (OR) operatörü.",
+            "değil"     => "**değil** — Mantıksal DEĞİL (NOT) operatörü.",
+            _ => return None,
+        };
+        Some(doc.to_string())
     }
 }
 
@@ -132,6 +157,7 @@ impl LanguageServer for Backend {
             capabilities: ServerCapabilities {
                 text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
                 definition_provider: Some(OneOf::Left(true)),
+                hover_provider: Some(HoverProviderCapability::Simple(true)),
                 completion_provider: Some(CompletionOptions {
                     resolve_provider: Some(false),
                     trigger_characters: Some(vec![".".to_string(), "'".to_string()]),
@@ -175,6 +201,62 @@ impl LanguageServer for Backend {
         }
     }
 
+    async fn hover(&self, params: HoverParams) -> LspResult<Option<Hover>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let pos = params.text_document_position_params.position;
+
+        let docs = self.docs.lock().await;
+        let Some(doc) = docs.get(&uri) else { return Ok(None); };
+        let Some(word) = Self::word_at_position(&doc.text, pos) else { return Ok(None); };
+        drop(docs);
+
+        // 1) Check built-in keyword docs
+        if let Some(doc_str) = Self::keyword_hover(&word) {
+            return Ok(Some(Hover {
+                contents: HoverContents::Markup(MarkupContent {
+                    kind: MarkupKind::Markdown,
+                    value: doc_str,
+                }),
+                range: None,
+            }));
+        }
+
+        // 2) Look for function definition in workspace
+        let root_guard = self.root.read().await;
+        if let Some(root) = root_guard.as_ref() {
+            let files = Self::scan_hb_files(root);
+            let def_re = Regex::new(&format!(
+                r#"(?m)^\s*{}\s+fonksiyon\s+olsun(?:\s+(\w[\wÇĞİÖŞÜçğıöşü,\s]*)\s+alsın)?"#,
+                regex::escape(&word)
+            )).ok();
+            if let Some(def_re) = def_re {
+                for p in files {
+                    if let Ok(text) = std::fs::read_to_string(&p) {
+                        for cap in def_re.captures_iter(&text) {
+                            let params_str = cap.get(1)
+                                .map(|m| m.as_str().to_string())
+                                .unwrap_or_default();
+                            let hover_text = if params_str.is_empty() {
+                                format!("**{}** *(fonksiyon)*", word)
+                            } else {
+                                format!("**{}** *(fonksiyon)*\n\nParametreler: `{}`", word, params_str)
+                            };
+                            return Ok(Some(Hover {
+                                contents: HoverContents::Markup(MarkupContent {
+                                    kind: MarkupKind::Markdown,
+                                    value: hover_text,
+                                }),
+                                range: None,
+                            }));
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
     async fn goto_definition(&self, params: GotoDefinitionParams) -> LspResult<Option<GotoDefinitionResponse>> {
         let uri = params.text_document_position_params.text_document.uri;
         let pos = params.text_document_position_params.position;
@@ -206,7 +288,7 @@ impl LanguageServer for Backend {
         // 2) Search workspace files
         let root_guard = self.root.read().await;
         let Some(root) = root_guard.as_ref() else { return Ok(None); };
-        let files = Self::scan_hb_files(&root);
+        let files = Self::scan_hb_files(root);
         let def_re = Regex::new(&format!(r#"(?m)^\s*{}\s+fonksiyon\b"#, regex::escape(&word))).ok();
         if let Some(def_re) = def_re {
             for p in files {
@@ -235,19 +317,48 @@ impl LanguageServer for Backend {
     async fn completion(&self, _params: CompletionParams) -> LspResult<Option<CompletionResponse>> {
         let mut items = Vec::new();
 
-        // 1) Keywords
-        let keywords = vec![
-            "yazdır", "olsun", "alsın", "fonksiyon", "sınıf", "ise", "yoksa",
-            "olduğu", "sürece", "döndür", "ve", "veya", "değil", "yükle",
-            "liste", "ekle", "çıkar", "uzunluğu", "kendisi", "doğru", "yanlış",
-            "dene", "yakala", "hata", "var", "kadar", "mi", "ile", "bekle", "çağır"
+        // 1) Keywords with documentation
+        let keywords: Vec<(&str, &str)> = vec![
+            ("yazdır",   "Bir değeri ekrana yazar"),
+            ("olsun",    "Değişken tanımlar veya değer atar"),
+            ("alsın",    "Fonksiyon parametrelerini tanımlar"),
+            ("fonksiyon","Yeni bir fonksiyon tanımlar"),
+            ("sınıf",    "Yeni bir sınıf tanımlar"),
+            ("ise",      "Koşul ifadesi (if)"),
+            ("yoksa",    "Koşul karşılanmadığında (else)"),
+            ("olduğu",   "'olduğu sürece' döngüsünün parçası"),
+            ("sürece",   "'olduğu sürece' döngüsünün parçası"),
+            ("döndür",   "Fonksiyondan değer döndürür"),
+            ("ve",       "Mantıksal VE (AND)"),
+            ("veya",     "Mantıksal VEYA (OR)"),
+            ("değil",    "Mantıksal DEĞİL (NOT)"),
+            ("yükle",    "Modül yükler: \"lib.hb\"'yi yükle"),
+            ("liste",    "Boş liste oluşturur"),
+            ("ekle",     "Listeye eleman ekler"),
+            ("çıkar",    "Listeden eleman çıkarır"),
+            ("uzunluğu", "Boyutu döndürür"),
+            ("kendisi",  "Sınıf içi öz-referans (self)"),
+            ("doğru",    "Boolean true"),
+            ("yanlış",   "Boolean false"),
+            ("dene",     "Hata yakalama bloğu (try)"),
+            ("yakala",   "Hata yakalar (catch)"),
+            ("var",      "ile var: Boyunca gezinir"),
+            ("kadar",    "Aralık döngüsü üst sınırı"),
+            ("mi",       "Soru eki"),
+            ("ile",      "Fonksiyon argümanını bağlar (with)"),
+            ("bekle",    "Asenkron bekler (await)"),
+            ("çağır",    "Fonksiyon çağırır"),
         ];
-        
-        for kw in keywords {
+
+        for (kw, desc) in keywords {
             items.push(CompletionItem {
                 label: kw.to_string(),
                 kind: Some(CompletionItemKind::KEYWORD),
-                detail: Some("Hüma Anahtar Kelimesi".to_string()),
+                detail: Some(desc.to_string()),
+                documentation: Some(Documentation::MarkupContent(MarkupContent {
+                    kind: MarkupKind::Markdown,
+                    value: format!("**{}** — Hüma anahtar kelimesi\n\n{}", kw, desc),
+                })),
                 ..Default::default()
             });
         }
@@ -282,4 +393,3 @@ async fn main() -> Result<()> {
     Server::new(stdin, stdout, socket).serve(service).await;
     Ok(())
 }
-

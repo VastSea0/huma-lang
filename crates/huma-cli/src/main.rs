@@ -106,10 +106,6 @@ enum Commands {
         target: Option<String>,
     },
 
-    /// Masaüstü IDE (Geliştirme Ortamı) uygulamasını başlat
-    #[cfg(feature = "ide")]
-    #[command(alias = "arayüz")]
-    Ide,
 
     /// Hüma araç takımını GitHub'dan en son sürüme güncelle
     #[command(alias = "güncelle")]
@@ -272,8 +268,6 @@ fn run(cli: Cli) -> i32 {
         Some(Commands::Gen { file, output }) => commands::generate_standalone(&file, &output),
         Some(Commands::Repl) => commands::start_repl(),
         Some(Commands::Test { target }) => commands::run_tests(target.as_deref()),
-        #[cfg(feature = "ide")]
-        Some(Commands::Ide) => commands::start_ide(),
         Some(Commands::Update { check }) => {
             if check {
                 updater::check_for_update()

@@ -91,85 +91,75 @@ export default async function GrammarPage({
 
         {/* Suffixes Library */}
         <section className="mb-16" id="suffixes">
-          <h2 className="text-2xl font-bold text-on-surface mb-6 flex items-center gap-3">
-            <span className="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-sm font-mono text-primary">
+          <h2 className="text-3xl font-black text-on-surface mb-8 tracking-tighter flex items-center gap-4">
+            <span className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-lg font-mono text-primary rotate-3">
               02
             </span>
             {g?.suffixes?.title}
           </h2>
-          <p className="mb-8 text-on-surface-variant leading-relaxed">
+          <p className="mb-10 text-xl text-on-surface-variant/80 font-medium leading-relaxed max-w-2xl">
             {g?.suffixes?.desc}
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            {/* Accusative */}
-            <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-2xl p-6 hover:border-primary/30 transition-colors">
-              <h3 className="text-lg font-bold text-primary mb-2">{g?.suffixes?.accusative?.name}</h3>
-              <p className="text-xs font-mono text-tertiary mb-4 bg-tertiary/10 inline-block px-2 py-1 rounded">
-                {g?.suffixes?.accusative?.suffixes}
-              </p>
-              <p className="text-sm text-on-surface-variant mb-4">{g?.suffixes?.accusative?.usage}</p>
-              <p className="text-xs font-mono text-on-surface/80">» {g?.suffixes?.accusative?.example}</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+             {/* Accusative */}
+             <div className="group relative bg-surface-container-lowest border border-outline-variant/10 rounded-3xl p-8 hover:bg-primary/[0.02] transition-all duration-500 overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                <span className="text-6xl font-black">i</span>
+              </div>
+              <div className="relative z-10">
+                <h3 className="text-xl font-bold text-primary mb-3">Belirtme Durumu</h3>
+                <div className="flex gap-1 mb-6">
+                  {["'i", "'ı", "'u", "'ü"].map(s => (
+                    <span key={s} className="px-2 py-1 bg-primary/10 text-primary font-mono text-xs rounded-lg">{s}</span>
+                  ))}
+                </div>
+                <p className="text-on-surface-variant text-sm mb-6 leading-relaxed">Değişkeni veya nesneyi hedef alır.</p>
+                <div className="p-4 bg-surface-container rounded-xl border border-outline-variant/20 font-mono text-[11px]">
+                  <span className="opacity-50"># Örnek</span><br/>
+                  sayı'yı <span className="text-primary">yazdır</span>
+                </div>
+              </div>
             </div>
 
             {/* Dative */}
-            <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-2xl p-6 hover:border-primary/30 transition-colors">
-              <h3 className="text-lg font-bold text-primary mb-2">{g?.suffixes?.dative?.name}</h3>
-              <p className="text-xs font-mono text-tertiary mb-4 bg-tertiary/10 inline-block px-2 py-1 rounded">
-                {g?.suffixes?.dative?.suffixes}
-              </p>
-              <p className="text-sm text-on-surface-variant mb-4">{g?.suffixes?.dative?.usage}</p>
-              <p className="text-xs font-mono text-on-surface/80">» {g?.suffixes?.dative?.example}</p>
-            </div>
-
-            {/* Ablative */}
-            <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-2xl p-6 hover:border-primary/30 transition-colors">
-              <h3 className="text-lg font-bold text-primary mb-2">{g?.suffixes?.ablative?.name}</h3>
-              <p className="text-xs font-mono text-tertiary mb-4 bg-tertiary/10 inline-block px-2 py-1 rounded">
-                {g?.suffixes?.ablative?.suffixes}
-              </p>
-              <p className="text-sm text-on-surface-variant mb-4">{g?.suffixes?.ablative?.usage}</p>
-              <p className="text-xs font-mono text-on-surface/80">» {g?.suffixes?.ablative?.example}</p>
+            <div className="group relative bg-surface-container-lowest border border-outline-variant/10 rounded-3xl p-8 hover:bg-primary/[0.02] transition-all duration-500 overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                <span className="text-6xl font-black">e</span>
+              </div>
+              <div className="relative z-10">
+                <h3 className="text-xl font-bold text-primary mb-3">Yönelme Durumu</h3>
+                <div className="flex gap-1 mb-6">
+                  {["'e", "'a", "'ye", "'ya"].map(s => (
+                    <span key={s} className="px-2 py-1 bg-primary/10 text-primary font-mono text-xs rounded-lg">{s}</span>
+                  ))}
+                </div>
+                <p className="text-on-surface-variant text-sm mb-6 leading-relaxed">İşlemin yapılacağı hedefi belirtir.</p>
+                <div className="p-4 bg-surface-container rounded-xl border border-outline-variant/20 font-mono text-[11px]">
+                  <span className="opacity-50"># Örnek</span><br/>
+                  liste'ye <span className="text-primary">ekle</span>
+                </div>
+              </div>
             </div>
 
             {/* Genitive */}
-            <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-2xl p-6 hover:border-primary/30 transition-colors">
-              <h3 className="text-lg font-bold text-primary mb-2">{g?.suffixes?.genitive?.name}</h3>
-              <p className="text-xs font-mono text-tertiary mb-4 bg-tertiary/10 inline-block px-2 py-1 rounded">
-                {g?.suffixes?.genitive?.suffixes}
-              </p>
-              <p className="text-sm text-on-surface-variant mb-4">{g?.suffixes?.genitive?.usage}</p>
-              <p className="text-xs font-mono text-on-surface/80">» {g?.suffixes?.genitive?.example}</p>
-            </div>
-
-            {/* Possessive */}
-            <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-2xl p-6 hover:border-primary/30 transition-colors">
-              <h3 className="text-lg font-bold text-primary mb-2">{g?.suffixes?.possessive?.name}</h3>
-              <p className="text-xs font-mono text-tertiary mb-4 bg-tertiary/10 inline-block px-2 py-1 rounded">
-                {g?.suffixes?.possessive?.suffixes}
-              </p>
-              <p className="text-sm text-on-surface-variant mb-4">{g?.suffixes?.possessive?.usage}</p>
-              <p className="text-xs font-mono text-on-surface/80">» {g?.suffixes?.possessive?.example}</p>
-            </div>
-
-            {/* Plural */}
-            <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-2xl p-6 hover:border-primary/30 transition-colors">
-              <h3 className="text-lg font-bold text-primary mb-2">{g?.suffixes?.plural?.name}</h3>
-              <p className="text-xs font-mono text-tertiary mb-4 bg-tertiary/10 inline-block px-2 py-1 rounded">
-                {g?.suffixes?.plural?.suffixes}
-              </p>
-              <p className="text-sm text-on-surface-variant mb-4">{g?.suffixes?.plural?.usage}</p>
-              <p className="text-xs font-mono text-on-surface/80">» {g?.suffixes?.plural?.example}</p>
-            </div>
-
-            {/* Equality */}
-            <div className="bg-surface-container-lowest border border-outline-variant/10 rounded-2xl p-6 hover:border-primary/30 transition-colors">
-              <h3 className="text-lg font-bold text-primary mb-2">{g?.suffixes?.equality?.name}</h3>
-              <p className="text-xs font-mono text-tertiary mb-4 bg-tertiary/10 inline-block px-2 py-1 rounded">
-                {g?.suffixes?.equality?.suffixes}
-              </p>
-              <p className="text-sm text-on-surface-variant mb-4">{g?.suffixes?.equality?.usage}</p>
-              <p className="text-xs font-mono text-on-surface/80">» {g?.suffixes?.equality?.example}</p>
+            <div className="group relative bg-surface-container-lowest border border-outline-variant/10 rounded-3xl p-8 hover:bg-primary/[0.02] transition-all duration-500 overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                <span className="text-6xl font-black">in</span>
+              </div>
+              <div className="relative z-10">
+                <h3 className="text-xl font-bold text-primary mb-3">İlgi/İyelik Durumu</h3>
+                <div className="flex gap-1 mb-6">
+                  {["'in", "'ın", "'un", "'ün"].map(s => (
+                    <span key={s} className="px-2 py-1 bg-primary/10 text-primary font-mono text-xs rounded-lg">{s}</span>
+                  ))}
+                </div>
+                <p className="text-on-surface-variant text-sm mb-6 leading-relaxed">Özelliklere ve alt öğelere erişir.</p>
+                <div className="p-4 bg-surface-container rounded-xl border border-outline-variant/20 font-mono text-[11px]">
+                  <span className="opacity-50"># Örnek</span><br/>
+                  kişi'nin <span className="text-primary">ad'ı</span>
+                </div>
+              </div>
             </div>
           </div>
 

@@ -1,88 +1,89 @@
-// Hüma Native GUI Kütüphanesi
+// Hüma Native GUI Kütüphanesi — v0.5.0 (Modern Syntax Edition)
 // egui tabanlı yerel arayüz oluşturma araçları
 
-GUI_SÜRÜM = "0.4.0" olsun
+GUI_SÜRÜM = "0.5.0" olsun
 
 gui_sürüm_al fonksiyon olsun {
     GUI_SÜRÜM'ü döndür
 }
 
+// Pencere oluşturur
 pencere_oluştur fonksiyon olsun başlık, genişlik, yükseklik, çizim_fks alsın {
-    pencere_başlat(başlık, genişlik, yükseklik, çizim_fks)
+    başlık ile genişlik ve yükseklik ve çizim_fks'ı pencere_başlat
 }
 
-// Birleşik Buton API'sı
-// Kullanım Boş: buton_ekle("Metin")
-// Kullanım Renkli: buton_ekle("Metin", R, G, B)
-// Kullanım Boyutlu: buton_ekle("Metin", W, H)
-// Kullanım Full: buton_ekle("Metin", R, G, B, W, H)
+// Buton ekler. Boş parametreler göz ardı edilir.
+// Kullanım: "Tamam" ile buton_ekle
+// Kullanım Renkli: "Tamam" ile 255 ve 0 ve 0'ı renkli_buton_ekle
 buton_ekle fonksiyon olsun metin, p1, p2, p3, p4, p5 alsın {
     p1 == boş ise {
-        buton(metin)'i döndür
+        metin'i buton döndür
     } yoksa {
         p2 == boş ise {
-            buton(metin)'i döndür
+            metin'i buton döndür
         } yoksa {
             p3 == boş ise {
-                buton(metin, p1, p2)'i döndür
+                metin ile p1 ve p2'yi buton döndür
             } yoksa {
                 p4 == boş ise {
-                    buton(metin, p1, p2, p3)'i döndür
+                    metin ile p1 ve p2 ve p3'ü buton döndür
                 } yoksa {
-                    buton(metin, p1, p2, p3, p4, p5)'i döndür
+                    metin ile p1 ve p2 ve p3 ve p4 ve p5'i buton döndür
                 }
             }
         }
     }
 }
 
-// Birleşik Yazı/Etiket API'sı
-// Kullanım: yazı_ekle("Metin")
-// Kullanım Stil: yazı_ekle("Metin", "kalın") // "kalın", "eğik", "başlık"
-// Kullanım Renkli: yazı_ekle("Metin", R, G, B)
+// Yazı/Etiket ekler
+// Kullanım: "Başlık" ile yazı_ekle
 yazı_ekle fonksiyon olsun metin, p1, p2, p3 alsın {
     p1 == boş ise {
-        etiket(metin)
+        metin'i etiket
     } yoksa {
         p2 == boş ise {
-            etiket(metin, p1)
+            metin ile p1'i etiket
         } yoksa {
-            etiket(metin, p1, p2, p3)
+            metin ile p1 ve p2 ve p3'ü etiket
         }
     }
 }
 
-// Metin kutusu ekler. İsteğe bağlı genişlik alabilir.
+// Metin kutusu ekler
 metin_kutusu_ekle fonksiyon olsun metin, w alsın {
     w == boş ise {
-        girdi_alanı(metin)'i döndür
+        metin'i girdi_alanı döndür
     } yoksa {
-        girdi_alanı(metin, w)'i döndür
+        metin ile w'yi girdi_alanı döndür
     }
 }
 
 tema_degistir fonksiyon olsun tema alsın {
-    tema_ayarla(tema)
+    tema'yı tema_ayarla
 }
 
 büyük_metin_kutusu_ekle fonksiyon olsun metin alsın {
-    büyük_girdi_alanı(metin)'i döndür
+    metin'i büyük_girdi_alanı döndür
 }
 
+// Kaydırıcı ekler
+// Kullanım: değer ile 0 ve 100'ü kaydırıcı_ekle
 kaydırıcı_ekle fonksiyon olsun değer, min, max alsın {
-    kaydırıcı(değer, min, max)'ı döndür
+    değer ile min ve max'ı kaydırıcı döndür
 }
 
+// Onay kutusu ekler
+// Kullanım: durum ile "Aktif"'i onay_kutusu_ekle
 onay_kutusu_ekle fonksiyon olsun durum, metin alsın {
-    onay_kutusu(durum, metin)'i döndür
+    durum ile metin'i onay_kutusu döndür
 }
 
 yan_yana_diz fonksiyon olsun fks alsın {
-    yan_yana(fks)
+    fks'ı yan_yana
 }
 
 alt_alta_diz fonksiyon olsun fks alsın {
-    alt_alta(fks)
+    fks'ı alt_alta
 }
 
 ayraç_çiz fonksiyon olsun {
@@ -90,31 +91,31 @@ ayraç_çiz fonksiyon olsun {
 }
 
 boşluk_bırak fonksiyon olsun miktar alsın {
-    boşluk(miktar)
+    miktar'ı boşluk
 }
 
 sekme_ekle fonksiyon olsun seçili_mi, metin alsın {
-    sekme(seçili_mi, metin)'i döndür
+    seçili_mi ile metin'i sekme döndür
 }
 
 yüzen_pencere_ekle fonksiyon olsun başlık, açık_mı, fks alsın {
-    yüzen_pencere(başlık, açık_mı, fks)'ı döndür
+    başlık ile açık_mı ve fks'ı yüzen_pencere döndür
 }
 
 menü_çubuğu_ekle fonksiyon olsun fks alsın {
-    menü_çubuğu(fks)
+    fks'ı menü_çubuğu
 }
 
 açılır_menü_ekle fonksiyon olsun başlık, fks alsın {
-    açılır_menü(başlık, fks)
+    başlık ile fks'ı açılır_menü
 }
 
 grup_kutusu_ekle fonksiyon olsun başlık, fks alsın {
-    grup_kutusu(başlık, fks)
+    başlık ile fks'ı grup_kutusu
 }
 
 grid_ekle fonksiyon olsun id, fks alsın {
-    grid_oluştur(id, fks)
+    id ile fks'ı grid_oluştur
 }
 
 yeni_satır_ekle fonksiyon olsun {
@@ -122,9 +123,9 @@ yeni_satır_ekle fonksiyon olsun {
 }
 
 kaydırılabilir_liste_ekle fonksiyon olsun id, fks alsın {
-    kaydırılabilir_alan(id, fks)
+    id ile fks'ı kaydırılabilir_alan
 }
 
 alan_ayır_ekle fonksiyon olsun w, h, fks alsın {
-    alan_ayır(w, h, fks)
+    w ile h ve fks'ı alan_ayır
 }
