@@ -1,8 +1,0 @@
-{
-  "ad": "test_kurulum",
-  "surum": "0.1.0",
-  "aciklama": "Yeni bir Hüma projesi.",
-  "yazar": "Geliştirici",
-  "giris": "test_kurulum.hb",
-  "huma_surum": ">=0.4.0"
-}

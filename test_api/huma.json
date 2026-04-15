@@ -1,9 +1,0 @@
-{
-  "ad": "test_api",
-  "surum": "0.1.0",
-  "aciklama": "Yeni bir Hüma projesi.",
-  "yazar": "Geliştirici",
-  "giris": "test_api.hb",
-  "huma_surum": ">=0.4.0",
-  "bagimliliklar": {}
-}
