@@ -454,16 +454,41 @@
       "hero_desc": "Learn step-by-step how to build basic applications using pure Hüma code. The examples below can be copied and run directly.",
       "todo": {
         "title": "Task Manager (CLI To-Do)",
-        "desc": "Create a persistent command-line task manager using file reading, writing, and conditionals. This example uses the 'dosya.hb' library."
+        "desc": "Create a persistent command-line task manager using file reading, writing, and conditionals. This example uses the 'dosya.hb' library.",
+        "steps": [
+          "1. First, we import the 'dosya.hb' library. This module provides functions to read and write txt files.",
+          "2. We check the disk with the 'dosya_var_mı' function and, if it exists, read the existing tasks into memory using 'dosya_oku'.",
+          "3. We append the new task data and save it back to the file with 'dosya_yaz'."
+        ]
       },
       "calculator": {
         "title": "Advanced Calculator",
-        "desc": "Let's build a simple calculator to understand functions, mathematical operations, and decision structures. It leverages 'matematik.hb' features."
+        "desc": "Let's build a simple calculator to understand functions, mathematical operations, and decision structures. It leverages 'matematik.hb' features.",
+        "steps": [
+          "1. The function takes 3 arguments: Operation type, the first number, and the second number.",
+          "2. We conditionally determine the operation logic using 'ise / yoksa' (if / else) blocks.",
+          "3. The corresponding operation calculates the result, and we flush it to the console using 'yazdır'."
+        ]
       },
       "grades": {
         "title": "Student Grades Tracking System",
-        "desc": "A practical exercise demonstrating Lists (Arrays), loops, and dynamic parameter passing."
-      }
+        "desc": "A practical exercise demonstrating Lists (Arrays), loops, and dynamic parameter passing.",
+        "steps": [
+          "1. We pass the student name and an array payload of grades as parameters to the 'not_hesapla' function.",
+          "2. We find the total length of the array using the embedded 'uzunluğu' (length) syntax property.",
+          "3. We iterate through the scores and collect the sum using the 'dan e kadar' (range) loop syntax."
+        ]
+      },
+      "server": {
+        "title": "Simple Web Server (HTTP Server)",
+        "desc": "A guide to building a basic web API using Hüma's built-in HTTP server module.",
+        "steps": [
+          "1. We import the 'huma_sunucu.hb' library, instantiating the HTTP server class implementation.",
+          "2. We define a functional handler hook that takes the request and response (req, res) parameters to map routes.",
+          "3. We bootstrap the listener bindings specifically assigned to the 8080 port."
+        ]
+      },
+      "tutorial_title": "Step-by-Step Tutorial"
     },
     "changelog": {
       "title": "Changelog",

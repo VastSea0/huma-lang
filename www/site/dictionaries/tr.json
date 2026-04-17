@@ -452,16 +452,41 @@
       "hero_desc": "Saf Hüma kodu kullanarak temel uygulamaların nasıl inşa edileceğini adım adım öğrenin. Aşağıdaki örnekler doğrudan kopyalanıp çalıştırılabilir.",
       "todo": {
         "title": "Görev Yöneticisi (CLI To-Do)",
-        "desc": "Dosya okuma, yazma ve koşullu ifadeleri kullanarak komut satırında çalışan kalıcı bir görev yöneticisi oluşturun. Bu örnek 'dosya.hb' kütüphanesini kullanır."
+        "desc": "Dosya okuma, yazma ve koşullu ifadeleri kullanarak komut satırında çalışan kalıcı bir görev yöneticisi oluşturun. Bu örnek 'dosya.hb' kütüphanesini kullanır.",
+        "steps": [
+          "1. İlk olarak 'dosya.hb' kütüphanesini projeye dahil ediyoruz. Bu modül txt dosyaları okuma/yazma işlevi sunar.",
+          "2. 'dosya_var_mı' fonksiyonuyla diski kontrol ediyor, eğer varsa 'dosya_oku' ile görevlerin mevcut halini belleğe alıyoruz.",
+          "3. Yeni veriyi ekleyip 'dosya_yaz' ile tekrar dosyaya kaydediyoruz."
+        ]
       },
       "calculator": {
         "title": "Gelişmiş Hesap Makinesi",
-        "desc": "Fonksiyonlar, matematik işlemleri ve karar yapılarını anlamak için basit bir hesap makinesi yapalım. 'matematik.hb' yeteneklerinden yararlanır."
+        "desc": "Fonksiyonlar, matematik işlemleri ve karar yapılarını anlamak için basit bir hesap makinesi yapalım. 'matematik.hb' yeteneklerinden yararlanır.",
+        "steps": [
+          "1. Fonksiyona 3 argüman aktarılıyor: İşlem tipi, birinci sayı ve ikinci sayı.",
+          "2. 'ise / yoksa' (if / else) bloklarıyla girilen işlem tipinin türüne karar veriliyor.",
+          "3. İlgili operasyon gerçekleştirilip 'yazdır' komutu ile konsola iletiliyor."
+        ]
       },
       "grades": {
         "title": "Öğrenci Not Takip Sistemi",
-        "desc": "Listeler (Arrays), döngüler ve dinamik parametre aktarımını gösteren pratik bir çalışma."
-      }
+        "desc": "Listeler (Arrays), döngüler ve dinamik parametre aktarımını gösteren pratik bir çalışma.",
+        "steps": [
+          "1. 'not_hesapla' adlı fonksiyona öğrenci ismi ve liste tipindeki (Array) notlar parametre olarak iletiliyor.",
+          "2. 'notlar'ın uzunluğu' diyerek dizideki toplam not sayısını buluyoruz.",
+          "3. 'dan e kadar' (range) döngüsüyle sıfırdan listenin uzunluğuna kadar iterasyon yaparak notları bir değişkene topluyoruz."
+        ]
+      },
+      "server": {
+        "title": "Basit Web Sunucusu (HTTP Server)",
+        "desc": "Hüma'nın yerleşik HTTP sunucu modülünü kullanarak basit bir web API oluşturma rehberi.",
+        "steps": [
+          "1. Gelişmiş ağ kontrolü sağlayan 'huma_sunucu.hb' kütüphanesinden Sunucu nesnesi başlatıyoruz.",
+          "2. İstek ve cevap (req, res) parametresi alan bir işleyici fonksiyon yazıyoruz ve router içerisine işliyoruz.",
+          "3. Belirttiğimiz 8080 portu ile sunucumuzu dinlemeye (Listening) başlıyoruz."
+        ]
+      },
+      "tutorial_title": "Adım Adım Nasıl Çalışır?"
     },
     "changelog": {
       "title": "Sürüm Notları",
