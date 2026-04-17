@@ -105,6 +105,7 @@
       "huma_sunucu": "Hüma Sunucu (HTTP)",
       "package_manager": "Paket Yöneticisi",
       "my_first_package": "İlk Paketim",
+      "projects": "Proje Örnekleri",
       "sqlite": "SQLite Veritabanı",
       "changelog": "Sürüm Notları"
     }
@@ -442,6 +443,24 @@
       "architecture": {
         "title": "Mimari Yapı",
         "desc": "IDE, modern bir web yığını (Vite+React) ile Rust'ın (Tauri) gücünü birleştirerek güvenli ve hızlı bir masaüstü deneyimi sunar."
+      }
+    },
+    "projects": {
+      "title": "Proje Örnekleri",
+      "description": "Hüma'nın gücünü göstermek için gerçek dünya uygulamaları ve öğreticiler.",
+      "hero_title": "Proje Örnekleri & Öğreticiler",
+      "hero_desc": "Saf Hüma kodu kullanarak temel uygulamaların nasıl inşa edileceğini adım adım öğrenin. Aşağıdaki örnekler doğrudan kopyalanıp çalıştırılabilir.",
+      "todo": {
+        "title": "Görev Yöneticisi (CLI To-Do)",
+        "desc": "Dosya okuma, yazma ve koşullu ifadeleri kullanarak komut satırında çalışan kalıcı bir görev yöneticisi oluşturun. Bu örnek 'dosya.hb' kütüphanesini kullanır."
+      },
+      "calculator": {
+        "title": "Gelişmiş Hesap Makinesi",
+        "desc": "Fonksiyonlar, matematik işlemleri ve karar yapılarını anlamak için basit bir hesap makinesi yapalım. 'matematik.hb' yeteneklerinden yararlanır."
+      },
+      "grades": {
+        "title": "Öğrenci Not Takip Sistemi",
+        "desc": "Listeler (Arrays), döngüler ve dinamik parametre aktarımını gösteren pratik bir çalışma."
       }
     },
     "changelog": {

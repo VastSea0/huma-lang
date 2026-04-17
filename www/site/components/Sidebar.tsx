@@ -91,6 +91,7 @@ export default function Sidebar({ dict, locale }: { dict: any; locale: string })
           title: dict.Sidebar.community,
           items: [
             { href: getPath("/docs/my-first-package"), label: dict.Sidebar.items.my_first_package, icon: "star" },
+            { href: getPath("/docs/projects"), label: dict.Sidebar.items.projects, icon: "lightbulb" },
             { href: getPath("/docs/changelog"), label: dict.Sidebar.items.changelog, icon: "history_edu" },
           ],
         },

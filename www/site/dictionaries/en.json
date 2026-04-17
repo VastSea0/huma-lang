@@ -105,6 +105,7 @@
       "huma_sunucu": "Server (HTTP)",
       "package_manager": "Package Manager",
       "my_first_package": "My First Package",
+      "projects": "Project Examples",
       "sqlite": "SQLite Database",
       "changelog": "Changelog"
     }
@@ -444,6 +445,24 @@
       "architecture": {
         "title": "Architectural Structure",
         "desc": "The IDE provides a secure and fast desktop experience by combining a modern web stack (Vite+React) with the power of Rust (Tauri)."
+      }
+    },
+    "projects": {
+      "title": "Project Examples",
+      "description": "Real-world applications and tutorials to demonstrate the power of Hüma.",
+      "hero_title": "Project Examples & Tutorials",
+      "hero_desc": "Learn step-by-step how to build basic applications using pure Hüma code. The examples below can be copied and run directly.",
+      "todo": {
+        "title": "Task Manager (CLI To-Do)",
+        "desc": "Create a persistent command-line task manager using file reading, writing, and conditionals. This example uses the 'dosya.hb' library."
+      },
+      "calculator": {
+        "title": "Advanced Calculator",
+        "desc": "Let's build a simple calculator to understand functions, mathematical operations, and decision structures. It leverages 'matematik.hb' features."
+      },
+      "grades": {
+        "title": "Student Grades Tracking System",
+        "desc": "A practical exercise demonstrating Lists (Arrays), loops, and dynamic parameter passing."
       }
     },
     "changelog": {
