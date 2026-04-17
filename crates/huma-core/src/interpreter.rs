@@ -1143,7 +1143,33 @@ impl Yorumlayici {
                             _ => Deger::Bos
                         },
                         (l_val, r_val) => match operator {
-                            Token::Arti => Deger::Metin(format!("{}{}", l_val, r_val)),
+                            Token::Arti => {
+                                // Sayısal olmayan kombinasyonlarda tip kontrolü:
+                                // - Sayı + Boş veya Boş + Sayı → Tip Hatası (sessiz string birleştirme engellendi)
+                                // - Metin + herhangi → string birleştirme (izin verilir)
+                                let l_is_num = matches!(l_val, Deger::Sayi(_));
+                                let r_is_num = matches!(r_val, Deger::Sayi(_));
+                                let l_is_bos = matches!(l_val, Deger::Bos);
+                                let r_is_bos = matches!(r_val, Deger::Bos);
+
+                                if (l_is_num && r_is_bos) || (l_is_bos && r_is_num) {
+                                    // Sayı ile Boş toplanamaz — Tip Hatası
+                                    Deger::Hata(format!(
+                                        "Tip Hatası: '{}' ile '{}' toplanamaz. Sayısal işlemde Boş değer kullanılamaz.",
+                                        l_val, r_val
+                                    ))
+                                } else {
+                                    // Metin birleştirme (Metin + herhangi veya herhangi + Metin)
+                                    Deger::Metin(format!("{}{}", l_val, r_val))
+                                }
+                            }
+                            Token::Eksi | Token::Carpi | Token::Bolnu | Token::Mod => {
+                                // Sayısal operatörlerde Boş değer kullanılamaz → Tip Hatası
+                                Deger::Hata(format!(
+                                    "Tip Hatası: '{}' ve '{}' arasında sayısal işlem yapılamaz. Her iki değer de sayı olmalıdır.",
+                                    l_val, r_val
+                                ))
+                            }
                             Token::Kucuktur => Deger::Sayi(if l_val.to_string() < r_val.to_string() { 1.0 } else { 0.0 }),
                             Token::Buyuktur => Deger::Sayi(if l_val.to_string() > r_val.to_string() { 1.0 } else { 0.0 }),
                             _ => Deger::Bos

@@ -437,6 +437,20 @@ impl Parser {
         }
     }
 
+    /// Belirli keyword'leri değişken adı olarak döndür (context-sensitive ayrıştırma)
+    fn keyword_degisken_olarak(&mut self) -> Option<Ifade> {
+        let ad = match &self.current_token {
+            Token::HataAnahtar => "hata".to_string(),
+            Token::Var => "var".to_string(),
+            Token::Ekle => "ekle".to_string(),
+            Token::Cikar => "çıkar".to_string(),
+            Token::Mi => "mi".to_string(),
+            _ => return None,
+        };
+        self.next_token();
+        Some(Ifade::Degisken(ad))
+    }
+
     fn parse_temel(&mut self) -> Ifade {
         let mut node = match self.current_token.clone() {
             Token::Sayi(n) => { self.next_token(); Ifade::Sayi(n) }
@@ -473,7 +487,15 @@ impl Parser {
             Token::AcikKose => self.parse_liste(),
             Token::AcikSuskun => self.parse_sozluk(),
             Token::Fonksiyon => self.parse_anonim_fonksiyon(),
-            _ => { self.next_token(); Ifade::Bos }
+            // Bazı keyword'ler değişken adı olarak da kullanılabilir (örn: `hata`, `var`)
+            _ => {
+                if let Some(v) = self.keyword_degisken_olarak() {
+                    v
+                } else {
+                    self.next_token();
+                    Ifade::Bos
+                }
+            }
         };
 
         // Postfix operatörler
