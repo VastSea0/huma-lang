@@ -1378,13 +1378,22 @@ pub fn run_script(name: &str) -> Result<()> {
                 komut.bright_black()
             );
 
+            let exe_str = std::env::current_exe()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|_| "huma".to_string());
+            let final_cmd = if komut.starts_with("huma ") {
+                komut.replacen("huma ", &format!("\"{}\" ", exe_str), 1)
+            } else {
+                komut.to_string()
+            };
+
             let status = if cfg!(target_os = "windows") {
                 std::process::Command::new("cmd")
-                    .args(["/C", komut])
+                    .args(["/C", &final_cmd])
                     .status()?
             } else {
                 std::process::Command::new("sh")
-                    .args(["-c", komut])
+                    .args(["-c", &final_cmd])
                     .status()?
             };
 
