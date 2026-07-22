@@ -2,6 +2,7 @@ use crate::ast::{Ifade, Komut};
 use std::collections::{HashMap};
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::fmt::Write as _;
 
 #[allow(unpredictable_function_pointer_comparisons)]
 #[derive(Debug, Clone, PartialEq)]
@@ -28,6 +29,14 @@ pub enum Deger {
     },
     Sozluk(Rc<RefCell<HashMap<String, Deger>>>),
     Hata(String),
+    /// Bitişik f64 vektörü — boxing olmadan ML hesaplamaları için
+    Vektor(Rc<RefCell<Vec<f64>>>),
+    /// 2D matris — satır-önce (row-major) düzende saklanan f64 dizisi
+    Matris {
+        satirlar: usize,
+        sutunlar: usize,
+        veri: Rc<RefCell<Vec<f64>>>,
+    },
 }
 
 impl std::fmt::Display for Deger {
@@ -56,6 +65,29 @@ impl std::fmt::Display for Deger {
                 write!(f, "{{{}}}", p.join(", "))
             }
             Deger::Hata(e) => write!(f, "Hata: {}", e),
+            Deger::Vektor(v) => {
+                let b = v.borrow();
+                let mut s = String::from("vektor[");
+                for (i, x) in b.iter().enumerate() {
+                    if i > 0 { s.push_str(", "); }
+                    let _ = write!(s, "{:.6}", x);
+                }
+                s.push(']');
+                write!(f, "{}", s)
+            }
+            Deger::Matris { satirlar, sutunlar, veri } => {
+                write!(f, "matris[{}×{}]", satirlar, sutunlar)?;
+                let b = veri.borrow();
+                for i in 0..*satirlar {
+                    write!(f, "\n  [")?;
+                    for j in 0..*sutunlar {
+                        if j > 0 { write!(f, ", ")?; }
+                        write!(f, "{:.4}", b[i * sutunlar + j])?;
+                    }
+                    write!(f, "]")?;
+                }
+                Ok(())
+            }
             _ => write!(f, "<dahili>"),
         }
     }
@@ -88,6 +120,22 @@ impl Deger {
                 serde_json::Value::Object(map)
             }
             Deger::Hata(e) => serde_json::Value::String(format!("Hata: {}", e)),
+            Deger::Vektor(v) => {
+                let arr: Vec<serde_json::Value> = v.borrow().iter()
+                    .map(|x| serde_json::Value::Number(serde_json::Number::from_f64(*x).unwrap_or(serde_json::Number::from(0))))
+                    .collect();
+                serde_json::Value::Array(arr)
+            }
+            Deger::Matris { satirlar, sutunlar, veri } => {
+                let b = veri.borrow();
+                let rows: Vec<serde_json::Value> = (0..*satirlar).map(|i| {
+                    let cols: Vec<serde_json::Value> = (0..*sutunlar).map(|j| {
+                        serde_json::Value::Number(serde_json::Number::from_f64(b[i * sutunlar + j]).unwrap_or(serde_json::Number::from(0)))
+                    }).collect();
+                    serde_json::Value::Array(cols)
+                }).collect();
+                serde_json::Value::Array(rows)
+            }
             _ => serde_json::Value::Null,
         }
     }

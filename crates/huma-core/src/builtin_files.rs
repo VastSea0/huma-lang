@@ -9,6 +9,7 @@ pub fn get_lib_files() -> Vec<(&'static str, &'static str)> {
         ("rastgele.hb",   include_str!("../../../lib/rastgele.hb")),
         ("renkler.hb",    include_str!("../../../lib/renkler.hb")),
         ("zaman.hb",      include_str!("../../../lib/zaman.hb")),
+        ("yapay_zeka_temel.hb", include_str!("../../../lib/yapay_zeka_temel.hb")),
     ]
 }
 

@@ -19,6 +19,10 @@ use tokio::sync::{mpsc, oneshot};
 use futures_util::FutureExt;
 use hyper::{Body, Request, Response, Server};
 use hyper::service::{make_service_fn, service_fn};
+use regex::Regex;
+use rand::{SeedableRng, Rng};
+use rand::rngs::SmallRng;
+use unicode_normalization::UnicodeNormalization;
 
 // Async server (hyper) state
 struct IncomingRequest {
@@ -698,6 +702,8 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
                 Deger::GorevId(_) => Deger::Metin("görev".to_string()),
                 Deger::Bos => Deger::Metin("boş".to_string()),
                 Deger::Hata(_) => Deger::Metin("hata".to_string()),
+                Deger::Vektor(v) => Deger::Metin(format!("vektör[{}]", v.borrow().len())),
+                Deger::Matris { satirlar, sutunlar, .. } => Deger::Metin(format!("matris[{}×{}]", satirlar, sutunlar)),
             }
         } else {
             Deger::Metin("bilinmeyen".to_string())
@@ -829,6 +835,732 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
 
     let cli_args: Vec<Deger> = std::env::args().map(|s| Deger::Metin(s)).collect();
     globals.insert("argümanlar".to_string(), Deger::Liste(Rc::new(RefCell::new(cli_args))));
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // BLOK A — Genişletilmiş Matematik Built-in'leri
+    // ═══════════════════════════════════════════════════════════════════════
+
+    globals.insert("üs".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let (Deger::Sayi(taban), Deger::Sayi(kuvvet)) = (&args[0], &args[1]) {
+                return Deger::Sayi(taban.powf(*kuvvet));
+            }
+        }
+        Deger::Bos
+    }));
+
+    globals.insert("ln".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(x)) = args.first() {
+            return Deger::Sayi(x.ln());
+        }
+        Deger::Bos
+    }));
+
+    globals.insert("log2".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(x)) = args.first() {
+            return Deger::Sayi(x.log2());
+        }
+        Deger::Bos
+    }));
+
+    globals.insert("log10".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(x)) = args.first() {
+            return Deger::Sayi(x.log10());
+        }
+        Deger::Bos
+    }));
+
+    globals.insert("sin".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(x)) = args.first() { Deger::Sayi(x.sin()) } else { Deger::Bos }
+    }));
+
+    globals.insert("cos".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(x)) = args.first() { Deger::Sayi(x.cos()) } else { Deger::Bos }
+    }));
+
+    globals.insert("tan".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(x)) = args.first() { Deger::Sayi(x.tan()) } else { Deger::Bos }
+    }));
+
+    globals.insert("exp".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(x)) = args.first() { Deger::Sayi(x.exp()) } else { Deger::Bos }
+    }));
+
+    globals.insert("tavan".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(x)) = args.first() { Deger::Sayi(x.ceil()) } else { Deger::Bos }
+    }));
+
+    globals.insert("taban_sayı".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(x)) = args.first() { Deger::Sayi(x.floor()) } else { Deger::Bos }
+    }));
+
+    globals.insert("mutlak_sayı".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(x)) = args.first() { Deger::Sayi(x.abs()) } else { Deger::Bos }
+    }));
+
+    globals.insert("işaret".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(x)) = args.first() { Deger::Sayi(x.signum()) } else { Deger::Bos }
+    }));
+
+    globals.insert("sonlu_mu".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(x)) = args.first() {
+            Deger::Sayi(if x.is_finite() { 1.0 } else { 0.0 })
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("klamp".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 3 {
+            if let (Deger::Sayi(x), Deger::Sayi(min), Deger::Sayi(max)) = (&args[0], &args[1], &args[2]) {
+                return Deger::Sayi(x.clamp(*min, *max));
+            }
+        }
+        Deger::Bos
+    }));
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // BLOK B — Aktivasyon Fonksiyonları & ML Primitifleri
+    // ═══════════════════════════════════════════════════════════════════════
+
+    globals.insert("sigmoid".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(x)) = args.first() {
+            Deger::Sayi(1.0 / (1.0 + (-x).exp()))
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("relu".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(x)) = args.first() {
+            Deger::Sayi(x.max(0.0))
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("tanh_aktivasyon".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(x)) = args.first() {
+            Deger::Sayi(x.tanh())
+        } else { Deger::Bos }
+    }));
+
+    // GELU — Gaussian Error Linear Unit (tanh approximation)
+    globals.insert("gelu".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(x)) = args.first() {
+            let x = *x;
+            let val = 0.5 * x * (1.0 + (0.7978845608028654 * (x + 0.044715 * x * x * x)).tanh());
+            Deger::Sayi(val)
+        } else { Deger::Bos }
+    }));
+
+    // softmax(vektor) — her iki vektör tipi de kabul edilir
+    globals.insert("softmax".to_string(), Deger::DahiliFonksiyon(|args| {
+        let vals: Option<Vec<f64>> = match args.first() {
+            Some(Deger::Vektor(v)) => Some(v.borrow().clone()),
+            Some(Deger::Liste(l)) => Some(l.borrow().iter().filter_map(|d| {
+                if let Deger::Sayi(n) = d { Some(*n) } else { None }
+            }).collect()),
+            _ => None,
+        };
+        if let Some(v) = vals {
+            let max_val = v.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let exps: Vec<f64> = v.iter().map(|x| (x - max_val).exp()).collect();
+            let toplam: f64 = exps.iter().sum();
+            if toplam == 0.0 { return Deger::Bos; }
+            let sonuc: Vec<f64> = exps.iter().map(|e| e / toplam).collect();
+            Deger::Vektor(Rc::new(RefCell::new(sonuc)))
+        } else { Deger::Bos }
+    }));
+
+    // log_softmax — numerically stable log-softmax
+    globals.insert("log_softmax".to_string(), Deger::DahiliFonksiyon(|args| {
+        let vals: Option<Vec<f64>> = match args.first() {
+            Some(Deger::Vektor(v)) => Some(v.borrow().clone()),
+            Some(Deger::Liste(l)) => Some(l.borrow().iter().filter_map(|d| {
+                if let Deger::Sayi(n) = d { Some(*n) } else { None }
+            }).collect()),
+            _ => None,
+        };
+        if let Some(v) = vals {
+            let max_val = v.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let log_sum_exp = v.iter().map(|x| (x - max_val).exp()).sum::<f64>().ln() + max_val;
+            let sonuc: Vec<f64> = v.iter().map(|x| x - log_sum_exp).collect();
+            Deger::Vektor(Rc::new(RefCell::new(sonuc)))
+        } else { Deger::Bos }
+    }));
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // BLOK C — Vektör Operasyonları
+    // ═══════════════════════════════════════════════════════════════════════
+
+    globals.insert("vektor_olustur".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let (Deger::Sayi(n), Deger::Sayi(val)) = (&args[0], &args[1]) {
+                let v = vec![*val; *n as usize];
+                return Deger::Vektor(Rc::new(RefCell::new(v)));
+            }
+        }
+        Deger::Bos
+    }));
+
+    globals.insert("vektor_uzunluk".to_string(), Deger::DahiliFonksiyon(|args| {
+        match args.first() {
+            Some(Deger::Vektor(v)) => Deger::Sayi(v.borrow().len() as f64),
+            Some(Deger::Liste(l)) => Deger::Sayi(l.borrow().len() as f64),
+            _ => Deger::Bos,
+        }
+    }));
+
+    globals.insert("ic_carpim".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        let a: Option<Vec<f64>> = match &args[0] {
+            Deger::Vektor(v) => Some(v.borrow().clone()),
+            Deger::Liste(l) => Some(l.borrow().iter().filter_map(|d| if let Deger::Sayi(n) = d { Some(*n) } else { None }).collect()),
+            _ => None,
+        };
+        let b: Option<Vec<f64>> = match &args[1] {
+            Deger::Vektor(v) => Some(v.borrow().clone()),
+            Deger::Liste(l) => Some(l.borrow().iter().filter_map(|d| if let Deger::Sayi(n) = d { Some(*n) } else { None }).collect()),
+            _ => None,
+        };
+        if let (Some(va), Some(vb)) = (a, b) {
+            if va.len() != vb.len() { return Deger::Hata("ic_carpim: vektör boyutları eşit olmalı".to_string()); }
+            let sonuc: f64 = va.iter().zip(vb.iter()).map(|(x, y)| x * y).sum();
+            Deger::Sayi(sonuc)
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("vektor_norm".to_string(), Deger::DahiliFonksiyon(|args| {
+        match args.first() {
+            Some(Deger::Vektor(v)) => {
+                let n: f64 = v.borrow().iter().map(|x| x * x).sum::<f64>().sqrt();
+                Deger::Sayi(n)
+            }
+            Some(Deger::Liste(l)) => {
+                let n: f64 = l.borrow().iter().filter_map(|d| if let Deger::Sayi(x) = d { Some(x * x) } else { None }).sum::<f64>().sqrt();
+                Deger::Sayi(n)
+            }
+            _ => Deger::Bos,
+        }
+    }));
+
+    globals.insert("vektor_birim".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Vektor(v)) = args.first() {
+            let b = v.borrow();
+            let norm: f64 = b.iter().map(|x| x * x).sum::<f64>().sqrt();
+            if norm == 0.0 { return Deger::Hata("vektor_birim: sıfır vektörü normalize edilemez".to_string()); }
+            let sonuc: Vec<f64> = b.iter().map(|x| x / norm).collect();
+            Deger::Vektor(Rc::new(RefCell::new(sonuc)))
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("kosinus_benzerligi".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        let get_vec = |d: &Deger| -> Option<Vec<f64>> {
+            match d {
+                Deger::Vektor(v) => Some(v.borrow().clone()),
+                Deger::Liste(l) => Some(l.borrow().iter().filter_map(|x| if let Deger::Sayi(n) = x { Some(*n) } else { None }).collect()),
+                _ => None,
+            }
+        };
+        if let (Some(va), Some(vb)) = (get_vec(&args[0]), get_vec(&args[1])) {
+            if va.len() != vb.len() { return Deger::Hata("kosinus_benzerligi: boyutlar eşit olmalı".to_string()); }
+            let dot: f64 = va.iter().zip(vb.iter()).map(|(a, b)| a * b).sum();
+            let na: f64 = va.iter().map(|x| x * x).sum::<f64>().sqrt();
+            let nb: f64 = vb.iter().map(|x| x * x).sum::<f64>().sqrt();
+            if na == 0.0 || nb == 0.0 { return Deger::Sayi(0.0); }
+            Deger::Sayi(dot / (na * nb))
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("vektor_topla".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        let get_vec = |d: &Deger| -> Option<Vec<f64>> {
+            match d {
+                Deger::Vektor(v) => Some(v.borrow().clone()),
+                Deger::Liste(l) => Some(l.borrow().iter().filter_map(|x| if let Deger::Sayi(n) = x { Some(*n) } else { None }).collect()),
+                _ => None,
+            }
+        };
+        if let (Some(va), Some(vb)) = (get_vec(&args[0]), get_vec(&args[1])) {
+            if va.len() != vb.len() { return Deger::Hata("vektor_topla: boyutlar eşit olmalı".to_string()); }
+            let sonuc: Vec<f64> = va.iter().zip(vb.iter()).map(|(a, b)| a + b).collect();
+            Deger::Vektor(Rc::new(RefCell::new(sonuc)))
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("vektor_carpi".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        let get_vec = |d: &Deger| -> Option<Vec<f64>> {
+            match d {
+                Deger::Vektor(v) => Some(v.borrow().clone()),
+                Deger::Liste(l) => Some(l.borrow().iter().filter_map(|x| if let Deger::Sayi(n) = x { Some(*n) } else { None }).collect()),
+                _ => None,
+            }
+        };
+        if let (Some(va), Some(vb)) = (get_vec(&args[0]), get_vec(&args[1])) {
+            if va.len() != vb.len() { return Deger::Hata("vektor_carpi: boyutlar eşit olmalı".to_string()); }
+            let sonuc: Vec<f64> = va.iter().zip(vb.iter()).map(|(a, b)| a * b).collect();
+            Deger::Vektor(Rc::new(RefCell::new(sonuc)))
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("vektor_skalar_carp".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        let skalar = match &args[1] { Deger::Sayi(n) => *n, _ => return Deger::Bos };
+        match &args[0] {
+            Deger::Vektor(v) => {
+                let sonuc: Vec<f64> = v.borrow().iter().map(|x| x * skalar).collect();
+                Deger::Vektor(Rc::new(RefCell::new(sonuc)))
+            }
+            _ => Deger::Bos,
+        }
+    }));
+
+    globals.insert("listeye_vektor".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Liste(l)) = args.first() {
+            let v: Vec<f64> = l.borrow().iter().filter_map(|d| {
+                if let Deger::Sayi(n) = d { Some(*n) } else { None }
+            }).collect();
+            Deger::Vektor(Rc::new(RefCell::new(v)))
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("vektore_liste".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Vektor(v)) = args.first() {
+            let l: Vec<Deger> = v.borrow().iter().map(|x| Deger::Sayi(*x)).collect();
+            Deger::Liste(Rc::new(RefCell::new(l)))
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("vektor_dilim".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 3 {
+            if let (Deger::Vektor(v), Deger::Sayi(bas), Deger::Sayi(son)) = (&args[0], &args[1], &args[2]) {
+                let b = v.borrow();
+                let start = *bas as usize;
+                let end = (*son as usize).min(b.len());
+                if start <= end {
+                    let dilim: Vec<f64> = b[start..end].to_vec();
+                    return Deger::Vektor(Rc::new(RefCell::new(dilim)));
+                }
+            }
+        }
+        Deger::Bos
+    }));
+
+    // vektor_ekle — vektöre eleman ekle
+    globals.insert("vektor_ekle".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let (Deger::Vektor(v), Deger::Sayi(val)) = (&args[0], &args[1]) {
+                v.borrow_mut().push(*val);
+                return Deger::Vektor(Rc::clone(v));
+            }
+        }
+        Deger::Bos
+    }));
+
+    // vektor_al — vektörden indeks ile eleman oku
+    globals.insert("vektor_al".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let (Deger::Vektor(v), Deger::Sayi(i)) = (&args[0], &args[1]) {
+                return v.borrow().get(*i as usize).map(|x| Deger::Sayi(*x)).unwrap_or(Deger::Bos);
+            }
+        }
+        Deger::Bos
+    }));
+
+    // vektor_ata — vektöre indeks ile değer yaz
+    globals.insert("vektor_ata".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 3 {
+            if let (Deger::Vektor(v), Deger::Sayi(i), Deger::Sayi(val)) = (&args[0], &args[1], &args[2]) {
+                let mut b = v.borrow_mut();
+                let idx = *i as usize;
+                if idx < b.len() { b[idx] = *val; }
+                return Deger::Sayi(1.0);
+            }
+        }
+        Deger::Bos
+    }));
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // BLOK D — Matris Operasyonları (Naive GEMM — portable, zero-dep)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    globals.insert("matris_olustur".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let (Deger::Sayi(r), Deger::Sayi(c)) = (&args[0], &args[1]) {
+                let r = *r as usize; let c = *c as usize;
+                let baslangiç = if args.len() >= 3 { if let Deger::Sayi(v) = &args[2] { *v } else { 0.0 } } else { 0.0 };
+                return Deger::Matris {
+                    satirlar: r, sutunlar: c,
+                    veri: Rc::new(RefCell::new(vec![baslangiç; r * c])),
+                };
+            }
+        }
+        Deger::Bos
+    }));
+
+    globals.insert("matris_al".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 3 {
+            if let (Deger::Matris { sutunlar, veri, .. }, Deger::Sayi(i), Deger::Sayi(j)) = (&args[0], &args[1], &args[2]) {
+                let idx = *i as usize * sutunlar + *j as usize;
+                return veri.borrow().get(idx).map(|x| Deger::Sayi(*x)).unwrap_or(Deger::Bos);
+            }
+        }
+        Deger::Bos
+    }));
+
+    globals.insert("matris_ata".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 4 {
+            if let (Deger::Matris { sutunlar, veri, .. }, Deger::Sayi(i), Deger::Sayi(j), Deger::Sayi(val)) =
+                (&args[0], &args[1], &args[2], &args[3])
+            {
+                let idx = *i as usize * sutunlar + *j as usize;
+                let mut b = veri.borrow_mut();
+                if idx < b.len() { b[idx] = *val; }
+                return Deger::Sayi(1.0);
+            }
+        }
+        Deger::Bos
+    }));
+
+    // matris_carp — Naive O(n³) GEMM
+    globals.insert("matris_carp".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        if let (
+            Deger::Matris { satirlar: ra, sutunlar: ca, veri: va },
+            Deger::Matris { satirlar: rb, sutunlar: cb, veri: vb },
+        ) = (&args[0], &args[1]) {
+            if ca != rb {
+                return Deger::Hata(format!("matris_carp: boyut uyumsuzluğu {}x{} * {}x{}", ra, ca, rb, cb));
+            }
+            let (m, n, k) = (*ra, *cb, *ca);
+            let a = va.borrow(); let b = vb.borrow();
+            let mut c = vec![0.0f64; m * n];
+            for i in 0..m {
+                for j in 0..n {
+                    let mut s = 0.0f64;
+                    for p in 0..k { s += a[i * k + p] * b[p * n + j]; }
+                    c[i * n + j] = s;
+                }
+            }
+            Deger::Matris { satirlar: m, sutunlar: n, veri: Rc::new(RefCell::new(c)) }
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("matris_transpoz".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Matris { satirlar, sutunlar, veri }) = args.first() {
+            let b = veri.borrow();
+            let mut c = vec![0.0f64; satirlar * sutunlar];
+            for i in 0..*satirlar {
+                for j in 0..*sutunlar {
+                    c[j * satirlar + i] = b[i * sutunlar + j];
+                }
+            }
+            Deger::Matris { satirlar: *sutunlar, sutunlar: *satirlar, veri: Rc::new(RefCell::new(c)) }
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("matris_satir_al".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let (Deger::Matris { sutunlar, veri, .. }, Deger::Sayi(i)) = (&args[0], &args[1]) {
+                let b = veri.borrow();
+                let start = *i as usize * sutunlar;
+                let end = start + sutunlar;
+                if end <= b.len() {
+                    return Deger::Vektor(Rc::new(RefCell::new(b[start..end].to_vec())));
+                }
+            }
+        }
+        Deger::Bos
+    }));
+
+    globals.insert("matris_sutun_al".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let (Deger::Matris { satirlar, sutunlar, veri }, Deger::Sayi(j)) = (&args[0], &args[1]) {
+                let b = veri.borrow();
+                let col: Vec<f64> = (0..*satirlar).map(|i| b[i * sutunlar + *j as usize]).collect();
+                return Deger::Vektor(Rc::new(RefCell::new(col)));
+            }
+        }
+        Deger::Bos
+    }));
+
+    globals.insert("matris_satir_ata".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 3 {
+            if let (Deger::Matris { sutunlar, veri, .. }, Deger::Sayi(i), Deger::Vektor(row)) =
+                (&args[0], &args[1], &args[2])
+            {
+                let row_b = row.borrow();
+                let mut b = veri.borrow_mut();
+                let start = *i as usize * sutunlar;
+                for (j, &val) in row_b.iter().enumerate() {
+                    if start + j < b.len() { b[start + j] = val; }
+                }
+                return Deger::Sayi(1.0);
+            }
+        }
+        Deger::Bos
+    }));
+
+    globals.insert("kimlik_matrisi".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(n)) = args.first() {
+            let n = *n as usize;
+            let mut v = vec![0.0f64; n * n];
+            for i in 0..n { v[i * n + i] = 1.0; }
+            Deger::Matris { satirlar: n, sutunlar: n, veri: Rc::new(RefCell::new(v)) }
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("matris_boyutu".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Matris { satirlar, sutunlar, .. }) = args.first() {
+            Deger::Liste(Rc::new(RefCell::new(vec![Deger::Sayi(*satirlar as f64), Deger::Sayi(*sutunlar as f64)])))
+        } else { Deger::Bos }
+    }));
+
+    // matris_vektor_carp — M * v (2D matris ile 1D vektör çarpımı)
+    globals.insert("matris_vektor_carp".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        if let (Deger::Matris { satirlar, sutunlar, veri }, Deger::Vektor(v)) = (&args[0], &args[1]) {
+            let mb = veri.borrow();
+            let vb = v.borrow();
+            if *sutunlar != vb.len() {
+                return Deger::Hata(format!("matris_vektor_carp: matris sütun {} ≠ vektör boyutu {}", sutunlar, vb.len()));
+            }
+            let sonuc: Vec<f64> = (0..*satirlar).map(|i| {
+                (0..*sutunlar).map(|j| mb[i * sutunlar + j] * vb[j]).sum()
+            }).collect();
+            Deger::Vektor(Rc::new(RefCell::new(sonuc)))
+        } else { Deger::Bos }
+    }));
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // BLOK E — Düzenli İfade (Regex) Built-in'leri
+    // ═══════════════════════════════════════════════════════════════════════
+
+    globals.insert("regex_eslestir".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let (Deger::Metin(metin), Deger::Metin(desen)) = (&args[0], &args[1]) {
+                match Regex::new(desen) {
+                    Ok(re) => return Deger::Sayi(if re.is_match(metin) { 1.0 } else { 0.0 }),
+                    Err(e) => return Deger::Hata(format!("regex_eslestir: geçersiz desen — {}", e)),
+                }
+            }
+        }
+        Deger::Bos
+    }));
+
+    globals.insert("regex_bul".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let (Deger::Metin(metin), Deger::Metin(desen)) = (&args[0], &args[1]) {
+                match Regex::new(desen) {
+                    Ok(re) => {
+                        if let Some(m) = re.find(metin) {
+                            return Deger::Metin(m.as_str().to_string());
+                        }
+                        return Deger::Bos;
+                    }
+                    Err(e) => return Deger::Hata(format!("regex_bul: geçersiz desen — {}", e)),
+                }
+            }
+        }
+        Deger::Bos
+    }));
+
+    globals.insert("regex_bul_tum".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let (Deger::Metin(metin), Deger::Metin(desen)) = (&args[0], &args[1]) {
+                match Regex::new(desen) {
+                    Ok(re) => {
+                        let eslesme: Vec<Deger> = re.find_iter(metin)
+                            .map(|m| Deger::Metin(m.as_str().to_string()))
+                            .collect();
+                        return Deger::Liste(Rc::new(RefCell::new(eslesme)));
+                    }
+                    Err(e) => return Deger::Hata(format!("regex_bul_tum: geçersiz desen — {}", e)),
+                }
+            }
+        }
+        Deger::Bos
+    }));
+
+    globals.insert("regex_degistir".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 3 {
+            if let (Deger::Metin(metin), Deger::Metin(desen), Deger::Metin(yeni)) = (&args[0], &args[1], &args[2]) {
+                match Regex::new(desen) {
+                    Ok(re) => return Deger::Metin(re.replace_all(metin, yeni.as_str()).into_owned()),
+                    Err(e) => return Deger::Hata(format!("regex_degistir: geçersiz desen — {}", e)),
+                }
+            }
+        }
+        Deger::Bos
+    }));
+
+    globals.insert("regex_bol".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let (Deger::Metin(metin), Deger::Metin(desen)) = (&args[0], &args[1]) {
+                match Regex::new(desen) {
+                    Ok(re) => {
+                        let parcalar: Vec<Deger> = re.split(metin)
+                            .map(|p| Deger::Metin(p.to_string()))
+                            .collect();
+                        return Deger::Liste(Rc::new(RefCell::new(parcalar)));
+                    }
+                    Err(e) => return Deger::Hata(format!("regex_bol: geçersiz desen — {}", e)),
+                }
+            }
+        }
+        Deger::Bos
+    }));
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // BLOK F — Gelişmiş Rastgele Sayı Üretimi (SmallRng — seed destekli)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // Thread-local SmallRng
+    thread_local! {
+        static RNG: RefCell<SmallRng> = RefCell::new(SmallRng::from_entropy());
+    }
+
+    // Box-Muller dönüşümü ile Normal dağılım örneği
+    globals.insert("normal_rastgele".to_string(), Deger::DahiliFonksiyon(|args| {
+        let ortalama = match args.first() { Some(Deger::Sayi(n)) => *n, _ => 0.0 };
+        let sapma = match args.get(1) { Some(Deger::Sayi(n)) => *n, _ => 1.0 };
+        let (u1, u2) = RNG.with(|rng| {
+            let mut r = rng.borrow_mut();
+            (r.gen::<f64>(), r.gen::<f64>())
+        });
+        let u1 = u1.max(1e-10);
+        let z = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos();
+        Deger::Sayi(ortalama + sapma * z)
+    }));
+
+    globals.insert("uniform_rastgele".to_string(), Deger::DahiliFonksiyon(|args| {
+        let min = match args.first() { Some(Deger::Sayi(n)) => *n, _ => 0.0 };
+        let max = match args.get(1) { Some(Deger::Sayi(n)) => *n, _ => 1.0 };
+        let val = RNG.with(|rng| rng.borrow_mut().gen::<f64>());
+        Deger::Sayi(min + val * (max - min))
+    }));
+
+    globals.insert("rastgele_tohum_ata".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(seed)) = args.first() {
+            RNG.with(|rng| {
+                *rng.borrow_mut() = SmallRng::seed_from_u64(*seed as u64);
+            });
+            Deger::Sayi(1.0)
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("rastgele_tamsayi".to_string(), Deger::DahiliFonksiyon(|args| {
+        let min = match args.first() { Some(Deger::Sayi(n)) => *n as i64, _ => 0 };
+        let max = match args.get(1) { Some(Deger::Sayi(n)) => *n as i64, _ => 100 };
+        if min >= max { return Deger::Sayi(min as f64); }
+        let val = RNG.with(|rng| rng.borrow_mut().gen_range(min..=max));
+        Deger::Sayi(val as f64)
+    }));
+
+    globals.insert("vektor_karistir".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Vektor(v)) = args.first() {
+            let mut b = v.borrow_mut();
+            let n = b.len();
+            for i in (1..n).rev() {
+                let j = RNG.with(|rng| rng.borrow_mut().gen_range(0..=i));
+                b.swap(i, j);
+            }
+            Deger::Sayi(1.0)
+        } else if let Some(Deger::Liste(l)) = args.first() {
+            let mut b = l.borrow_mut();
+            let n = b.len();
+            for i in (1..n).rev() {
+                let j = RNG.with(|rng| rng.borrow_mut().gen_range(0..=i));
+                b.swap(i, j);
+            }
+            Deger::Sayi(1.0)
+        } else { Deger::Bos }
+    }));
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // BLOK G — Gelişmiş Metin & Unicode Built-in'leri
+    // ═══════════════════════════════════════════════════════════════════════
+
+    globals.insert("unicode_normalize".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Metin(s)) = args.first() {
+            let normalized: String = s.nfc().collect();
+            Deger::Metin(normalized)
+        } else { Deger::Bos }
+    }));
+
+    // FNV-1a hash — hızlı, non-kriptografik; lookup table indekslemesi için
+    globals.insert("metin_hash".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Metin(s)) = args.first() {
+            let mut hash: u64 = 0xcbf29ce484222325u64;
+            for byte in s.bytes() {
+                hash ^= byte as u64;
+                hash = hash.wrapping_mul(0x100000001b3u64);
+            }
+            Deger::Sayi(hash as f64)
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("bayt_metin".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Metin(s)) = args.first() {
+            let bytes: Vec<Deger> = s.bytes().map(|b| Deger::Sayi(b as f64)).collect();
+            Deger::Liste(Rc::new(RefCell::new(bytes)))
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("metin_bayt".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Liste(l)) = args.first() {
+            let bytes: Vec<u8> = l.borrow().iter().filter_map(|d| {
+                if let Deger::Sayi(n) = d { Some(*n as u8) } else { None }
+            }).collect();
+            match String::from_utf8(bytes) {
+                Ok(s) => Deger::Metin(s),
+                Err(_) => Deger::Hata("metin_bayt: geçersiz UTF-8 bayt dizisi".to_string()),
+            }
+        } else { Deger::Bos }
+    }));
+
+    // metin_benzerlik — normalized Levenshtein mesafesi (0.0 = farklı, 1.0 = aynı)
+    globals.insert("metin_benzerlik".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let (Deger::Metin(s1), Deger::Metin(s2)) = (&args[0], &args[1]) {
+                let a: Vec<char> = s1.chars().collect();
+                let b: Vec<char> = s2.chars().collect();
+                let la = a.len(); let lb = b.len();
+                if la == 0 && lb == 0 { return Deger::Sayi(1.0); }
+                let max_len = la.max(lb);
+                let mut dp = vec![vec![0usize; lb + 1]; la + 1];
+                for i in 0..=la { dp[i][0] = i; }
+                for j in 0..=lb { dp[0][j] = j; }
+                for i in 1..=la {
+                    for j in 1..=lb {
+                        let cost = if a[i-1] == b[j-1] { 0 } else { 1 };
+                        dp[i][j] = (dp[i-1][j] + 1).min(dp[i][j-1] + 1).min(dp[i-1][j-1] + cost);
+                    }
+                }
+                let dist = dp[la][lb];
+                Deger::Sayi(1.0 - (dist as f64 / max_len as f64))
+            } else { Deger::Bos }
+        } else { Deger::Bos }
+    }));
+
+    // metin_sablon — basit {anahtar} şablon dönüşümü (sözlük tabanlı)
+    globals.insert("metin_sablon".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        let sablon = match &args[0] { Deger::Metin(s) => s.clone(), _ => return Deger::Bos };
+        let mut sonuc = sablon;
+        let ikinci = &args[1];
+        match ikinci {
+            Deger::Sozluk(m) => {
+                for (k, v) in m.borrow().iter() {
+                    sonuc = sonuc.replace(&format!("{{{}}}", k), &v.to_string());
+                }
+            }
+            Deger::Nesne { alanlar, .. } => {
+                for (k, v) in alanlar.borrow().iter() {
+                    sonuc = sonuc.replace(&format!("{{{}}}", k), &v.to_string());
+                }
+            }
+            _ => return Deger::Bos,
+        }
+        Deger::Metin(sonuc)
+    }));
 
     crate::gui::kayit_et(&mut globals);
 
