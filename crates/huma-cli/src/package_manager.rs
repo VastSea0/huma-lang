@@ -634,22 +634,32 @@ pub fn install_package(input: Option<&str>, trusted: bool) -> Result<()> {
 
 /// [4] Yerel workspace'te paketi arar (mono-repo senaryosu)
 fn find_local_package(name: &str) -> Option<PathBuf> {
-    // Sırasıyla kontrol et: huma_modulleri/, lib/, kök dizin altındaki paket klasörleri
-    let candidates = [
-        PathBuf::from(format!("{}/{}", PACKAGE_DIR, name)),
-        PathBuf::from(format!("lib/{}", name)),
-        PathBuf::from(name),
-    ];
+    let mut search_dirs = vec![PathBuf::from(".")];
+    if let Ok(cwd) = std::env::current_dir() {
+        let mut curr = cwd.as_path();
+        while let Some(parent) = curr.parent() {
+            search_dirs.push(parent.to_path_buf());
+            curr = parent;
+        }
+    }
 
-    for candidate in &candidates {
-        let json_candidates = [
-            candidate.join("huma.json"),
-            candidate.join("paket.json"),
+    for base in &search_dirs {
+        let candidates = [
+            base.join(format!("{}/{}", PACKAGE_DIR, name)),
+            base.join(format!("lib/{}", name)),
+            base.join(name),
         ];
 
-        for json_path in &json_candidates {
-            if json_path.exists() {
-                return Some(candidate.clone());
+        for candidate in &candidates {
+            let json_candidates = [
+                candidate.join("huma.json"),
+                candidate.join("paket.json"),
+            ];
+
+            for json_path in &json_candidates {
+                if json_path.exists() {
+                    return Some(candidate.clone());
+                }
             }
         }
     }

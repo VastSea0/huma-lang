@@ -1,4 +1,4 @@
-yükle "lib/nlp.hb"
+"nlp_temel"'i yükle
 
 "\n╔══════════════════════════════════════════════════════╗"'i yazdır
 "║       HÜMA NLP v3.0.0 — TAM TEST SÜİTİ              ║"'i yazdır

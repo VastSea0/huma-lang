@@ -5,10 +5,7 @@
   "yazar": "Egehan KAHRAMAN",
   "giris": "nlp_temel.hb",
   "huma_surum": ">=0.5.0",
-  "bagimliliklar": {
-    "dizgi": "^1.1.0",
-    "liste": "^1.1.0"
-  },
+  "bagimliliklar": {},
   "betikler": {
     "test": "huma run tests/test_nlp.hb"
   },

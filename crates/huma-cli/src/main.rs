@@ -151,14 +151,14 @@ enum Commands {
     Listele,
 
     /// Mevcut dizini ilklendirir (Kısa yol)
-    #[command(alias = "init")]
+    #[command(alias = "init", alias = "ilkle")]
     İlkle,
 }
 
 #[derive(Subcommand)]
 pub enum PackageAction {
     /// Proje bağımlılıklarını kurar veya yeni bir paket ekler
-    #[command(alias = "install", alias = "add")]
+    #[command(alias = "install", alias = "add", alias = "ekle")]
     Kur {
         /// Paketin adı (boş bırakılırsa tüm bağımlılıklar kurulur)
         name: Option<String>,
@@ -183,7 +183,7 @@ pub enum PackageAction {
         name: String,
     },
     /// Mevcut dizini bir Hüma projesi olarak ilklendirir
-    #[command(alias = "init")]
+    #[command(alias = "init", alias = "ilkle")]
     İlkle,
     /// Projenin yayınlanmaya hazır olup olmadığını kontrol eder
     #[command(alias = "verify")]

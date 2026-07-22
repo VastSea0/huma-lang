@@ -704,61 +704,6 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
         }
     }));
 
-    globals.insert("küçük_harf".to_string(), Deger::DahiliFonksiyon(|args| {
-        if let Some(Deger::Metin(s)) = args.first() {
-            let res: String = s.chars().map(|c| match c {
-                'I' => 'ı', 'İ' => 'i',
-                _ => c.to_lowercase().next().unwrap_or(c)
-            }).collect();
-            Deger::Metin(res)
-        } else { Deger::Bos }
-    }));
-
-    globals.insert("büyük_harf".to_string(), Deger::DahiliFonksiyon(|args| {
-        if let Some(Deger::Metin(s)) = args.first() {
-            let res: String = s.chars().map(|c| match c {
-                'ı' => 'I', 'i' => 'İ',
-                _ => c.to_uppercase().next().unwrap_or(c)
-            }).collect();
-            Deger::Metin(res)
-        } else { Deger::Bos }
-    }));
-
-    globals.insert("böl".to_string(), Deger::DahiliFonksiyon(|args| {
-        if args.len() >= 2 {
-            if let (Deger::Metin(s), Deger::Metin(ayrac)) = (&args[0], &args[1]) {
-                let parts: Vec<Deger> = s.split(ayrac).map(|p| Deger::Metin(p.to_string())).collect();
-                return Deger::Liste(Rc::new(RefCell::new(parts)));
-            }
-        }
-        Deger::Liste(Rc::new(RefCell::new(Vec::new())))
-    }));
-
-    globals.insert("birleştir".to_string(), Deger::DahiliFonksiyon(|args| {
-        if args.len() >= 2 {
-            if let (Deger::Liste(l), Deger::Metin(ayrac)) = (&args[0], &args[1]) {
-                let parts: Vec<String> = l.borrow().iter().map(|v| v.to_string()).collect();
-                return Deger::Metin(parts.join(ayrac));
-            }
-        }
-        Deger::Metin("".to_string())
-    }));
-
-    globals.insert("değiştir".to_string(), Deger::DahiliFonksiyon(|args| {
-        if args.len() >= 3 {
-            if let (Deger::Metin(s), Deger::Metin(eski), Deger::Metin(yeni)) = (&args[0], &args[1], &args[2]) {
-                return Deger::Metin(s.replace(eski, yeni));
-            }
-        }
-        Deger::Bos
-    }));
-
-    globals.insert("kırp".to_string(), Deger::DahiliFonksiyon(|args| {
-        if let Some(Deger::Metin(s)) = args.first() {
-            Deger::Metin(s.trim().to_string())
-        } else { Deger::Bos }
-    }));
-
     globals.insert("içeriyor".to_string(), Deger::DahiliFonksiyon(|args| {
         if args.len() >= 2 {
             match (&args[0], &args[1]) {
@@ -1114,7 +1059,7 @@ impl Yorumlayici {
                 if let (Deger::Sayi(s), Deger::Sayi(e)) = (start_val, end_val) {
                     let mut i = s;
                     while i <= e {
-                        self.degisken_ata(degisken.clone(), Deger::Sayi(i));
+                        self.degisken_tanimla(degisken.clone(), Deger::Sayi(i));
                         for k in &govde {
                             self.komut_calistir(k.clone());
                             if self.donus_degeri.is_some() { break; }
@@ -1214,7 +1159,21 @@ impl Yorumlayici {
                 let mut parser = crate::parser::Parser::new(crate::lexer::Lexer::new(&icerik));
                 let prog = parser.parse_program();
                 let eski = self.donus_degeri.take();
+
+                let mut pushed = false;
+                if let Some(parent) = Path::new(&yol).parent() {
+                    let parent_str = parent.to_string_lossy().to_string();
+                    if !parent_str.is_empty() && !self.arama_yolları.contains(&parent_str) {
+                        self.arama_yolları.insert(0, parent_str);
+                        pushed = true;
+                    }
+                }
+
                 self.yorumla(prog);
+
+                if pushed {
+                    self.arama_yolları.remove(0);
+                }
                 self.donus_degeri = eski;
             }
         } else {

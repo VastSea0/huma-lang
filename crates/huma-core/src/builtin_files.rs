@@ -6,7 +6,6 @@ pub fn get_lib_files() -> Vec<(&'static str, &'static str)> {
         ("istatistik.hb", include_str!("../../../lib/istatistik.hb")),
         ("liste.hb",      include_str!("../../../lib/liste.hb")),
         ("matematik.hb",  include_str!("../../../lib/matematik.hb")),
-        ("nlp.hb",        include_str!("../../../lib/nlp.hb")),
         ("rastgele.hb",   include_str!("../../../lib/rastgele.hb")),
         ("renkler.hb",    include_str!("../../../lib/renkler.hb")),
         ("zaman.hb",      include_str!("../../../lib/zaman.hb")),

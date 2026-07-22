@@ -1,12 +1,15 @@
-// ═══════════════════════════════════════════════════════════════════
-// nlp_temel.hb — Hüma Türkçe NLP Kütüphanesi Giriş Noktası
-// Sürüm: 3.1.0
+// ══════════════════════════════════════════════════════════════════════════════
+// nlp_temel.hb — Hüma Türkçe NLP Temel Paketi Ana Giriş Noktası
+// Sürüm: 3.2.0 (Nesne Yönelimli ve Modüler Mimari)
 // Yazar: Egehan KAHRAMAN
-// ═══════════════════════════════════════════════════════════════════
-//
-// Bu modül, gömülü nlp.hb kütüphanesini yükler.
-// Tüm NLP fonksiyonları (tokenize, stem, duygu_analiz, ner_etiketle,
-// pos_etiketle, cümle_böl, vb.) bu yükleme ile kullanılabilir hale gelir.
-// ═══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
 
-"nlp.hb"'yi yükle;
+"sabitler.hb"'yi yükle
+"islemci.hb"'yi yükle
+"stemmer.hb"'yi yükle
+"analizci.hb"'yi yükle
+
+// ─── Varsayılan Global OOP Örnekleri ─────────────────────────────────────
+nlp_islemci = metin_islemci() olsun
+nlp_stemmer = kok_bulucu() olsun
+nlp_analizci = metin_analizci() olsun
