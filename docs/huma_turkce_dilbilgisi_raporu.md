@@ -1,8 +1,6 @@
 # Hüma Programlama Dili — Türkçe Dilbilgisi Uyumluluk Raporu
 
-> **Hazırlayan:** Antigravity AI Analizi  
-> **Tarih:** 2026-04-15  
-> **İncelenen Dosyalar:** `README.md`, `README.en.md`, `src/lexer.rs`, `src/token.rs`, `src/parser.rs`, `src/interpreter.rs`, `src/ast.rs`, `lib/*.hb`, `examples/*.hb`
+Bu rapor, Hüma dilinin Türkçe dilbilgisi eklerini destekleme durumunu, kaynak kod ve dokümantasyon karşılaştırması üzerinden analiz eder.
 
 ---
 
@@ -25,9 +23,9 @@ README'deki tablo 8 dilbilgisi hali / ek grubu içermektedir. Aşağıda her bir
 
 ---
 
-## 2. Hüma'nın Sağladığı Ama README'de Görünmeyen Özellikler
+## 2. README'de Yer Almayan Mevcut Özellikler
 
-Kaynak kod incelemesinde README tablosunda hiç yer almayan, ancak fiilen çalışan aşağıdaki özellikler tespit edilmiştir:
+Kaynak kod üzerinde yapılan incelemede, README tablosunda belirtilmeyen ancak dilde aktif olan şu özellikler tespit edilmiştir:
 
 ### 2.1 `kendisi` Anahtar Kelimesi (OOP Self Referansı)
 ```

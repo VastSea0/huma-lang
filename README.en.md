@@ -15,7 +15,7 @@ Hüma is a high-performance, safe, and intuitive programming language that combi
 - **Rich Standard Library:** Built-in support for mathematics, NLP, terminal coloring, time management, advanced list manipulation, and unit testing.
 - **Secure Package Management:** SHA-256 integrity verification, path traversal protection, and mono-repo (sub-directory) support (v0.5.2).
 - **Bilingual CLI (Turkish & English):** All commands work in both languages (e.g., `run` or `çalıştır`, `build` or `derle`, `package` or `paket`).
-- **Modern CLI + LSP Support:** Strong CLI workflows with editor intelligence (completion, hover, diagnostics) via LSP.
+- **Modern CLI + LSP Support:** Full CLI workflows and LSP integration for autocomplete, hover information, and static analysis diagnostics.
 
 ---
 
@@ -43,7 +43,7 @@ Hüma features a **Bilingual CLI**, meaning you can use the English commands (e.
 
 - `huma run <target>` (Alias: `çalıştır`)
     - **Description:** Run a `.hb` source file or a script defined in `huma.json`. 
-    - **Smart Logic:** If no target is provided, it looks for a script named `start` or `baslat`. If neither is found, it runs the entry file specified in `huma.json`.
+    - **Default Entrypoint Lookup:** If no target is specified, the CLI automatically runs the `start` or `baslat` script, or falls back to the entry file defined in `huma.json`.
 - `huma repl` (Alias: `kabuk`)
     - **Description:** Starts the interactive Read-Eval-Print Loop for quick prototyping and testing.
 - `huma test [target]` (Alias: `sına`)
@@ -150,7 +150,7 @@ i < fruits'ın uzunluğu olduğu sürece {
 
 ### 🇹🇷 Natural Language & Suffix System
 
-The most distinctive feature of Hüma is its built-in support for Turkish grammar and agglutination. Grammatical suffixes appended via an apostrophe (`'`) are cleanly and automatically stripped by the lexer at compile time. This drastically improves code readability and natural flow while ensuring absolutely zero runtime cost.
+Hüma supports Turkish grammar and agglutination. Suffixes appended via an apostrophe (`'`) are stripped by the lexer at compile time. This improves code readability without runtime performance penalties.
 
 **Supported Grammatical Suffixes and Usage Patterns:**
 | Grammatical Case | Supported Variations | Example Usage | Description |

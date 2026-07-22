@@ -13,7 +13,7 @@ Hüma, modern yazılım geliştirme prensiplerini Türkçe doğal dil yapısıyl
 - **Zengin Sistem Kütüphaneleri:** Matematik, NLP, terminal renklendirme, zaman yönetimi, liste araçları ve birim test çerçevesi hazırdır.
 - **Güvenli Paket Yönetimi:** SHA-256 bütünlük doğrulaması, path traversal koruması ve mono-repo (alt dizin) desteği ile güvenli modül yönetimi (v0.5.2).
 - **İki Dilli CLI (Bilingual CLI):** Tüm komutları hem Türkçe hem İngilizce olarak kullanabilirsiniz (Örn: `run` veya `çalıştır`, `build` veya `derle`).
-- **Modern CLI + LSP Desteği:** Güçlü CLI komut seti ve LSP entegrasyonu ile editörünüzde tamamlamalar, hover ve tanılamalar sunulur.
+- **Modern CLI + LSP Desteği:** CLI komut seti ve LSP entegrasyonu sayesinde editörde kod tamamlama, hover bilgi kartları ve statik analiz tanılamaları sunulur.
 
 ---
 
@@ -39,7 +39,7 @@ Hüma, **Çift Dilli (Bilingual) CLI** mimarisine sahiptir. Tüm komutları hem 
 
 - `huma çalıştır <hedef>` (Alias: `run`)
     - **Açıklama:** Bir `.hb` kaynak dosyasını veya `huma.json` içinde tanımlı bir betiği (script) çalıştırır.
-    - **Akıllı Mantık:** Hedef belirtilmezse dizinde `baslat` veya `start` betiği arar. Yoksa `huma.json` içindeki ana giriş dosyasını koşturur.
+    - **Varsayılan Dosya Tespiti:** Hedef belirtilmezse dizinde `baslat` veya `start` betiğini çalıştırır, aksi halde `huma.json` dosyasındaki ana giriş noktasını kullanır.
 - `huma kabuk` (Alias: `repl`)
     - **Açıklama:** Kodları satır satır denemek ve hızlı prototipleme yapmak için etkileşimli REPL modunu başlatır.
 - `huma sına [hedef]` (Alias: `test`)
@@ -151,7 +151,7 @@ i < meyveler'in uzunluğu olduğu sürece {
 
 ### 🇹🇷 Doğal Dil ve Ek Sistemi (Suffix System)
 
-Hüma'nın en ayırt edici özelliği, Türkçe'nin eklemeli yapısını doğal bir şekilde desteklemesidir. Kesme işareti (`'`) ile ayrılan dilbilgisi ekleri, derleyici (compiler) tarafından derleme aşamasında (lexical analysis) temizlenir. Bu sayede kodun hem okunabilirliği artar hem de çalışma zamanında hiçbir performans kaybı yaşanmaz.
+Hüma, Türkçe'nin eklemeli yapısını destekler. Kesme işareti (`'`) ile ayrılan dilbilgisi ekleri, derleyici tarafından derleme aşamasında (lexical analysis) temizlenir. Bu sayede kodun okunabilirliği artarken çalışma zamanında herhangi bir performans kaybı yaşanmaz.
 
 **Desteklenen Dilbilgisi Ekleri ve Kullanım Şablonları:**
 
