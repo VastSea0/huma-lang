@@ -1,0 +1,8 @@
+{
+  "ad": "nlp_ileri",
+  "surum": "1.0.0",
+  "aciklama": "Hüma İleri NLP Modülü — BPE, TF-IDF, Attention, Embedding, Transformer Blokları",
+  "yazar": "Egehan KAHRAMAN",
+  "ana_dosya": "nlp_ileri.hb",
+  "bagimliliklar": { "nlp_temel": "*", "yapay_zeka": "*" }
+}
