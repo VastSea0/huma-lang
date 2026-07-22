@@ -633,6 +633,13 @@ fn find_local_package(name: &str) -> Option<PathBuf> {
             curr = parent;
         }
     }
+    if let Ok(exe) = std::env::current_exe() {
+        let mut curr = exe.as_path();
+        while let Some(parent) = curr.parent() {
+            search_dirs.push(parent.to_path_buf());
+            curr = parent;
+        }
+    }
 
     for base in &search_dirs {
         let candidates = [
