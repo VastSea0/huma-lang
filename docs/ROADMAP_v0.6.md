@@ -68,7 +68,7 @@ Hüma for the web and high-load systems.
 - **Goal:** Non-blocking I/O for `huma_sunucu`.
 - **Status:** Implemented `bekle` (await) keyword and asynchronous execution engine.
 - **Detail:** Implement a "Yaprak" (Leaf/Task) executor in the VM to handle concurrent operations without blocking the main thread.
-- **Syntax:** `veri = bekle ag_istekleri.getir(url)`.
+- **Syntax:** `veri = bekle ag_istekleri.getir(url, basliklar)`.
 - **Server loop:** `istek = bekle dahili_sunucu_bekle(sid)`.
 
 ### 4.2 JIT (Just-In-Time) Research

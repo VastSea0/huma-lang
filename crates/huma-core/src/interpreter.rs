@@ -12,13 +12,12 @@ use std::time::Duration;
 use crate::builtin_files;
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
-use std::io::Read;
 use tokio::runtime::{Builder, Runtime};
 use tokio::task::JoinHandle;
 use tokio::task::LocalSet;
 use tokio::sync::{mpsc, oneshot};
 use futures_util::FutureExt;
-use hyper::{Body, Request, Response};
+use hyper::{Body, Request, Response, Server};
 use hyper::service::{make_service_fn, service_fn};
 
 // Async server (hyper) state
@@ -102,9 +101,8 @@ pub struct Yorumlayici {
     pub output_buffer: Option<Rc<RefCell<String>>>,
 }
 
-impl Yorumlayici {
-    pub fn new() -> Self {
-        let mut globals = HashMap::new();
+pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
+    let mut globals = HashMap::new();
         globals.insert("uzunluk".to_string(), Deger::DahiliFonksiyon(|args| {
             match args.first() {
                 Some(Deger::Metin(s)) => Deger::Sayi(s.chars().count() as f64),
@@ -215,7 +213,7 @@ impl Yorumlayici {
             });
 
             YAPRAK.with(|y| {
-                let mut y = y.borrow_mut();
+                let y = y.borrow_mut();
                 let fut = hyper::Server::bind(&addr).serve(make_svc).map(|_| ());
                 let _ = y.local.spawn_local(fut);
             });
@@ -250,7 +248,7 @@ impl Yorumlayici {
             if args.len() < 2 { return Deger::Sayi(0.0); }
             let i_id = match &args[0] { Deger::Sayi(n) => *n as u64, _ => return Deger::Sayi(0.0) };
             
-            let (data, len) = match &args[1] {
+            let (data, _len) = match &args[1] {
                 Deger::Metin(s) => (s.as_bytes().to_vec(), s.len()),
                 Deger::Bayt(b) => (b.clone(), b.len()),
                 _ => (Vec::new(), 0),
@@ -507,177 +505,395 @@ impl Yorumlayici {
         globals.insert("içeriyor".to_string(), Deger::DahiliFonksiyon(|args| {
             if args.len() >= 2 {
                 match (&args[0], &args[1]) {
-                    (Deger::Metin(s), Deger::Metin(aranan)) => {
-                        return Deger::Sayi(if s.contains(aranan.as_str()) { 1.0 } else { 0.0 });
+                    (Deger::Metin(s), Deger::Metin(sub)) => {
+                        return Deger::Sayi(if s.contains(sub.as_str()) { 1.0 } else { 0.0 });
                     }
-                    (Deger::Liste(l), aranan) => {
-                        return Deger::Sayi(if l.borrow().contains(aranan) { 1.0 } else { 0.0 });
-                    }
-                    (Deger::Nesne { alanlar, .. }, Deger::Metin(anahtar)) => {
-                        return Deger::Sayi(if alanlar.borrow().contains_key(anahtar) { 1.0 } else { 0.0 });
+                    (Deger::Liste(l), target) => {
+                        let has = l.borrow().iter().any(|item| item == target);
+                        return Deger::Sayi(if has { 1.0 } else { 0.0 });
                     }
                     _ => {}
                 }
             }
             Deger::Sayi(0.0)
         }));
+    globals.insert("dahili_sunucu_baslat".to_string(), Deger::DahiliFonksiyon(|args| {
+        let port = match args.first() { Some(Deger::Sayi(n)) => *n as u16, _ => 8080 };
+        let sid = get_id();
 
-        // değer_al(nesne, anahtar) → değer
-        globals.insert("değer_al".to_string(), Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Nesne { alanlar, .. }, Deger::Metin(anahtar)) = (&args[0], &args[1]) {
-                    return alanlar.borrow().get(anahtar).cloned().unwrap_or(Deger::Bos);
+        let (tx, rx) = mpsc::unbounded_channel::<IncomingRequest>();
+        SUNUCULAR.lock().unwrap().insert(sid, tx);
+        SUNUCU_RX.blocking_lock().insert(sid, rx);
+
+        let addr = ([0, 0, 0, 0], port).into();
+        let make_svc = make_service_fn(move |_conn| {
+            let sid2 = sid;
+            async move {
+                Ok::<_, hyper::Error>(service_fn(move |req: Request<Body>| {
+                    let sid3 = sid2;
+                    async move {
+                        let url = req.uri().to_string();
+                        let metot = req.method().to_string();
+                        let bytes = hyper::body::to_bytes(req.into_body()).await.unwrap_or_default();
+                        let govde = String::from_utf8_lossy(&bytes).to_string();
+
+                        let (resp_tx, resp_rx) = oneshot::channel::<Response<Body>>();
+                        let rid = get_id();
+                        let incoming = IncomingRequest { id: rid, url, metot, govde, respond_to: resp_tx };
+                        if let Some(tx) = SUNUCULAR.lock().unwrap().get(&sid3) {
+                            let _ = tx.send(incoming);
+                        }
+
+                        if let Ok(resp) = resp_rx.await {
+                            Ok::<_, hyper::Error>(resp)
+                        } else {
+                            Ok::<_, hyper::Error>(Response::builder().status(500).body(Body::from("İç Sunucu Hatası")).unwrap())
+                        }
+                    }
+                }))
+            }
+        });
+
+        tokio::spawn(async move {
+            let server = Server::bind(&addr).serve(make_svc);
+            let _ = server.await;
+        });
+
+        Deger::Sayi(sid as f64)
+    }));
+
+    globals.insert("dahili_sunucu_bekle".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(sid)) = args.first() {
+            let sid = *sid as u64;
+            let mut guard = SUNUCU_RX.blocking_lock();
+            if let Some(rx) = guard.get_mut(&sid) {
+                if let Some(req) = rx.blocking_recv() {
+                    let mut fields = HashMap::new();
+                    fields.insert("id".to_string(), Deger::Sayi(req.id as f64));
+                    fields.insert("url".to_string(), Deger::Metin(req.url));
+                    fields.insert("metot".to_string(), Deger::Metin(req.metot));
+                    fields.insert("gövde".to_string(), Deger::Metin(req.govde));
+
+                    let rid = req.id;
+                    YANITLAR.lock().unwrap().insert(rid, req.respond_to);
+
+                    return Deger::Nesne { sinif_adi: "İstek".to_string(), alanlar: Rc::new(RefCell::new(fields)) };
                 }
             }
-            Deger::Bos
-        }));
+        }
+        Deger::Bos
+    }));
 
-        // değer_ata(nesne, anahtar, değer)
-        globals.insert("değer_ata".to_string(), Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 3 {
-                if let (Deger::Nesne { alanlar, .. }, Deger::Metin(anahtar)) = (&args[0], &args[1]) {
-                    alanlar.borrow_mut().insert(anahtar.clone(), args[2].clone());
+    globals.insert("dahili_sunucu_yanıtla".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 3 {
+            if let (Deger::Sayi(rid), Deger::Sayi(durum), Deger::Metin(icerik)) = (&args[0], &args[1], &args[2]) {
+                let rid = *rid as u64;
+                let responder = YANITLAR.lock().unwrap().remove(&rid);
+                if let Some(tx) = responder {
+                    let resp = Response::builder()
+                        .status(*durum as u16)
+                        .header("Content-Type", "text/html; charset=utf-8")
+                        .body(Body::from(icerik.clone()))
+                        .unwrap();
+                    let _ = tx.send(resp);
                     return Deger::Sayi(1.0);
                 }
             }
-            Deger::Sayi(0.0)
-        }));
+        }
+        Deger::Sayi(0.0)
+    }));
 
-
-        // hızlı_içeriyor(liste, eleman) → O(1) arama (HashSet kullanarak)
-        // NOT: Bu fonksiyon ilk çağrıda listeyi bir küme gibi önbelleğe alırsa daha da hızlanır,
-        // ancak KISS prensibi gereği şimdilik her seferinde HashSet oluşturuyoruz (geçici çözüm).
-        // Gerçek çözüm: Liste'yi küme tipine çeviren bir built-in eklemek.
-        globals.insert("hızlı_içeriyor".to_string(), Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Liste(l), eleman) = (&args[0], &args[1]) {
-                    let set: HashSet<String> = l.borrow().iter().map(|d| d.to_string()).collect();
-                    return Deger::Sayi(if set.contains(&eleman.to_string()) { 1.0 } else { 0.0 });
-                }
+    globals.insert("dosya_oku_bayt".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Metin(yol)) = args.first() {
+            if let Ok(bytes) = std::fs::read(yol) {
+                return Deger::Bayt(bytes);
             }
-            Deger::Bos
-        }));
+        }
+        Deger::Bos
+    }));
 
-        // başlıyor_mu(metin, ön_ek) → 1 veya 0
-        globals.insert("başlıyor_mu".to_string(), Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Metin(s), Deger::Metin(onek)) = (&args[0], &args[1]) {
-                    return Deger::Sayi(if s.starts_with(onek.as_str()) { 1.0 } else { 0.0 });
-                }
+    globals.insert("ortam_değişkeni".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Metin(key)) = args.first() {
+            if let Ok(v) = std::env::var(key) {
+                return Deger::Metin(v);
             }
-            Deger::Bos
-        }));
+        }
+        Deger::Bos
+    }));
 
-        // bitiyor_mu(metin, son_ek) → 1 veya 0
-        globals.insert("bitiyor_mu".to_string(), Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Metin(s), Deger::Metin(sonek)) = (&args[0], &args[1]) {
-                    return Deger::Sayi(if s.ends_with(sonek.as_str()) { 1.0 } else { 0.0 });
-                }
+    globals.insert("tekrar_sayısı".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let (Deger::Metin(metin), Deger::Metin(aranan)) = (&args[0], &args[1]) {
+                return Deger::Sayi(metin.matches(aranan).count() as f64);
             }
-            Deger::Bos
-        }));
+        }
+        Deger::Sayi(0.0)
+    }));
 
-        // dizi_dilim(metin, baş, son) → alt metin (char-bazlı, Unicode güvenli)
-        globals.insert("dizi_dilim".to_string(), Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 3 {
-                if let (Deger::Metin(s), Deger::Sayi(bas), Deger::Sayi(son)) =
-                    (&args[0], &args[1], &args[2])
-                {
-                    let chars: Vec<char> = s.chars().collect();
-                    let b = *bas as usize;
-                    let e = (*son as usize).min(chars.len());
-                    if b <= e {
-                        return Deger::Metin(chars[b..e].iter().collect());
+    globals.insert("ascii_kodu".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Metin(s)) = args.first() {
+            if let Some(c) = s.chars().next() {
+                return Deger::Sayi(c as u32 as f64);
+            }
+        }
+        Deger::Sayi(0.0)
+    }));
+
+    globals.insert("karakterden".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(n)) = args.first() {
+            if let Some(c) = std::char::from_u32(*n as u32) {
+                return Deger::Metin(c.to_string());
+            }
+        }
+        Deger::Bos
+    }));
+
+    globals.insert("değer_al".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let Deger::Nesne { alanlar, .. } = &args[0] {
+                if let Deger::Metin(key) = &args[1] {
+                    if let Some(val) = alanlar.borrow().get(key) {
+                        return val.clone();
                     }
                 }
             }
-            Deger::Bos
-        }));
+        }
+        Deger::Bos
+    }));
 
-        // ── SQL / Veritabanı Fonksiyonları ───────────────────────────────
-        globals.insert("dahili_sql_bağlan".to_string(), Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Metin(yol)) = args.first() {
-                if let Ok(conn) = rusqlite::Connection::open(yol) {
-                    let id = get_id();
-                    SQL_CONNECTIONS.lock().unwrap().insert(id, conn);
-                    return Deger::Sayi(id as f64);
+    globals.insert("değer_ata".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 3 {
+            if let Deger::Nesne { alanlar, .. } = &args[0] {
+                if let Deger::Metin(key) = &args[1] {
+                    alanlar.borrow_mut().insert(key.clone(), args[2].clone());
+                    return Deger::Sayi(1.0);
                 }
             }
-            Deger::Bos
-        }));
+        }
+        Deger::Sayi(0.0)
+    }));
 
-        globals.insert("dahili_sql_yürüt".to_string(), Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 { return Deger::Sayi(0.0); }
-            if let (Deger::Sayi(id), Deger::Metin(sql)) = (&args[0], &args[1]) {
-                let conn_id = *id as u64;
-                let conns = SQL_CONNECTIONS.lock().unwrap();
-                if let Some(conn) = conns.get(&conn_id) {
-                    match conn.execute(sql, []) {
-                        Ok(_) => return Deger::Sayi(1.0),
-                        Err(e) => {
-                            eprintln!("[Hüma SQL Hatası] Yürütme: {}", e);
-                            return Deger::Sayi(0.0);
-                        }
+    globals.insert("hızlı_içeriyor".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let Deger::Liste(l) = &args[0] {
+                let target = &args[1];
+                let contains = l.borrow().iter().any(|x| x == target);
+                return Deger::Sayi(if contains { 1.0 } else { 0.0 });
+            }
+        }
+        Deger::Sayi(0.0)
+    }));
+
+    globals.insert("tipi".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(v) = args.first() {
+            match v {
+                Deger::Sayi(_) => Deger::Metin("sayı".to_string()),
+                Deger::Metin(_) => Deger::Metin("metin".to_string()),
+                Deger::Liste(_) => Deger::Metin("liste".to_string()),
+                Deger::Sozluk(_) => Deger::Metin("sözlük".to_string()),
+                Deger::Fonksiyon { .. } | Deger::DahiliFonksiyon(_) => Deger::Metin("fonksiyon".to_string()),
+                Deger::Nesne { sinif_adi, .. } => Deger::Metin(sinif_adi.clone()),
+                Deger::Sinif { ad, .. } => Deger::Metin(format!("sınıf_{}", ad)),
+                Deger::Bayt(_) => Deger::Metin("bayt".to_string()),
+                Deger::GorevId(_) => Deger::Metin("görev".to_string()),
+                Deger::Bos => Deger::Metin("boş".to_string()),
+                Deger::Hata(_) => Deger::Metin("hata".to_string()),
+            }
+        } else {
+            Deger::Metin("bilinmeyen".to_string())
+        }
+    }));
+
+    globals.insert("küçük_harf".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Metin(s)) = args.first() {
+            let res: String = s.chars().map(|c| match c {
+                'I' => 'ı', 'İ' => 'i',
+                _ => c.to_lowercase().next().unwrap_or(c)
+            }).collect();
+            Deger::Metin(res)
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("büyük_harf".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Metin(s)) = args.first() {
+            let res: String = s.chars().map(|c| match c {
+                'ı' => 'I', 'i' => 'İ',
+                _ => c.to_uppercase().next().unwrap_or(c)
+            }).collect();
+            Deger::Metin(res)
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("böl".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let (Deger::Metin(s), Deger::Metin(ayrac)) = (&args[0], &args[1]) {
+                let parts: Vec<Deger> = s.split(ayrac).map(|p| Deger::Metin(p.to_string())).collect();
+                return Deger::Liste(Rc::new(RefCell::new(parts)));
+            }
+        }
+        Deger::Liste(Rc::new(RefCell::new(Vec::new())))
+    }));
+
+    globals.insert("birleştir".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let (Deger::Liste(l), Deger::Metin(ayrac)) = (&args[0], &args[1]) {
+                let parts: Vec<String> = l.borrow().iter().map(|v| v.to_string()).collect();
+                return Deger::Metin(parts.join(ayrac));
+            }
+        }
+        Deger::Metin("".to_string())
+    }));
+
+    globals.insert("değiştir".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 3 {
+            if let (Deger::Metin(s), Deger::Metin(eski), Deger::Metin(yeni)) = (&args[0], &args[1], &args[2]) {
+                return Deger::Metin(s.replace(eski, yeni));
+            }
+        }
+        Deger::Bos
+    }));
+
+    globals.insert("kırp".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Metin(s)) = args.first() {
+            Deger::Metin(s.trim().to_string())
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("içeriyor".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            match (&args[0], &args[1]) {
+                (Deger::Metin(s), Deger::Metin(sub)) => {
+                    return Deger::Sayi(if s.contains(sub.as_str()) { 1.0 } else { 0.0 });
+                }
+                (Deger::Liste(l), target) => {
+                    let has = l.borrow().iter().any(|item| item == target);
+                    return Deger::Sayi(if has { 1.0 } else { 0.0 });
+                }
+                _ => {}
+            }
+        }
+        Deger::Sayi(0.0)
+    }));
+
+    globals.insert("başlıyor_mu".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let (Deger::Metin(s), Deger::Metin(onek)) = (&args[0], &args[1]) {
+                return Deger::Sayi(if s.starts_with(onek.as_str()) { 1.0 } else { 0.0 });
+            }
+        }
+        Deger::Sayi(0.0)
+    }));
+
+    globals.insert("bitiyor_mu".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let (Deger::Metin(s), Deger::Metin(sonek)) = (&args[0], &args[1]) {
+                return Deger::Sayi(if s.ends_with(sonek.as_str()) { 1.0 } else { 0.0 });
+            }
+        }
+        Deger::Sayi(0.0)
+    }));
+
+    globals.insert("dizi_dilim".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 3 {
+            if let (Deger::Metin(s), Deger::Sayi(bas), Deger::Sayi(son)) =
+                (&args[0], &args[1], &args[2])
+            {
+                let chars: Vec<char> = s.chars().collect();
+                let b = *bas as usize;
+                let e = (*son as usize).min(chars.len());
+                if b <= e {
+                    return Deger::Metin(chars[b..e].iter().collect());
+                }
+            }
+        }
+        Deger::Bos
+    }));
+
+    globals.insert("dahili_sql_bağlan".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Metin(yol)) = args.first() {
+            if let Ok(conn) = rusqlite::Connection::open(yol) {
+                let id = get_id();
+                SQL_CONNECTIONS.lock().unwrap().insert(id, conn);
+                return Deger::Sayi(id as f64);
+            }
+        }
+        Deger::Bos
+    }));
+
+    globals.insert("dahili_sql_yürüt".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Sayi(0.0); }
+        if let (Deger::Sayi(id), Deger::Metin(sql)) = (&args[0], &args[1]) {
+            let conn_id = *id as u64;
+            let conns = SQL_CONNECTIONS.lock().unwrap();
+            if let Some(conn) = conns.get(&conn_id) {
+                match conn.execute(sql, []) {
+                    Ok(_) => return Deger::Sayi(1.0),
+                    Err(e) => {
+                        eprintln!("[Hüma SQL Hatası] Yürütme: {}", e);
+                        return Deger::Sayi(0.0);
                     }
-                } else {
-                    eprintln!("[Hüma SQL Hatası] Bağlantı ID bulunamadı: {} (Haritadaki boyut: {})", conn_id, conns.len());
                 }
+            } else {
+                eprintln!("[Hüma SQL Hatası] Bağlantı ID bulunamadı: {} (Haritadaki boyut: {})", conn_id, conns.len());
             }
-            Deger::Sayi(0.0)
-        }));
+        }
+        Deger::Sayi(0.0)
+    }));
 
-        globals.insert("dahili_sql_sorgula".to_string(), Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 { return Deger::Liste(Rc::new(RefCell::new(Vec::new()))); }
-            if let (Deger::Sayi(id), Deger::Metin(sql)) = (&args[0], &args[1]) {
-                let conn_id = *id as u64;
-                let mut conns = SQL_CONNECTIONS.lock().unwrap();
-                if let Some(conn) = conns.get(&conn_id) {
-                    match conn.prepare(sql) {
-                        Ok(mut stmt) => {
-                            let col_names: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
-                            let rows_res = stmt.query_map([], |row| {
-                                let mut fields = HashMap::new();
-                                for i in 0..col_names.len() {
-                                    let val: rusqlite::types::Value = row.get(i).unwrap_or(rusqlite::types::Value::Null);
-                                    let d_val = match val {
-                                        rusqlite::types::Value::Integer(i) => Deger::Sayi(i as f64),
-                                        rusqlite::types::Value::Real(f) => Deger::Sayi(f),
-                                        rusqlite::types::Value::Text(t) => Deger::Metin(t),
-                                        _ => Deger::Bos,
-                                    };
-                                    let col_name = col_names[i].to_lowercase().trim().to_string();
-                                    fields.insert(col_name, d_val);
-                                }
-                                Ok(Deger::Nesne { sinif_adi: "Satır".to_string(), alanlar: Rc::new(RefCell::new(fields)) })
-                            });
-
-                            match rows_res {
-                                Ok(iterator) => {
-                                    let rows: Vec<Deger> = iterator.flatten().collect();
-                                    return Deger::Liste(Rc::new(RefCell::new(rows)));
-                                }
-                                Err(e) => eprintln!("[Hüma SQL Hatası] Sorgu Haritalama: {}", e),
+    globals.insert("dahili_sql_sorgula".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Liste(Rc::new(RefCell::new(Vec::new()))); }
+        if let (Deger::Sayi(id), Deger::Metin(sql)) = (&args[0], &args[1]) {
+            let conn_id = *id as u64;
+            let conns = SQL_CONNECTIONS.lock().unwrap();
+            if let Some(conn) = conns.get(&conn_id) {
+                match conn.prepare(sql) {
+                    Ok(mut stmt) => {
+                        let col_names: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
+                        let rows_res = stmt.query_map([], |row| {
+                            let mut fields = HashMap::new();
+                            for i in 0..col_names.len() {
+                                let val: rusqlite::types::Value = row.get(i).unwrap_or(rusqlite::types::Value::Null);
+                                let d_val = match val {
+                                    rusqlite::types::Value::Integer(i) => Deger::Sayi(i as f64),
+                                    rusqlite::types::Value::Real(f) => Deger::Sayi(f),
+                                    rusqlite::types::Value::Text(t) => Deger::Metin(t),
+                                    _ => Deger::Bos,
+                                };
+                                let col_name = col_names[i].to_lowercase().trim().to_string();
+                                fields.insert(col_name, d_val);
                             }
+                            Ok(Deger::Nesne { sinif_adi: "Satır".to_string(), alanlar: Rc::new(RefCell::new(fields)) })
+                        });
+
+                        match rows_res {
+                            Ok(iterator) => {
+                                let rows: Vec<Deger> = iterator.flatten().collect();
+                                return Deger::Liste(Rc::new(RefCell::new(rows)));
+                            }
+                            Err(e) => eprintln!("[Hüma SQL Hatası] Sorgu Haritalama: {}", e),
                         }
-                        Err(e) => eprintln!("[Hüma SQL Hatası] Sorgulama: {}", e),
                     }
-                } else {
-                    eprintln!("[Hüma SQL Hatası] Sorgulama - Bağlantı ID bulunamadı: {} (Haritadaki boyut: {})", conn_id, conns.len());
+                    Err(e) => eprintln!("[Hüma SQL Hatası] Sorgulama: {}", e),
                 }
+            } else {
+                eprintln!("[Hüma SQL Hatası] Sorgulama - Bağlantı ID bulunamadı: {} (Haritadaki boyut: {})", conn_id, conns.len());
             }
-            Deger::Liste(Rc::new(RefCell::new(Vec::new())))
-        }));
+        }
+        Deger::Liste(Rc::new(RefCell::new(Vec::new())))
+    }));
 
-        // ── Argümanları al ──────────────────────────────────────────────────────
-        let cli_args: Vec<Deger> = std::env::args().map(|s| Deger::Metin(s)).collect();
-        globals.insert("argümanlar".to_string(), Deger::Liste(Rc::new(RefCell::new(cli_args))));
+    let cli_args: Vec<Deger> = std::env::args().map(|s| Deger::Metin(s)).collect();
+    globals.insert("argümanlar".to_string(), Deger::Liste(Rc::new(RefCell::new(cli_args))));
 
-        // ── GUI Fonksiyonları ─────────────────────────────────────────────────
-        crate::gui::kayit_et(&mut globals);
+    crate::gui::kayit_et(&mut globals);
 
+    globals
+}
+
+impl Yorumlayici {
+    pub fn new() -> Self {
         Self { 
-            global_degiskenler: globals, 
+            global_degiskenler: varsayilan_global_degiskenler(), 
             yerel_scopes: Vec::new(), 
             donus_degeri: None, 
             yuklenen_dosyalar: HashSet::new(), 
@@ -731,6 +947,7 @@ impl Yorumlayici {
         self
     }
 
+    #[allow(dead_code)]
     fn yazdir(&self, content: &str) {
         if let Some(buf) = &self.output_buffer {
             buf.borrow_mut().push_str(content);

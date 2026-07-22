@@ -21,7 +21,8 @@ use tracing::error;
 use anyhow::anyhow;
 
 /// Standardised exit codes for CI/CD compatibility.
-mod exit_codes {
+#[allow(dead_code)]
+pub mod exit_codes {
     pub const SUCCESS: i32 = 0;
     pub const GENERAL_ERROR: i32 = 1;
     pub const FILE_NOT_FOUND: i32 = 2;

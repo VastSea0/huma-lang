@@ -49,8 +49,8 @@ Terminal çıktılarını renklendirmek için kullanılır.
 ### 5. Dizgi (`dizgi.hb`)
 
 - **`büyük_mü(karakter)`**, **`küçük_mü(karakter)`**, **`boşluk_mu(karakter)`**: Karakter kontrolleri.
-- **`başıyla_mı_başlıyor(dizgi, önek)`** → `başlıyor_mu()` alias'ıdır.
-- **`sonuyla_mı_bitiyor(dizgi, sonek)`** → `bitiyor_mu()` alias'ıdır.
+- **`başıyla_mı_başlıyor(dizgi, ön_ek)`** → `başlıyor_mu()` alias'ıdır.
+- **`sonuyla_mı_bitiyor(dizgi, son_ek)`** → `bitiyor_mu()` alias'ıdır.
 - *Kaldırılan fonksiyonlar (v1.1.0):* `kırp()` ve `içeriyor_mu()` Rust built-in ile çakıştığı için kaldırılmıştır. Yerlerine `kırp()` ve `içeriyor()` built-in'lerini kullanın.
 
 ### 6. Rastgele (`rastgele.hb`)
@@ -79,7 +79,7 @@ Terminal çıktılarını renklendirmek için kullanılır.
 
 ### 10. NLP — Türkçe Doğal Dil İşleme (`nlp.hb`)
 
-42KB'lık kapsamlı Türkçe NLP kütüphanesi. Tokenizasyon, stemming, POS etiketleme, NER, duygu analizi ve metin benzerliği.
+26KB'lık kapsamlı Türkçe NLP kütüphanesi. Tokenizasyon, stemming, POS etiketleme, NER, duygu analizi ve metin benzerliği.
 
 ---
 

@@ -15,20 +15,17 @@ yazdır_liste fonksiyon olsun d alsın {
 }
 
 içeriyor_mu fonksiyon olsun d, eleman alsın {
-    boy = d'nin uzunluğu olsun
-    i = 0'dan boy'a kadar {
-        d[i] = eleman ise { 1'i döndür }
-    }
-    0'ı döndür
+    içeriyor(d, eleman)'ı döndür
 }
 
 ters_cevir fonksiyon olsun d alsın {
-    yeni = [] olsun
     boy = d'nin uzunluğu olsun
-    i = boy - 1 olduğu sürece { // Reverse range is not natively supported yet, keep while
-        yeni'ye d[i]'yi ekle
+    boy = 0 ise { []'i döndür }
+    yeni = [] olsun
+    i = boy - 1 olsun
+    i >= 0 olduğu sürece {
+        yeni = yeni'ye d[i]'yi ekle olsun
         i = i - 1 olsun
-        i >= 0 ise { devam } yoksa { kes }
     }
     yeni'yi döndür
 }
@@ -38,7 +35,7 @@ eşle fonksiyon olsun d, f alsın {
     sonuç = [] olsun
     boy = d'nin uzunluğu olsun
     i = 0'dan boy'a kadar {
-        sonuç'a f(d[i])'yi ekle
+        sonuç = sonuç'a f(d[i])'yi ekle olsun
     }
     sonuç'u döndür
 }
@@ -49,7 +46,7 @@ filtrele fonksiyon olsun d, f alsın {
     i = 0'dan boy'a kadar {
         eleman = d[i] olsun
         f(eleman) ise {
-            sonuç'a eleman'ı ekle
+            sonuç = sonuç'a eleman'ı ekle olsun
         }
     }
     sonuç'u döndür
@@ -67,7 +64,7 @@ indirge fonksiyon olsun d, f, başlangıç alsın {
 dilimle fonksiyon olsun d, baş, son alsın {
     sonuç = [] olsun
     i = baş'tan son'a kadar {
-        sonuç'a d[i]'yi ekle
+        sonuç = sonuç'a d[i]'yi ekle olsun
     }
     sonuç'u döndür
 }

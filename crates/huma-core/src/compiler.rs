@@ -116,6 +116,17 @@ impl Derleyici {
                 }
                 self.instructions.push(OpCode::MakeMap(len));
             }
+            Ifade::ListeErisim { liste, indeks } => {
+                self.ifade_derle(*liste);
+                self.ifade_derle(*indeks);
+                self.instructions.push(OpCode::ListAccess);
+            }
+            Ifade::NesneErisim { nesne, ozellik } => {
+                self.ifade_derle(*nesne);
+                let idx = self.constant_ekle(Constant::Metin(ozellik));
+                self.instructions.push(OpCode::PushConstant(idx));
+                self.instructions.push(OpCode::ListAccess);
+            }
             unsupported => {
                 self.errors.push(format!(
                     "Bytecode derleyici tarafından henüz desteklenmeyen ifade: {:?}",

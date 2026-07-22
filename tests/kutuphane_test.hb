@@ -1,7 +1,7 @@
-yükle "matematik.hb";
-yükle "renkler.hb";
-yükle "zaman.hb";
-yükle "liste.hb";
+"matematik.hb"'yi yükle
+"renkler.hb"'yi yükle
+"zaman.hb"'yi yükle
+"liste.hb"'yi yükle
 
 renkli_yaz("--- Hüma Sistem Kütüphaneleri Testi ---", TURKUAZ + KALIN)
 
@@ -19,7 +19,7 @@ meyveler = ["Elma", "Armut", "Muz"] olsun
 "Meyveler:"'i yazdır
 yazdır_liste(meyveler)
 
-iceriyor_mu(meyveler, "Muz") ise {
+içeriyor_mu(meyveler, "Muz") ise {
     başarı_yaz("Listede Muz bulundu!")
 }
 

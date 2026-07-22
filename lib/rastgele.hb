@@ -8,7 +8,7 @@ r_tamsayı fonksiyon olsun min, max alsın {
 
 r_seç fonksiyon olsun d alsın {
     boy = uzunluk(d) olsun
-    boy = 0 ise { 0'ı döndür }
+    boy = 0 ise { Boş'u döndür }
     idx = r_tamsayı(0, boy - 1) olsun
     d[idx]'i döndür
 }

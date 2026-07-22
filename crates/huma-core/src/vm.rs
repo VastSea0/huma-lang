@@ -14,6 +14,7 @@ pub struct VM {
     yaprak: YaprakExecutor,
 }
 
+#[allow(dead_code)]
 struct YaprakExecutor {
     rt: Runtime,
     local: LocalSet,
@@ -21,6 +22,7 @@ struct YaprakExecutor {
     tasks: HashMap<u64, JoinHandle<Deger>>,
 }
 
+#[allow(dead_code)]
 impl YaprakExecutor {
     fn new() -> Self {
         Self {
@@ -56,7 +58,7 @@ impl VM {
     pub fn new(program: Program) -> Self {
         Self {
             stack: Vec::new(),
-            globals: HashMap::new(),
+            globals: crate::interpreter::varsayilan_global_degiskenler(),
             program,
             ip: 0,
             error_stack: Vec::new(),
@@ -206,7 +208,21 @@ impl VM {
                                 self.stack.push(items.borrow()[idx as usize].clone());
                             }
                         }
-                        _ => self.hata_firlat("Liste erişimi için liste ve sayısal indeks gerekir".to_string()),
+                        (Deger::Sozluk(map), Deger::Metin(k)) => {
+                            if let Some(v) = map.borrow().get(&k) {
+                                self.stack.push(v.clone());
+                            } else {
+                                self.stack.push(Deger::Bos);
+                            }
+                        }
+                        (Deger::Nesne { alanlar, .. }, Deger::Metin(k)) => {
+                            if let Some(v) = alanlar.borrow().get(&k) {
+                                self.stack.push(v.clone());
+                            } else {
+                                self.stack.push(Deger::Bos);
+                            }
+                        }
+                        _ => self.hata_firlat("Erişim için liste/sözlük ve geçerli indeks/anahtar gerekir".to_string()),
                     }
                 }
                 OpCode::MakeMap(len) => {

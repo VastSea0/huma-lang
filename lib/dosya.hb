@@ -35,7 +35,9 @@ satırlara_ayır fonksiyon olsun metin alsın {
             satırlar'a gecici'yi ekle
             gecici = "" olsun
         } yoksa {
-            gecici = gecici + c olsun
+            (c != "\r") ise {
+                gecici = gecici + c olsun
+            }
         }
     }
     gecici'nin uzunluğu > 0 ise {

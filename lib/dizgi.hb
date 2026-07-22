@@ -17,11 +17,11 @@
 // ═══════════════════════════════════════════════════════════════════
 
 büyük_mü fonksiyon olsun karakter alsın {
-    (karakter >= "A") ve (karakter <= "Z")'yi döndür
+    ((karakter >= "A") ve (karakter <= "Z")) veya (karakter = "Ç") veya (karakter = "Ğ") veya (karakter = "İ") veya (karakter = "Ö") veya (karakter = "Ş") veya (karakter = "Ü")'yi döndür
 }
 
 küçük_mü fonksiyon olsun karakter alsın {
-    (karakter >= "a") ve (karakter <= "z")'yi döndür
+    ((karakter >= "a") ve (karakter <= "z")) veya (karakter = "ç") veya (karakter = "ğ") veya (karakter = "ı") veya (karakter = "ö") veya (karakter = "ş") veya (karakter = "ü")'yi döndür
 }
 
 boşluk_mu fonksiyon olsun karakter alsın {

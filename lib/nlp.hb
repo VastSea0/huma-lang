@@ -112,7 +112,7 @@ BİLİNEN_YERLER = [
     "kahramanmaraş", "kocaeli", "muğla", "aydın", "tekirdağ", "balıkesir",
     "türkiye", "anadolu", "kapadokya", "avrupa", "asya", "akdeniz",
     "karadeniz", "ege", "marmara", "kadıköy", "üsküdar", "beşiktaş",
-    "avrupa", "almanya", "fransa", "italya", "ispanya", "hollanda"
+    "almanya", "fransa", "italya", "ispanya", "hollanda"
 ] olsun
 
 AY_LİSTESİ = [
@@ -121,7 +121,7 @@ AY_LİSTESİ = [
 ] olsun
 
 KURUM_LİSTESİ = [
-    "bakanlığı", "bakanlığı", "belediyesi", "üniversitesi", "müdürlüğü",
+    "bakanlığı", "belediyesi", "üniversitesi", "müdürlüğü",
     "başkanlığı", "merkezi", "ajansı", "kurumu", "enstitüsü", "vakfı",
     "sendikası", "federasyonu", "konfederasyonu", "birliği", "derneği",
     "şirketi", "grubu", "holdingı", "bankası", "sigortası", "hastanesi",
@@ -467,7 +467,7 @@ pos_etiket fonksiyon olsun kelime alsın {
     }
     
     buldu = 0 ise {
-        f_ekler = ["mak", "mek", "ıyor", "ıyor", "uyor", "üyor", "acak", "ecek", "mış", "miş", "arak", "erek"] olsun
+        f_ekler = ["mak", "mek", "ıyor", "iyor", "uyor", "üyor", "acak", "ecek", "mış", "miş", "arak", "erek"] olsun
         n = f_ekler'in uzunluğu olsun
         i = 0'dan n'e kadar {
             k ile f_ekler[i] ek_var_mı ise { etiket = POS_FİİL; buldu = 1; i = n }

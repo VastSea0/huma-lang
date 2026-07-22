@@ -43,7 +43,7 @@ Sunucu sınıf olsun {
         sid = dahili_sunucu_baslat(kendisi'nin port'u)
         sid == boş ise {
             "Hata: Sunucu başlatılamadı!"'ı yazdır
-            döndür 0
+            0'ı döndür
         }
         
         "Hüma Backend Sunucusu " + (kendisi'nin port'u) + " portunda aktif!"'ı yazdır

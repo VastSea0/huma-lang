@@ -52,9 +52,10 @@ en_küçük fonksiyon olsun d alsın {
 }
 
 varyans fonksiyon olsun d alsın {
+    boy = d'nin uzunluğu olsun
+    boy = 0 ise { 0'ı döndür }
     ort = ortalama(d) olsun
     toplam_kare_fark = 0 olsun
-    boy = d'nin uzunluğu olsun
     
     i = 0 olsun
     i < boy olduğu sürece {
