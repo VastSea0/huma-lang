@@ -1562,7 +1562,507 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
         Deger::Metin(sonuc)
     }));
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // P1.2 — Tensor Broadcasting & Toplu Matris Operasyonları
+    // (Hüma döngüsü olmadan Rust'ta tam vektörize — kritik hız kazanımı)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // matris_satirlara_ekle(M, v) — v vektörünü M'nin her satırına ekle (bias addition)
+    globals.insert("matris_satirlara_ekle".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        if let (Deger::Matris { satirlar, sutunlar, veri }, Deger::Vektor(v)) = (&args[0], &args[1]) {
+            let vb = v.borrow();
+            if *sutunlar != vb.len() {
+                return Deger::Hata(format!("matris_satirlara_ekle: matris sütun {} ≠ vektör boyutu {}", sutunlar, vb.len()));
+            }
+            let mut mb = veri.borrow().clone();
+            for i in 0..*satirlar {
+                for j in 0..*sutunlar {
+                    mb[i * sutunlar + j] += vb[j];
+                }
+            }
+            Deger::Matris { satirlar: *satirlar, sutunlar: *sutunlar, veri: Rc::new(RefCell::new(mb)) }
+        } else { Deger::Bos }
+    }));
+
+    // matris_sutunlara_ekle(M, v) — v vektörünü M'nin her sütununa ekle
+    globals.insert("matris_sutunlara_ekle".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        if let (Deger::Matris { satirlar, sutunlar, veri }, Deger::Vektor(v)) = (&args[0], &args[1]) {
+            let vb = v.borrow();
+            if *satirlar != vb.len() {
+                return Deger::Hata(format!("matris_sutunlara_ekle: matris satır {} ≠ vektör boyutu {}", satirlar, vb.len()));
+            }
+            let mut mb = veri.borrow().clone();
+            for i in 0..*satirlar {
+                for j in 0..*sutunlar {
+                    mb[i * sutunlar + j] += vb[i];
+                }
+            }
+            Deger::Matris { satirlar: *satirlar, sutunlar: *sutunlar, veri: Rc::new(RefCell::new(mb)) }
+        } else { Deger::Bos }
+    }));
+
+    // matris_skalar_carp(M, s) — matrisin tüm elemanlarını skalar ile çarp
+    globals.insert("matris_skalar_carp".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        if let (Deger::Matris { satirlar, sutunlar, veri }, Deger::Sayi(s)) = (&args[0], &args[1]) {
+            let sonuc: Vec<f64> = veri.borrow().iter().map(|x| x * s).collect();
+            Deger::Matris { satirlar: *satirlar, sutunlar: *sutunlar, veri: Rc::new(RefCell::new(sonuc)) }
+        } else { Deger::Bos }
+    }));
+
+    // matris_elemanlari_topla(M) — tüm elemanların toplamı
+    globals.insert("matris_elemanlari_topla".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Matris { veri, .. }) = args.first() {
+            Deger::Sayi(veri.borrow().iter().sum())
+        } else { Deger::Bos }
+    }));
+
+    // matris_satir_toplamları(M) — her satırın toplamı → Vektor [satirlar]
+    globals.insert("matris_satir_toplamları".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Matris { satirlar, sutunlar, veri }) = args.first() {
+            let b = veri.borrow();
+            let sonuc: Vec<f64> = (0..*satirlar).map(|i| {
+                b[i * sutunlar..(i + 1) * sutunlar].iter().sum()
+            }).collect();
+            Deger::Vektor(Rc::new(RefCell::new(sonuc)))
+        } else { Deger::Bos }
+    }));
+
+    // matris_sutun_toplamları(M) — her sütunun toplamı → Vektor [sutunlar]
+    globals.insert("matris_sutun_toplamları".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Matris { satirlar, sutunlar, veri }) = args.first() {
+            let b = veri.borrow();
+            let mut sonuc = vec![0.0f64; *sutunlar];
+            for i in 0..*satirlar {
+                for j in 0..*sutunlar {
+                    sonuc[j] += b[i * sutunlar + j];
+                }
+            }
+            Deger::Vektor(Rc::new(RefCell::new(sonuc)))
+        } else { Deger::Bos }
+    }));
+
+    // batch_softmax(M) — her satıra softmax uygula, Matris döndür
+    globals.insert("batch_softmax".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Matris { satirlar, sutunlar, veri }) = args.first() {
+            let b = veri.borrow();
+            let mut sonuc = vec![0.0f64; satirlar * sutunlar];
+            for i in 0..*satirlar {
+                let satir = &b[i * sutunlar..(i + 1) * sutunlar];
+                let max_val = satir.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+                let exps: Vec<f64> = satir.iter().map(|x| (x - max_val).exp()).collect();
+                let toplam: f64 = exps.iter().sum();
+                for (j, e) in exps.iter().enumerate() {
+                    sonuc[i * sutunlar + j] = if toplam > 0.0 { e / toplam } else { 1.0 / *sutunlar as f64 };
+                }
+            }
+            Deger::Matris { satirlar: *satirlar, sutunlar: *sutunlar, veri: Rc::new(RefCell::new(sonuc)) }
+        } else { Deger::Bos }
+    }));
+
+    // matris_satir_normlari(M) — her satırın L2 normunu hesapla → Vektor
+    globals.insert("matris_satir_normlari".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Matris { satirlar, sutunlar, veri }) = args.first() {
+            let b = veri.borrow();
+            let sonuc: Vec<f64> = (0..*satirlar).map(|i| {
+                b[i * sutunlar..(i + 1) * sutunlar].iter().map(|x| x * x).sum::<f64>().sqrt()
+            }).collect();
+            Deger::Vektor(Rc::new(RefCell::new(sonuc)))
+        } else { Deger::Bos }
+    }));
+
+    // vektor_dis_carpim(v1, v2) — dış çarpım → Matris [n1×n2]
+    globals.insert("vektor_dis_carpim".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        if let (Deger::Vektor(v1), Deger::Vektor(v2)) = (&args[0], &args[1]) {
+            let b1 = v1.borrow(); let b2 = v2.borrow();
+            let n1 = b1.len(); let n2 = b2.len();
+            let sonuc: Vec<f64> = (0..n1).flat_map(|i| (0..n2).map(move |j| b1[i] * b2[j])).collect();
+            Deger::Matris { satirlar: n1, sutunlar: n2, veri: Rc::new(RefCell::new(sonuc)) }
+        } else { Deger::Bos }
+    }));
+
+    // Element-wise aktivasyon fonksiyonları (tüm matris üzerinde — döngüsüz)
+    globals.insert("matris_relu".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Matris { satirlar, sutunlar, veri }) = args.first() {
+            let sonuc: Vec<f64> = veri.borrow().iter().map(|x| x.max(0.0)).collect();
+            Deger::Matris { satirlar: *satirlar, sutunlar: *sutunlar, veri: Rc::new(RefCell::new(sonuc)) }
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("matris_sigmoid".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Matris { satirlar, sutunlar, veri }) = args.first() {
+            let sonuc: Vec<f64> = veri.borrow().iter().map(|x| 1.0 / (1.0 + (-x).exp())).collect();
+            Deger::Matris { satirlar: *satirlar, sutunlar: *sutunlar, veri: Rc::new(RefCell::new(sonuc)) }
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("matris_tanh_akt".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Matris { satirlar, sutunlar, veri }) = args.first() {
+            let sonuc: Vec<f64> = veri.borrow().iter().map(|x| x.tanh()).collect();
+            Deger::Matris { satirlar: *satirlar, sutunlar: *sutunlar, veri: Rc::new(RefCell::new(sonuc)) }
+        } else { Deger::Bos }
+    }));
+
+    globals.insert("matris_gelu".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Matris { satirlar, sutunlar, veri }) = args.first() {
+            let sonuc: Vec<f64> = veri.borrow().iter().map(|x| {
+                0.5 * x * (1.0 + (0.7978845608028654 * (x + 0.044715 * x * x * x)).tanh())
+            }).collect();
+            Deger::Matris { satirlar: *satirlar, sutunlar: *sutunlar, veri: Rc::new(RefCell::new(sonuc)) }
+        } else { Deger::Bos }
+    }));
+
+    // matris_klamp(M, min, max) — tüm elemanları sınırla
+    globals.insert("matris_klamp".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 3 {
+            if let (Deger::Matris { satirlar, sutunlar, veri }, Deger::Sayi(min), Deger::Sayi(max)) = (&args[0], &args[1], &args[2]) {
+                let sonuc: Vec<f64> = veri.borrow().iter().map(|x| x.clamp(*min, *max)).collect();
+                return Deger::Matris { satirlar: *satirlar, sutunlar: *sutunlar, veri: Rc::new(RefCell::new(sonuc)) };
+            }
+        }
+        Deger::Bos
+    }));
+
+    // matris_topla(M1, M2) — element-wise matris toplama
+    globals.insert("matris_topla".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        if let (
+            Deger::Matris { satirlar: r1, sutunlar: c1, veri: v1 },
+            Deger::Matris { satirlar: r2, sutunlar: c2, veri: v2 },
+        ) = (&args[0], &args[1]) {
+            if r1 != r2 || c1 != c2 {
+                return Deger::Hata("matris_topla: boyutlar eşit olmalı".to_string());
+            }
+            let sonuc: Vec<f64> = v1.borrow().iter().zip(v2.borrow().iter()).map(|(a, b)| a + b).collect();
+            Deger::Matris { satirlar: *r1, sutunlar: *c1, veri: Rc::new(RefCell::new(sonuc)) }
+        } else { Deger::Bos }
+    }));
+
+    // matris_cikart(M1, M2) — element-wise matris çıkarma
+    globals.insert("matris_cikart".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        if let (
+            Deger::Matris { satirlar: r1, sutunlar: c1, veri: v1 },
+            Deger::Matris { satirlar: r2, sutunlar: c2, veri: v2 },
+        ) = (&args[0], &args[1]) {
+            if r1 != r2 || c1 != c2 {
+                return Deger::Hata("matris_cikart: boyutlar eşit olmalı".to_string());
+            }
+            let sonuc: Vec<f64> = v1.borrow().iter().zip(v2.borrow().iter()).map(|(a, b)| a - b).collect();
+            Deger::Matris { satirlar: *r1, sutunlar: *c1, veri: Rc::new(RefCell::new(sonuc)) }
+        } else { Deger::Bos }
+    }));
+
+    // matris_carpi_elemanlari(M1, M2) — element-wise (Hadamard) çarpım
+    globals.insert("matris_carpi_elemanlari".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        if let (
+            Deger::Matris { satirlar: r1, sutunlar: c1, veri: v1 },
+            Deger::Matris { satirlar: r2, sutunlar: c2, veri: v2 },
+        ) = (&args[0], &args[1]) {
+            if r1 != r2 || c1 != c2 {
+                return Deger::Hata("matris_carpi_elemanlari: boyutlar eşit olmalı".to_string());
+            }
+            let sonuc: Vec<f64> = v1.borrow().iter().zip(v2.borrow().iter()).map(|(a, b)| a * b).collect();
+            Deger::Matris { satirlar: *r1, sutunlar: *c1, veri: Rc::new(RefCell::new(sonuc)) }
+        } else { Deger::Bos }
+    }));
+
+    // gradyan_kirp(vektor, maks_norm) — gradient clipping (exploding gradients için)
+    globals.insert("gradyan_kirp".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        let maks_norm = match &args[1] { Deger::Sayi(n) => *n, _ => return Deger::Bos };
+        match &args[0] {
+            Deger::Vektor(v) => {
+                let b = v.borrow();
+                let norm: f64 = b.iter().map(|x| x * x).sum::<f64>().sqrt();
+                if norm > maks_norm {
+                    let olcek = maks_norm / norm;
+                    let kirpilmis: Vec<f64> = b.iter().map(|x| x * olcek).collect();
+                    Deger::Vektor(Rc::new(RefCell::new(kirpilmis)))
+                } else {
+                    Deger::Vektor(Rc::clone(v))
+                }
+            }
+            Deger::Matris { satirlar, sutunlar, veri } => {
+                let b = veri.borrow();
+                let norm: f64 = b.iter().map(|x| x * x).sum::<f64>().sqrt();
+                if norm > maks_norm {
+                    let olcek = maks_norm / norm;
+                    let kirpilmis: Vec<f64> = b.iter().map(|x| x * olcek).collect();
+                    Deger::Matris { satirlar: *satirlar, sutunlar: *sutunlar, veri: Rc::new(RefCell::new(kirpilmis)) }
+                } else {
+                    args[0].clone()
+                }
+            }
+            _ => Deger::Bos,
+        }
+    }));
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // P1.3 — Büyük Dosya Streaming I/O
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // dosya_satir_oku(yol) → tüm satırları liste olarak döndür (lazy-reader tarzı)
+    globals.insert("dosya_satir_oku".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Metin(yol)) = args.first() {
+            match std::fs::read_to_string(yol) {
+                Ok(icerik) => {
+                    let satirlar: Vec<Deger> = icerik.lines()
+                        .map(|s| Deger::Metin(s.to_string()))
+                        .collect();
+                    Deger::Liste(Rc::new(RefCell::new(satirlar)))
+                }
+                Err(e) => Deger::Hata(format!("dosya_satir_oku: {}", e)),
+            }
+        } else { Deger::Bos }
+    }));
+
+    // dosya_satir_ekle(yol, satir) → dosyaya yeni satır ekle (append mode)
+    globals.insert("dosya_satir_ekle".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let (Deger::Metin(yol), Deger::Metin(satir)) = (&args[0], &args[1]) {
+                use std::io::Write;
+                match std::fs::OpenOptions::new().create(true).append(true).open(yol) {
+                    Ok(mut f) => {
+                        let _ = writeln!(f, "{}", satir);
+                        return Deger::Sayi(1.0);
+                    }
+                    Err(e) => return Deger::Hata(format!("dosya_satir_ekle: {}", e)),
+                }
+            }
+        }
+        Deger::Bos
+    }));
+
+    // csv_oku(yol) → [[satır elemanları]] listesi — basit CSV (virgülle ayrılmış)
+    globals.insert("csv_oku".to_string(), Deger::DahiliFonksiyon(|args| {
+        let ayrac = match args.get(1) { Some(Deger::Metin(s)) => s.chars().next().unwrap_or(','), _ => ',' };
+        if let Some(Deger::Metin(yol)) = args.first() {
+            match std::fs::read_to_string(yol) {
+                Ok(icerik) => {
+                    let satirlar: Vec<Deger> = icerik.lines().map(|satir| {
+                        let parcalar: Vec<Deger> = satir.split(ayrac)
+                            .map(|p| Deger::Metin(p.trim().to_string()))
+                            .collect();
+                        Deger::Liste(Rc::new(RefCell::new(parcalar)))
+                    }).collect();
+                    Deger::Liste(Rc::new(RefCell::new(satirlar)))
+                }
+                Err(e) => Deger::Hata(format!("csv_oku: {}", e)),
+            }
+        } else { Deger::Bos }
+    }));
+
+    // csv_yaz(yol, veri_listesi) → [[satır]] → CSV dosyası
+    globals.insert("csv_yaz".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        let ayrac = match args.get(2) { Some(Deger::Metin(s)) => s.clone(), _ => ",".to_string() };
+        if let (Deger::Metin(yol), Deger::Liste(satirlar)) = (&args[0], &args[1]) {
+            let mut icerik = String::new();
+            for satir in satirlar.borrow().iter() {
+                if let Deger::Liste(parcalar) = satir {
+                    let parcalar_b = parcalar.borrow();
+                    let satir_str: Vec<String> = parcalar_b.iter().map(|p| p.to_string()).collect();
+                    icerik.push_str(&satir_str.join(&ayrac));
+                    icerik.push('\n');
+                }
+            }
+            match std::fs::write(yol, icerik) {
+                Ok(_) => Deger::Sayi(1.0),
+                Err(e) => Deger::Hata(format!("csv_yaz: {}", e)),
+            }
+        } else { Deger::Bos }
+    }));
+
+    // jsonl_oku(yol) → her satır bir JSON nesnesi → nesne listesi
+    globals.insert("jsonl_oku".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Metin(yol)) = args.first() {
+            match std::fs::read_to_string(yol) {
+                Ok(icerik) => {
+                    let nesneler: Vec<Deger> = icerik.lines()
+                        .filter(|s| !s.trim().is_empty())
+                        .map(|satir| {
+                            match serde_json::from_str::<serde_json::Value>(satir) {
+                                Ok(v) => Deger::from_json(&v),
+                                Err(_) => Deger::Metin(satir.to_string()),
+                            }
+                        }).collect();
+                    Deger::Liste(Rc::new(RefCell::new(nesneler)))
+                }
+                Err(e) => Deger::Hata(format!("jsonl_oku: {}", e)),
+            }
+        } else { Deger::Bos }
+    }));
+
+    // jsonl_yaz(yol, nesne) → nesneyi JSON satırı olarak dosyaya ekle
+    globals.insert("jsonl_yaz".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        if let Deger::Metin(yol) = &args[0] {
+            use std::io::Write;
+            let json_str = serde_json::to_string(&args[1].to_json()).unwrap_or_default();
+            match std::fs::OpenOptions::new().create(true).append(true).open(yol) {
+                Ok(mut f) => {
+                    let _ = writeln!(f, "{}", json_str);
+                    return Deger::Sayi(1.0);
+                }
+                Err(e) => return Deger::Hata(format!("jsonl_yaz: {}", e)),
+            }
+        }
+        Deger::Bos
+    }));
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // P1.4 — Boyut Doğrulama (Erken Hata Tespiti)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // matris_dogrula(M, beklenen_satir, beklenen_sutun) → 1 ya da Hata
+    globals.insert("matris_dogrula".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 3 { return Deger::Bos; }
+        if let (Deger::Matris { satirlar, sutunlar, .. }, Deger::Sayi(br), Deger::Sayi(bs)) = (&args[0], &args[1], &args[2]) {
+            if *satirlar != *br as usize || *sutunlar != *bs as usize {
+                return Deger::Hata(format!("matris_dogrula: beklenen {}×{}, bulunan {}×{}", br, bs, satirlar, sutunlar));
+            }
+            Deger::Sayi(1.0)
+        } else { Deger::Hata("matris_dogrula: geçersiz argümanlar".to_string()) }
+    }));
+
+    // vektor_dogrula(v, beklenen_boyut) → 1 ya da Hata
+    globals.insert("vektor_dogrula".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        if let (Deger::Vektor(v), Deger::Sayi(b)) = (&args[0], &args[1]) {
+            let n = v.borrow().len();
+            if n != *b as usize {
+                return Deger::Hata(format!("vektor_dogrula: beklenen {}, bulunan {}", b, n));
+            }
+            Deger::Sayi(1.0)
+        } else { Deger::Hata("vektor_dogrula: geçersiz argümanlar".to_string()) }
+    }));
+
+    // boyut_esit_mi(a, b) → 1 ya da 0 — iki vektör/matrisin boyutu eşit mi?
+    globals.insert("boyut_esit_mi".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        let esit = match (&args[0], &args[1]) {
+            (Deger::Vektor(v1), Deger::Vektor(v2)) => v1.borrow().len() == v2.borrow().len(),
+            (Deger::Matris { satirlar: r1, sutunlar: c1, .. }, Deger::Matris { satirlar: r2, sutunlar: c2, .. }) => r1 == r2 && c1 == c2,
+            _ => false,
+        };
+        Deger::Sayi(if esit { 1.0 } else { 0.0 })
+    }));
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // P2.3 — Profiling & İlerleme Takibi
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // zamanlayici_baslat() → anlık zaman (f64 saniye, yüksek çözünürlük)
+    globals.insert("zamanlayici_baslat".to_string(), Deger::DahiliFonksiyon(|_| {
+        Deger::Sayi(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs_f64())
+    }));
+
+    // zamanlayici_bitir(baslangic) → geçen süre ms cinsinden
+    globals.insert("zamanlayici_bitir".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Sayi(baslangic)) = args.first() {
+            let simdi = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs_f64();
+            Deger::Sayi((simdi - baslangic) * 1000.0)
+        } else { Deger::Bos }
+    }));
+
+    // ilerleme_cubugu(simdi, toplam, mesaj) → ASCII progress bar yazdır
+    globals.insert("ilerleme_cubugu".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() >= 2 {
+            if let (Deger::Sayi(simdi), Deger::Sayi(toplam)) = (&args[0], &args[1]) {
+                let mesaj = match args.get(2) { Some(Deger::Metin(s)) => s.as_str(), _ => "" };
+                let yuzde = if *toplam > 0.0 { (*simdi / toplam * 100.0) as usize } else { 0 };
+                let dolu = yuzde / 5;
+                let bos = 20usize.saturating_sub(dolu);
+                let cubuk: String = format!("[{}{}] {}% {}", "█".repeat(dolu), "░".repeat(bos), yuzde, mesaj);
+                print!("\r{}", cubuk);
+                use std::io::Write;
+                let _ = std::io::stdout().flush();
+                if (*simdi as usize) >= (*toplam as usize) { println!(); }
+                return Deger::Sayi(1.0);
+            }
+        }
+        Deger::Bos
+    }));
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // P2.4 — Model Değerlendirme Metrikleri
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // f1_skoru(tahmin_listesi, gercek_listesi) → {f1, precision, recall} sözlüğü
+    globals.insert("f1_skoru".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 2 { return Deger::Bos; }
+        if let (Deger::Liste(tahmin_l), Deger::Liste(gercek_l)) = (&args[0], &args[1]) {
+            let t = tahmin_l.borrow();
+            let g = gercek_l.borrow();
+            if t.len() != g.len() { return Deger::Hata("f1_skoru: liste uzunlukları eşit olmalı".to_string()); }
+            let mut tp = 0.0f64; let mut fp = 0.0f64; let mut fn_ = 0.0f64;
+            for (ti, gi) in t.iter().zip(g.iter()) {
+                let tv = match ti { Deger::Sayi(n) => *n >= 0.5, _ => false };
+                let gv = match gi { Deger::Sayi(n) => *n >= 0.5, _ => false };
+                match (tv, gv) {
+                    (true, true) => tp += 1.0,
+                    (true, false) => fp += 1.0,
+                    (false, true) => fn_ += 1.0,
+                    _ => {}
+                }
+            }
+            let precision = if tp + fp > 0.0 { tp / (tp + fp) } else { 0.0 };
+            let recall = if tp + fn_ > 0.0 { tp / (tp + fn_) } else { 0.0 };
+            let f1 = if precision + recall > 0.0 { 2.0 * precision * recall / (precision + recall) } else { 0.0 };
+            let mut m = std::collections::HashMap::new();
+            m.insert("f1".to_string(), Deger::Sayi(f1));
+            m.insert("precision".to_string(), Deger::Sayi(precision));
+            m.insert("recall".to_string(), Deger::Sayi(recall));
+            m.insert("tp".to_string(), Deger::Sayi(tp));
+            m.insert("fp".to_string(), Deger::Sayi(fp));
+            m.insert("fn".to_string(), Deger::Sayi(fn_));
+            Deger::Sozluk(Rc::new(RefCell::new(m)))
+        } else { Deger::Bos }
+    }));
+
+    // karisiklik_matrisi(tahmin, gercek, sinif_sayisi) → Matris [n×n]
+    globals.insert("karisiklik_matrisi".to_string(), Deger::DahiliFonksiyon(|args| {
+        if args.len() < 3 { return Deger::Bos; }
+        if let (Deger::Liste(tahmin_l), Deger::Liste(gercek_l), Deger::Sayi(sinif_n)) = (&args[0], &args[1], &args[2]) {
+            let n = *sinif_n as usize;
+            let mut matris = vec![0.0f64; n * n];
+            let t = tahmin_l.borrow();
+            let g = gercek_l.borrow();
+            for (ti, gi) in t.iter().zip(g.iter()) {
+                let tv = match ti { Deger::Sayi(n) => *n as usize, _ => 0 };
+                let gv = match gi { Deger::Sayi(n) => *n as usize, _ => 0 };
+                if gv < n && tv < n { matris[gv * n + tv] += 1.0; }
+            }
+            Deger::Matris { satirlar: n, sutunlar: n, veri: Rc::new(RefCell::new(matris)) }
+        } else { Deger::Bos }
+    }));
+
+    // perplexity(log_olasiliklar_listesi) → e^(-ortalama_log_olasilik)
+    globals.insert("perplexity".to_string(), Deger::DahiliFonksiyon(|args| {
+        if let Some(Deger::Liste(l)) = args.first() {
+            let b = l.borrow();
+            let n = b.len();
+            if n == 0 { return Deger::Bos; }
+            let ort_log: f64 = b.iter().filter_map(|d| {
+                if let Deger::Sayi(x) = d { Some(*x) } else { None }
+            }).sum::<f64>() / n as f64;
+            Deger::Sayi((-ort_log).exp())
+        } else if let Some(Deger::Vektor(v)) = args.first() {
+            let b = v.borrow();
+            let n = b.len();
+            if n == 0 { return Deger::Bos; }
+            let ort_log: f64 = b.iter().sum::<f64>() / n as f64;
+            Deger::Sayi((-ort_log).exp())
+        } else { Deger::Bos }
+    }));
+
     crate::gui::kayit_et(&mut globals);
+
 
     globals
 }
