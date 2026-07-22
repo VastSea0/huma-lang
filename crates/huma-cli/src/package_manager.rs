@@ -95,20 +95,11 @@ const CURRENT_HUMA_VER: &str = env!("CARGO_PKG_VERSION");
 /// Hüma Dahili Paket Registry'si
 /// (paket_adı, github_repo_path, varsayılan_dal)
 const BUILTIN_REGISTRY: &[(&str, &str, &str)] = &[
-    ("nlp_temel",    "VastSea0/humapy/huma_modulleri/nlp_temel", "main"),
-    ("ag_istekleri", "VastSea0/humapy/huma_modulleri/ag_istekleri", "main"),
-    ("huma_sunucu",  "VastSea0/humapy/huma_modulleri/huma_sunucu", "main"),
-    ("huma_sqlite",  "VastSea0/humapy/huma_modulleri/huma_sqlite", "main"),
-    ("gui",          "VastSea0/humapy/huma_modulleri/gui", "main"),
-    ("matematik",    "VastSea0/humapy/lib", "main"),
-    ("dizgi",        "VastSea0/humapy/lib", "main"),
-    ("liste",        "VastSea0/humapy/lib", "main"),
-    ("renkler",      "VastSea0/humapy/lib", "main"),
-    ("dosya",        "VastSea0/humapy/lib", "main"),
-    ("istatistik",   "VastSea0/humapy/lib", "main"),
-    ("zaman",        "VastSea0/humapy/lib", "main"),
-    ("rastgele",     "VastSea0/humapy/lib", "main"),
-    ("birim_test",   "VastSea0/humapy/lib", "main"),
+    ("nlp_temel",    "VastSea0/huma-lang/huma_modulleri/nlp_temel", "main"),
+    ("ag_istekleri", "VastSea0/huma-lang/huma_modulleri/ag_istekleri", "main"),
+    ("huma_sunucu",  "VastSea0/huma-lang/huma_modulleri/huma_sunucu", "main"),
+    ("huma_sqlite",  "VastSea0/huma-lang/huma_modulleri/huma_sqlite", "main"),
+    ("gui",          "VastSea0/huma-lang/huma_modulleri/gui", "main"),
 ];
 
 /// Paket adları ve dosya yollarında izin verilmeyen kalıplar
@@ -693,14 +684,35 @@ fn install_from_local(local_path: &Path, name: &str, trusted: bool) -> Result<()
     // [2] Güvenlik: Native kod kontrolü
     check_native_code_safety(&meta, trusted)?;
 
+    let package_dir = PathBuf::from(PACKAGE_DIR);
+    let package_path = package_dir.join(&meta.ad);
+    copy_dir_contents(local_path, &package_path)?;
+
     // Giriş dosyasını oku
-    let entry_path = local_path.join(&meta.giris);
-    verify_path_within_boundary(&entry_path, local_path)?;
+    let entry_path = package_path.join(&meta.giris);
     let content = fs::read_to_string(&entry_path)
         .with_context(|| format!("Giriş dosyası okunamadı: {}", entry_path.display()))?;
 
     save_package(meta, &content, Some("yerel"), trusted)?;
 
+    Ok(())
+}
+
+fn copy_dir_contents(src: &Path, dst: &Path) -> Result<()> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let entry_path = entry.path();
+        let target_path = dst.join(entry.file_name());
+        if entry_path.is_dir() {
+            let name = entry.file_name();
+            if name != ".git" && name != "target" && name != "huma_modulleri" {
+                copy_dir_contents(&entry_path, &target_path)?;
+            }
+        } else {
+            fs::copy(&entry_path, &target_path)?;
+        }
+    }
     Ok(())
 }
 
