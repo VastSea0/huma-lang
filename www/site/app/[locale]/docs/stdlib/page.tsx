@@ -315,6 +315,51 @@ export default async function StdlibPage({
         },
       ],
     },
+    {
+      id: "yapay_zeka",
+      file: "yapay_zeka_temel.hb",
+      icon: "psychology",
+      title: "yapay_zeka",
+      descriptionKey: "yapay_zeka",
+      colorAccent: "text-primary",
+      functions: [
+        {
+          name: "bpe_tokenizer_oluştur(sözlük)",
+          signature: "bpe_tokenizer_oluştur(sözlük: Sözlük) → Tokenizer",
+          description: locale === "tr" ? "Rust yerel BPE Tokenizer motorunu başlatır" : "Initializes native Rust BPE Tokenizer engine",
+        },
+        {
+          name: "otomatik_türev_grafı()",
+          signature: "otomatik_türev_grafı() → AutogradGraph",
+          description: locale === "tr" ? "Otomatik türev hesaplama grafı (Autograd) oluşturur" : "Creates automatic differentiation computation graph (Autograd)",
+        },
+        {
+          name: "sinir_ağı_katmanı(giriş, çıkış)",
+          signature: "sinir_ağı_katmanı(giriş: Sayı, çıkış: Sayı) → Katman",
+          description: locale === "tr" ? "Ağırlıkları rastgele ilklendirilmiş katman oluşturur" : "Creates dense neural network layer with initialized weights",
+        },
+      ],
+    },
+    {
+      id: "ffi",
+      file: "ffi.rs",
+      icon: "terminal",
+      title: "FFI (C/C++/CUDA)",
+      descriptionKey: "ffi",
+      colorAccent: "text-secondary",
+      functions: [
+        {
+          name: "ffi_yükle(kütüphane_yolu)",
+          signature: "ffi_yükle(kütüphane_yolu: Yazı) → FFIDomain",
+          description: locale === "tr" ? "Dinamik C/C++/CUDA kütüphanesini (.so/.dylib/.dll) yükler" : "Loads dynamic C/C++/CUDA shared library (.so/.dylib/.dll)",
+        },
+        {
+          name: "ffi_çağır(domain, sembol, argümanlar)",
+          signature: "ffi_çağır(domain: FFIDomain, sembol: Yazı, args: Liste) → Değer",
+          description: locale === "tr" ? "Yerel C/CUDA sembolünü doğrudan çağırır" : "Calls native C/CUDA symbol directly at native speeds",
+        },
+      ],
+    },
   ];
 
   const getPath = (path: string) => `/${locale}${path}`;

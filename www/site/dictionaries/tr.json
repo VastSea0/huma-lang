@@ -313,7 +313,9 @@
         "istatistik": "Ortalama, varyans ve standart sapma hesaplamaları.",
         "dizgi": "Karakter kontrolü ve metin yardımcıları.",
         "rastgele": "Rastgele sayı üretimi ve liste karıştırma.",
-        "birim_test": "Birim test çerçevesi: test_et, iddia_et, test_raporu."
+        "birim_test": "Birim test çerçevesi: test_et, iddia_et, test_raporu.",
+        "yapay_zeka": "Otomatik türev (Autograd), BPE Tokenizer ve Yapay Sinir Ağı paket kütüphanesi.",
+        "ffi": "C, C++ ve CUDA dinamik kütüphaneleriyle yerel FFI köprüsü."
       }
     },
     "compiler": {
@@ -350,6 +352,17 @@
       "description": "Hüma dili ve araç zinciri resmi güncelleme geçmişi.",
       "hero_title": "Neler Değişti?",
       "hero_desc": "Hüma sürekli gelişiyor. Her sürümde dile eklenen yeni özellikleri, performans iyileştirmelerini ve topluluktan gelen hata düzeltmelerini buradan takip edebilirsiniz.",
+      "v0_6_0_alfa_3": {
+        "version": "v0.6.0-alfa.3 (Yapay Zeka, FFI ve Çapraz Derleme)",
+        "date": "25 Temmuz 2026",
+        "changes": [
+          "Autograd & Yapay Zeka Motoru: Otomatik türev alabilen hesaplama grafı (Autograd) ve BPE Tokenizer çekirdeğe eklendi.",
+          "C/C++/CUDA FFI Köprüsü: C, C++ ve CUDA yerel kütüphanelerini doğrudan Hüma içerisinden yükleme desteği (ffi.rs).",
+          "Tüm Platform Çapraz Derleme: Linux (x64/musl/ARM64/ARMv7/RISC-V), macOS (Intel/Apple Silicon) ve Windows (x64/x86/ARM64) için tam GitHub Actions derleme boru hattı.",
+          "Bytecode VM --vm Bayrağı: Bytecode dosyalarını doğrudan sanal makine üzerinde yüksek performansla çalıştırma seçeneği.",
+          "Temiz ve Minimal Dokümantasyon: Web sitesindeki çelişkili eski sayfalar temizlendi, tek kaynaklı modern dokümantasyona geçildi."
+        ]
+      },
       "v0_6_0_alfa_2": {
         "version": "v0.6.0-alfa.2 (Dilbilgisi Devrimi)",
         "date": "15 Nisan 2026",

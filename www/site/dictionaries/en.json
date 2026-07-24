@@ -313,7 +313,9 @@
         "istatistik": "Mean, variance, and standard deviation calculations.",
         "dizgi": "Character checks and string helpers.",
         "rastgele": "Random number generation and list shuffling.",
-        "birim_test": "Unit test framework: test_et, iddia_et, test_raporu."
+        "birim_test": "Unit test framework: test_et, iddia_et, test_raporu.",
+        "yapay_zeka": "Automatic differentiation (Autograd), BPE Tokenizer, and Neural Network package library.",
+        "ffi": "Native FFI bridge for C, C++, and CUDA dynamic shared libraries."
       }
     },
     "compiler": {
@@ -350,6 +352,17 @@
       "description": "Official update history of the Hüma language and toolchain.",
       "hero_title": "What's New?",
       "hero_desc": "Hüma is constantly evolving. In every version, you can track new language features, performance improvements, and community-driven bug fixes here.",
+      "v0_6_0_alfa_3": {
+        "version": "v0.6.0-alfa.3 (AI Engine, FFI & Cross-Compilation)",
+        "date": "July 25, 2026",
+        "changes": [
+          "Autograd & AI Neural Network Engine: Native automatic differentiation graph computation and BPE Tokenizer added to core.",
+          "C/C++/CUDA FFI Bridge: Direct FFI integration for loading C, C++, and CUDA dynamic libraries natively (ffi.rs).",
+          "Multi-Architecture CI/CD Pipeline: Full cross-compilation matrix for Linux (x64/musl/ARM64/ARMv7/RISC-V), macOS (Intel/Apple Silicon), and Windows (x64/x86/ARM64).",
+          "Bytecode VM --vm Flag: High-performance direct bytecode execution flag for the Hüma VM.",
+          "Streamlined Documentation Hub: Obsolete & conflicting legacy pages removed, establishing a unified modern documentation site."
+        ]
+      },
       "v0_6_0_alfa_2": {
         "version": "v0.6.0-alfa.2 (Grammar Revolution)",
         "date": "April 15, 2026",
