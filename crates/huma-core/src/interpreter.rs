@@ -248,6 +248,37 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
             }
             Deger::Bos
         }));
+        globals.insert("bpe_eğit".to_string(), Deger::DahiliFonksiyon(|args| {
+            if args.len() >= 2 {
+                if let (Deger::Metin(metin), Deger::Sayi(vocab_boyutu)) = (&args[0], &args[1]) {
+                    if let Ok(mut tok) = crate::tokenizer::BPE_TOKENIZER.lock() {
+                        tok.egit(metin, *vocab_boyutu as usize);
+                        return Deger::Sayi(1.0);
+                    }
+                }
+            }
+            Deger::Sayi(0.0)
+        }));
+        globals.insert("bpe_kodla".to_string(), Deger::DahiliFonksiyon(|args| {
+            if let Some(Deger::Metin(metin)) = args.first() {
+                if let Ok(tok) = crate::tokenizer::BPE_TOKENIZER.lock() {
+                    let ids = tok.kodla(metin);
+                    let list: Vec<Deger> = ids.into_iter().map(|id| Deger::Sayi(id as f64)).collect();
+                    return Deger::Liste(Rc::new(RefCell::new(list)));
+                }
+            }
+            Deger::Bos
+        }));
+        globals.insert("bpe_çöz".to_string(), Deger::DahiliFonksiyon(|args| {
+            if let Some(Deger::Liste(l)) = args.first() {
+                let ids: Vec<usize> = l.borrow().iter().map(|d| match d { Deger::Sayi(n) => *n as usize, _ => 0 }).collect();
+                if let Ok(tok) = crate::tokenizer::BPE_TOKENIZER.lock() {
+                    let text = tok.coz(&ids);
+                    return Deger::Metin(text);
+                }
+            }
+            Deger::Bos
+        }));
         globals.insert("sistem".to_string(), Deger::DahiliFonksiyon(|args| {
             if let Some(Deger::Metin(komut)) = args.first() {
                 let output = std::process::Command::new("sh")
@@ -2253,6 +2284,16 @@ impl Yorumlayici {
     }
 
     fn degisken_ata(&mut self, ad: String, deger: Deger) {
+        if ad.contains('.') {
+            let parts: Vec<&str> = ad.splitn(2, '.').collect();
+            let nesne_adi = parts[0];
+            let alan_adi = parts[1];
+            let obj = self.get_degisken(nesne_adi);
+            if let Deger::Nesne { alanlar, .. } = obj {
+                alanlar.borrow_mut().insert(alan_adi.to_string(), deger);
+                return;
+            }
+        }
         for scope in self.yerel_scopes.iter_mut().rev() {
             if scope.contains_key(&ad) { scope.insert(ad, deger); return; }
         }
@@ -2260,6 +2301,16 @@ impl Yorumlayici {
     }
 
     fn degisken_tanimla(&mut self, ad: String, deger: Deger) {
+        if ad.contains('.') {
+            let parts: Vec<&str> = ad.splitn(2, '.').collect();
+            let nesne_adi = parts[0];
+            let alan_adi = parts[1];
+            let obj = self.get_degisken(nesne_adi);
+            if let Deger::Nesne { alanlar, .. } = obj {
+                alanlar.borrow_mut().insert(alan_adi.to_string(), deger);
+                return;
+            }
+        }
         if let Some(scope) = self.yerel_scopes.last_mut() {
             scope.insert(ad, deger);
         } else {
