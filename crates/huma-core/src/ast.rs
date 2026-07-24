@@ -1,6 +1,7 @@
 use crate::token::Token;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Ifade {
     Bos,
     Sayi(f64),
@@ -47,7 +48,7 @@ pub enum Ifade {
     Sozluk(Vec<(Ifade, Ifade)>),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Komut {
     DegiskenTanimla {
         ad: String,

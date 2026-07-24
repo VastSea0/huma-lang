@@ -1,6 +1,7 @@
 use std::fmt;
+use serde::{Serialize, Deserialize};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum Token {
     // Anahtar Kelimeler
     Yazdir,         // yazdır

@@ -62,6 +62,10 @@ enum Commands {
     Run {
         /// .hb dosyası veya huma.json içindeki betik adı
         target: Option<String>,
+
+        /// Bytecode Sanal Makinesi (VM) kullanarak çalıştır
+        #[arg(long = "vm")]
+        vm: bool,
     },
 
     /// Bir Hüma kaynak dosyasını bytecode'a derle
@@ -221,11 +225,12 @@ fn main() {
 
 fn run(cli: Cli) -> i32 {
     let result = match cli.command {
-        Some(Commands::Run { target }) => {
+        Some(Commands::Run { target, vm }) => {
+            let runner = if vm { commands::run_vm_file } else { commands::run_file };
             if let Some(t) = target {
                 // Eğer bir .hb dosyası ise direkt çalıştır
                 if t.ends_with(".hb") && std::path::Path::new(&t).exists() {
-                    commands::run_file(&t)
+                    runner(&t)
                 } else {
                     // Script olup olmadığını kontrol et
                     match package_manager::run_script(&t) {
@@ -235,14 +240,12 @@ fn run(cli: Cli) -> i32 {
                             if !std::path::Path::new(&t).exists() {
                                 return 1; // Hata kodu
                             }
-                            commands::run_file(&t)
+                            runner(&t)
                         }
                     }
                 }
             } else {
                 // Hiçbir şey verilmemişse:
-                // 1. "start" betiği var mı bak
-                // 2. huma.json'daki "giris" dosyasına bak
                 if let Ok(meta) = package_manager::get_local_metadata() {
                     if let Some(ref betikler) = meta.betikler {
                         if betikler.contains_key("baslat") {
@@ -258,7 +261,7 @@ fn run(cli: Cli) -> i32 {
                         }
                     }
                     // Giriş dosyasını dene
-                    commands::run_file(&meta.giris)
+                    runner(&meta.giris)
                 } else {
                     println!("{} Ne bir .hb dosyası belirtildi ne de bir huma.json projesi bulundu.", "Hata:".bright_red());
                     Err(anyhow!("Ne bir .hb dosyası belirtildi ne de bir huma.json projesi bulundu."))

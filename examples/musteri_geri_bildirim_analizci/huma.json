@@ -1,0 +1,15 @@
+{
+  "ad": "musteri_geri_bildirim_analizci",
+  "surum": "1.0.0",
+  "aciklama": "Gerçek Zamanlı Müşteri Geri Bildirim & Yorum Analiz Aracı",
+  "yazar": "Egehan KAHRAMAN",
+  "giris": "analiz.hb",
+  "huma_surum": ">=0.5.2",
+  "bagimliliklar": {
+    "nlp_temel": "^3.1.0"
+  },
+  "betikler": {
+    "baslat": "huma run analiz.hb"
+  },
+  "lisans": "MIT"
+}

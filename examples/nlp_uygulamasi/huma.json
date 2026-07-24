@@ -1,0 +1,15 @@
+{
+  "ad": "nlp_uygulamasi",
+  "surum": "0.1.0",
+  "aciklama": "Hüma Paket Yöneticisi ile Doğal Dil İşleme (NLP) Örnek Uygulaması",
+  "yazar": "Egehan KAHRAMAN",
+  "giris": "ana.hb",
+  "huma_surum": ">=0.5.2",
+  "bagimliliklar": {
+    "nlp_temel": "^3.1.0"
+  },
+  "betikler": {
+    "baslat": "huma run ana.hb"
+  },
+  "lisans": "MIT"
+}

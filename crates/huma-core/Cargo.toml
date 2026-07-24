@@ -24,5 +24,6 @@ futures-util = "0.3"
 regex = "1"
 rand = { version = "0.8", features = ["small_rng"] }
 unicode-normalization = "0.1"
+libloading = "0.8"
 
 

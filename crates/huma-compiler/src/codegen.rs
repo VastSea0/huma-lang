@@ -83,6 +83,7 @@ pub fn generate_standalone(input_path: &str, output_name: &str) -> HumaResult<St
             OpCode::Div => "OpCode::Div".to_string(),
             OpCode::Greater => "OpCode::Greater".to_string(),
             OpCode::Less => "OpCode::Less".to_string(),
+            OpCode::LessOrEqual => "OpCode::LessOrEqual".to_string(),
             OpCode::Equal => "OpCode::Equal".to_string(),
             OpCode::NotEqual => "OpCode::NotEqual".to_string(),
             OpCode::Jump(n) => format!("OpCode::Jump({})", n),
@@ -98,6 +99,8 @@ pub fn generate_standalone(input_path: &str, output_name: &str) -> HumaResult<St
             OpCode::TryBlockStart(n) => format!("OpCode::TryBlockStart({})", n),
             OpCode::TryBlockEnd => "OpCode::TryBlockEnd".to_string(),
             OpCode::Await => "OpCode::Await".to_string(),
+            OpCode::CallFFI { lib_ad, fn_ad, arg_len } => format!("OpCode::CallFFI {{ lib_ad: \"{}\".to_string(), fn_ad: \"{}\".to_string(), arg_len: {} }}", lib_ad, fn_ad, arg_len),
+            OpCode::MakeFunction { name, params, .. } => format!("OpCode::MakeFunction {{ name: \"{}\".to_string(), params: vec!{:?}, body: vec![] }}", name, params),
         })
         .collect();
     let inst_str = format!("vec![{}]", inst_items.join(", "));

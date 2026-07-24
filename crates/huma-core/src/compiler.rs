@@ -199,6 +199,40 @@ impl Derleyici {
                 self.ifade_derle(ifade);
                 self.instructions.push(OpCode::Return);
             }
+            Komut::AralikDongusu { degisken, baslangic, bitis, govde } => {
+                // Initialize loop variable
+                self.ifade_derle(baslangic);
+                self.instructions.push(OpCode::DefineVar(degisken.clone()));
+
+                let start_idx = self.instructions.len();
+                // Condition check: var <= bitis
+                self.instructions.push(OpCode::LoadVar(degisken.clone()));
+                self.ifade_derle(bitis);
+                self.instructions.push(OpCode::LessOrEqual);
+                
+                let jump_if_false_idx = self.instructions.len();
+                self.instructions.push(OpCode::JumpIfFalse(0));
+
+                for k in govde { self.komut_derle(k); }
+
+                // Increment var = var + 1
+                self.instructions.push(OpCode::LoadVar(degisken.clone()));
+                let one_idx = self.constant_ekle(Constant::Sayi(1.0));
+                self.instructions.push(OpCode::PushConstant(one_idx));
+                self.instructions.push(OpCode::Add);
+                self.instructions.push(OpCode::StoreVar(degisken));
+
+                self.instructions.push(OpCode::Jump(start_idx));
+                let end_idx = self.instructions.len();
+                self.instructions[jump_if_false_idx] = OpCode::JumpIfFalse(end_idx);
+            }
+            Komut::FonksiyonTanimla { ad, parametreler, govde } => {
+                self.instructions.push(OpCode::MakeFunction {
+                    name: ad,
+                    params: parametreler,
+                    body: govde,
+                });
+            }
             Komut::DeneKomutu { dene_govde, hata_degisken, hata_govde } => {
                 let try_start_idx = self.instructions.len();
                 self.instructions.push(OpCode::TryBlockStart(0));

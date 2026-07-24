@@ -12,6 +12,7 @@ pub enum OpCode {
     Div,
     Greater,
     Less,
+    LessOrEqual,
     Equal,
     NotEqual,
     Jump(usize),
@@ -27,6 +28,8 @@ pub enum OpCode {
     Await,
     Pop,
     Bos,
+    CallFFI { lib_ad: String, fn_ad: String, arg_len: usize },
+    MakeFunction { name: String, params: Vec<String>, body: Vec<crate::ast::Komut> },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

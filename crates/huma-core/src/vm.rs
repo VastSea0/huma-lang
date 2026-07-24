@@ -93,10 +93,14 @@ impl VM {
                     self.globals.insert(ad.clone(), val);
                 }
                 OpCode::Add => {
-                    let r = self.stack.pop().unwrap();
-                    let l = self.stack.pop().unwrap();
-                    if let (Deger::Sayi(a), Deger::Sayi(b)) = (l, r) {
-                        self.stack.push(Deger::Sayi(a + b));
+                    let r = self.stack.pop().unwrap_or(Deger::Bos);
+                    let l = self.stack.pop().unwrap_or(Deger::Bos);
+                    match (l, r) {
+                        (Deger::Sayi(a), Deger::Sayi(b)) => self.stack.push(Deger::Sayi(a + b)),
+                        (Deger::Metin(a), Deger::Metin(b)) => self.stack.push(Deger::Metin(a + &b)),
+                        (Deger::Metin(a), b) => self.stack.push(Deger::Metin(format!("{}{}", a, b))),
+                        (a, Deger::Metin(b)) => self.stack.push(Deger::Metin(format!("{}{}", a, b))),
+                        _ => self.stack.push(Deger::Bos),
                     }
                 }
                 OpCode::Sub => {
@@ -144,6 +148,16 @@ impl VM {
                         _ => self.hata_firlat("Küçüktür karşılaştırması sadece sayılarda desteklenir".to_string()),
                     }
                 }
+                OpCode::LessOrEqual => {
+                    let r = self.stack.pop().unwrap_or(Deger::Bos);
+                    let l = self.stack.pop().unwrap_or(Deger::Bos);
+                    match (l, r) {
+                        (Deger::Sayi(a), Deger::Sayi(b)) => {
+                            self.stack.push(Deger::Sayi(if a <= b { 1.0 } else { 0.0 }))
+                        }
+                        _ => self.hata_firlat("Küçük eşittir karşılaştırması sadece sayılarda desteklenir".to_string()),
+                    }
+                }
                 OpCode::Equal => {
                     let r = self.stack.pop().unwrap_or(Deger::Bos);
                     let l = self.stack.pop().unwrap_or(Deger::Bos);
@@ -165,6 +179,19 @@ impl VM {
                     match callable {
                         Deger::DahiliFonksiyon(f) => {
                             self.stack.push(f(args));
+                        }
+                        Deger::Fonksiyon { parametreler, govde } => {
+                            let mut sub_compiler = crate::compiler::Derleyici::new();
+                            let sub_prog = sub_compiler.derle(govde);
+                            let mut sub_vm = VM::new(sub_prog);
+                            for (i, p) in parametreler.iter().enumerate() {
+                                if i < args.len() {
+                                    sub_vm.globals.insert(p.clone(), args[i].clone());
+                                }
+                            }
+                            sub_vm.run();
+                            let ret = sub_vm.stack.pop().unwrap_or(Deger::Bos);
+                            self.stack.push(ret);
                         }
                         other => {
                             self.hata_firlat(format!("Çağrılamayan değer: {}", other));
@@ -253,6 +280,22 @@ impl VM {
                             self.stack.push(Deger::Hata(format!("bekle: await edilemez değer: {}", other)));
                         }
                     }
+                }
+                OpCode::CallFFI { lib_ad, fn_ad, arg_len } => {
+                    let mut args = Vec::with_capacity(*arg_len);
+                    for _ in 0..*arg_len {
+                        args.push(self.stack.pop().unwrap_or(Deger::Bos));
+                    }
+                    args.reverse();
+                    if let Ok(mgr) = crate::ffi::FFI_YONETICI.lock() {
+                        match mgr.cagir_esnek(lib_ad, fn_ad, args) {
+                            Ok(res) => self.stack.push(res),
+                            Err(e) => self.hata_firlat(e),
+                        }
+                    }
+                }
+                OpCode::MakeFunction { name, params, body } => {
+                    self.globals.insert(name.clone(), Deger::Fonksiyon { parametreler: params.clone(), govde: body.clone() });
                 }
             }
         }

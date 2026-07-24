@@ -30,6 +30,23 @@ pub fn run_file(path: &str) -> Result<()> {
     Ok(())
 }
 
+/// Run a `.hb` source file by compiling to Bytecode and executing in Bytecode VM.
+pub fn run_vm_file(path: &str) -> Result<()> {
+    let source = std::fs::read_to_string(path)
+        .with_context(|| format!("'{}' dosyası okunamadı", path))?;
+
+    let lexer = Lexer::new(&source);
+    let mut parser = Parser::new(lexer);
+    let program_ast = parser.parse_program();
+
+    let mut derleyici = huma_core::compiler::Derleyici::new();
+    let bytecode_prog = derleyici.derle(program_ast);
+
+    let mut vm = VM::new(bytecode_prog);
+    vm.run();
+    Ok(())
+}
+
 /// Compile a `.hb` file to bytecode.
 pub fn build_file(input: &str, output: &str, json_output: bool) -> Result<()> {
     if json_output {

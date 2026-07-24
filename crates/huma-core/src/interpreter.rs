@@ -159,6 +159,32 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
             }
             Deger::Sayi(0.0)
         }));
+        globals.insert("ffi_yükle".to_string(), Deger::DahiliFonksiyon(|args| {
+            if args.len() >= 2 {
+                if let (Deger::Metin(ad), Deger::Metin(yol)) = (&args[0], &args[1]) {
+                    if let Ok(mut mgr) = crate::ffi::FFI_YONETICI.lock() {
+                        if let Ok(()) = mgr.yukle(ad, yol) {
+                            return Deger::Sayi(1.0);
+                        }
+                    }
+                }
+            }
+            Deger::Sayi(0.0)
+        }));
+        globals.insert("ffi_çağır".to_string(), Deger::DahiliFonksiyon(|args| {
+            if args.len() >= 2 {
+                if let (Deger::Metin(lib_ad), Deger::Metin(fn_ad)) = (&args[0], &args[1]) {
+                    let fn_args = args[2..].to_vec();
+                    if let Ok(mgr) = crate::ffi::FFI_YONETICI.lock() {
+                        match mgr.cagir_esnek(lib_ad, fn_ad, fn_args) {
+                            Ok(res) => return res,
+                            Err(e) => return Deger::Hata(e),
+                        }
+                    }
+                }
+            }
+            Deger::Bos
+        }));
         globals.insert("sistem".to_string(), Deger::DahiliFonksiyon(|args| {
             if let Some(Deger::Metin(komut)) = args.first() {
                 let output = std::process::Command::new("sh")
@@ -1679,7 +1705,12 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
         if let (Deger::Vektor(v1), Deger::Vektor(v2)) = (&args[0], &args[1]) {
             let b1 = v1.borrow(); let b2 = v2.borrow();
             let n1 = b1.len(); let n2 = b2.len();
-            let sonuc: Vec<f64> = (0..n1).flat_map(|i| (0..n2).map(move |j| b1[i] * b2[j])).collect();
+            let mut sonuc = Vec::with_capacity(n1 * n2);
+            for i in 0..n1 {
+                for j in 0..n2 {
+                    sonuc.push(b1[i] * b2[j]);
+                }
+            }
             Deger::Matris { satirlar: n1, sutunlar: n2, veri: Rc::new(RefCell::new(sonuc)) }
         } else { Deger::Bos }
     }));
