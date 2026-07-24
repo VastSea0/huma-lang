@@ -185,6 +185,69 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
             }
             Deger::Bos
         }));
+        globals.insert("tensor_olustur".to_string(), Deger::DahiliFonksiyon(|args| {
+            if args.len() >= 3 {
+                if let (Deger::Sayi(r), Deger::Sayi(c), Deger::Liste(l)) = (&args[0], &args[1], &args[2]) {
+                    let req_grad = args.get(3).map(|v| match v { Deger::Sayi(n) => *n != 0.0, _ => true }).unwrap_or(true);
+                    let veri: Vec<f64> = l.borrow().iter().map(|d| match d { Deger::Sayi(n) => *n, _ => 0.0 }).collect();
+                    if let Ok(mut g) = crate::autograd::AUTOGRAD_GRAF.lock() {
+                        let t = g.tensor_olustur(*r as usize, *c as usize, veri, req_grad);
+                        return Deger::Tensor(t);
+                    }
+                }
+            }
+            Deger::Bos
+        }));
+        globals.insert("tensor_topla".to_string(), Deger::DahiliFonksiyon(|args| {
+            if args.len() >= 2 {
+                if let (Deger::Tensor(t1), Deger::Tensor(t2)) = (&args[0], &args[1]) {
+                    if let Ok(mut g) = crate::autograd::AUTOGRAD_GRAF.lock() {
+                        let res = g.topla(t1, t2);
+                        return Deger::Tensor(res);
+                    }
+                }
+            }
+            Deger::Bos
+        }));
+        globals.insert("tensor_matris_carp".to_string(), Deger::DahiliFonksiyon(|args| {
+            if args.len() >= 2 {
+                if let (Deger::Tensor(t1), Deger::Tensor(t2)) = (&args[0], &args[1]) {
+                    if let Ok(mut g) = crate::autograd::AUTOGRAD_GRAF.lock() {
+                        match g.matris_carp(t1, t2) {
+                            Ok(res) => return Deger::Tensor(res),
+                            Err(e) => return Deger::Hata(e),
+                        }
+                    }
+                }
+            }
+            Deger::Bos
+        }));
+        globals.insert("tensor_relu".to_string(), Deger::DahiliFonksiyon(|args| {
+            if let Some(Deger::Tensor(t1)) = args.first() {
+                if let Ok(mut g) = crate::autograd::AUTOGRAD_GRAF.lock() {
+                    let res = g.relu(t1);
+                    return Deger::Tensor(res);
+                }
+            }
+            Deger::Bos
+        }));
+        globals.insert("tensor_geri_yayilim".to_string(), Deger::DahiliFonksiyon(|args| {
+            if let Some(Deger::Tensor(t1)) = args.first() {
+                if let Ok(mut g) = crate::autograd::AUTOGRAD_GRAF.lock() {
+                    if let Ok(()) = g.backward(t1.id) {
+                        return Deger::Sayi(1.0);
+                    }
+                }
+            }
+            Deger::Sayi(0.0)
+        }));
+        globals.insert("tensor_gradyan".to_string(), Deger::DahiliFonksiyon(|args| {
+            if let Some(Deger::Tensor(t1)) = args.first() {
+                let grad_vec = t1.gradyan.lock().unwrap().iter().map(|n| Deger::Sayi(*n)).collect();
+                return Deger::Liste(Rc::new(RefCell::new(grad_vec)));
+            }
+            Deger::Bos
+        }));
         globals.insert("sistem".to_string(), Deger::DahiliFonksiyon(|args| {
             if let Some(Deger::Metin(komut)) = args.first() {
                 let output = std::process::Command::new("sh")
@@ -730,6 +793,7 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
                 Deger::Hata(_) => Deger::Metin("hata".to_string()),
                 Deger::Vektor(v) => Deger::Metin(format!("vektör[{}]", v.borrow().len())),
                 Deger::Matris { satirlar, sutunlar, .. } => Deger::Metin(format!("matris[{}×{}]", satirlar, sutunlar)),
+                Deger::Tensor(t) => Deger::Metin(format!("tensor[{}×{}]", t.satirlar, t.sutunlar)),
             }
         } else {
             Deger::Metin("bilinmeyen".to_string())

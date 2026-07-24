@@ -16,6 +16,7 @@ pub mod compiler;
 pub mod vm;
 pub mod gui;
 pub mod ffi;
+pub mod autograd;
 pub mod builtin_files;
 
 /// Re-export most-used items at the crate root for convenience.

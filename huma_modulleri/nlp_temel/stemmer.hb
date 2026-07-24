@@ -87,10 +87,22 @@ kok_bulucu sınıf olsun {
         sonuç'u döndür
     }
 
+    sozlukte_var_mı fonksiyon olsun kelime alsın {
+        (içeriyor(TÜRKÇE_KÖK_SÖZLÜĞÜ, kelime)) ise { r = 1 olsun r'yi döndür }
+        (içeriyor(FİİL_KÖKLERİ, kelime)) ise { r = 1 olsun r'yi döndür }
+        (içeriyor(BİLİNEN_YERLER, kelime)) ise { r = 1 olsun r'yi döndür }
+        r = 0 olsun
+        r'yi döndür
+    }
+
     stem fonksiyon olsun kelime alsın {
         k = küçük_harf(kelime) olsun
         k_len = uzunluk(k) olsun
         (k_len <= 2) ise { k'yi döndür }
+
+        (kendisi.sozlukte_var_mı(k)) ise {
+            k'yi döndür
+        }
 
         n_ekler = uzunluk(ÇEKİM_EKLERİ) olsun
         i = 0'dan (n_ekler - 1)'e kadar {
@@ -98,7 +110,14 @@ kok_bulucu sınıf olsun {
             (kendisi.ek_var_mı(k, ek)) ise {
                 kök = kendisi.ek_çıkar(k, ek) olsun
                 (uzunluk(kök) >= 2) ise {
-                    k = kök olsun
+                    (kendisi.sozlukte_var_mı(kök)) ise {
+                        k = kök olsun
+                        k'yi döndür
+                    } yoksa {
+                        (uzunluk(kök) >= 3) ise {
+                            k = kök olsun
+                        }
+                    }
                 }
             }
         }

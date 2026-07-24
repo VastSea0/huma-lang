@@ -48,6 +48,18 @@ POS_ZAMİR  = "ZAMİR" olsun
 POS_BAĞLAÇ = "BAĞLAÇ" olsun
 POS_EDAT   = "EDAT" olsun
 
+TÜRKÇE_KÖK_SÖZLÜĞÜ = [
+    "ürün", "kötü", "harika", "izmir", "kalite", "sayı", "kitap", "okul", "bilgi",
+    "yazılım", "şirket", "destek", "yardım", "kargo", "müşteri", "fiyat", "dünya",
+    "insan", "konferans", "ankara", "istanbul", "türkiye", "zeynep", "ayşe", "mehmet",
+    "öğrenci", "öğretmen", "ev", "araba", "yol", "deniz", "gün", "gece", "hava",
+    "yağmur", "güneş", "film", "takım", "çalışma", "sonuç", "deneyim", "hizmet",
+    "iade", "talep", "parça", "para", "kutu", "ambalaj", "fatura", "zaman", "bölüm",
+    "alan", "hız", "önemli", "yeni", "başarılı", "büyük", "küçük", "uzun", "kısa",
+    "güzel", "çirkin", "hızlı", "yavaş", "temiz", "kirli", "doğru", "yanlış", "zor",
+    "kolay", "prof", "dr", "algoritma", "üniversite", "katılımcı", "bilim", "ülke"
+] olsun
+
 FİİL_KÖKLERİ = [
     "gel", "git", "ver", "al", "yap", "bil", "gör", "kal", "çık", "gir",
     "bak", "çalış", "yaz", "oku", "söyle", "anla", "başla", "bitir", "dön",

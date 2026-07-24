@@ -37,6 +37,7 @@ pub enum Deger {
         sutunlar: usize,
         veri: Rc<RefCell<Vec<f64>>>,
     },
+    Tensor(crate::autograd::TensorData),
 }
 
 impl std::fmt::Display for Deger {
@@ -83,6 +84,19 @@ impl std::fmt::Display for Deger {
                     for j in 0..*sutunlar {
                         if j > 0 { write!(f, ", ")?; }
                         write!(f, "{:.4}", b[i * sutunlar + j])?;
+                    }
+                    write!(f, "]")?;
+                }
+                Ok(())
+            }
+            Deger::Tensor(t) => {
+                write!(f, "tensor[{}×{}, id={}, requires_grad={}]", t.satirlar, t.sutunlar, t.id, t.requires_grad)?;
+                let b = t.veri.lock().unwrap();
+                for i in 0..t.satirlar {
+                    write!(f, "\n  [")?;
+                    for j in 0..t.sutunlar {
+                        if j > 0 { write!(f, ", ")?; }
+                        write!(f, "{:.4}", b[i * t.sutunlar + j])?;
                     }
                     write!(f, "]")?;
                 }
