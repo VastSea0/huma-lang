@@ -1,38 +1,19 @@
-name: Release
+name: Multi-Architecture Cross-Compilation Build
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: ["main", "master"]
+  pull_request:
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
-
 jobs:
-  create-release:
-    runs-on: ubuntu-latest
-    outputs:
-      release_id: ${{ steps.create-release.outputs.id }}
-    steps:
-      - name: Create Release
-        id: create-release
-        uses: softprops/action-gh-release@v2
-        with:
-          draft: false
-          prerelease: false
-          name: Release ${{ github.ref_name }}
-          generate_release_notes: true
-
-  # ── Build the standalone huma CLI binary for self_update ────────────
-  build-cli:
-    needs: create-release
+  build-matrix:
+    name: Build (${{ matrix.target }})
     strategy:
       fail-fast: false
       matrix:
         include:
-          # --- Linux Targets ---
+          # ── Linux Targets ──────────────────────────────────────────
           - platform: 'ubuntu-latest'
             target: 'x86_64-unknown-linux-gnu'
             artifact: 'huma-x86_64-unknown-linux-gnu.tar.gz'
@@ -58,7 +39,7 @@ jobs:
             artifact: 'huma-riscv64gc-unknown-linux-gnu.tar.gz'
             use_cross: true
 
-          # --- macOS Targets ---
+          # ── macOS Targets ──────────────────────────────────────────
           - platform: 'macos-latest'
             target: 'x86_64-apple-darwin'
             artifact: 'huma-x86_64-apple-darwin.tar.gz'
@@ -68,7 +49,7 @@ jobs:
             artifact: 'huma-aarch64-apple-darwin.tar.gz'
             use_cross: false
 
-          # --- Windows Targets ---
+          # ── Windows Targets ────────────────────────────────────────
           - platform: 'windows-latest'
             target: 'x86_64-pc-windows-msvc'
             artifact: 'huma-x86_64-pc-windows-msvc.zip'
@@ -92,7 +73,7 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install Cross (Linux Cross-Compilation)
+      - name: Install Cross (for Cross-Compilation targets)
         if: matrix.use_cross
         uses: taiki-e/install-action@cross
 
@@ -101,88 +82,29 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
-      - name: Build CLI Release Binary (Cargo)
+      - name: Build CLI Binary (Native Cargo)
         if: ${{ !matrix.use_cross }}
         run: cargo build --release --package huma-cli --target ${{ matrix.target }}
 
-      - name: Build CLI Release Binary (Cross)
+      - name: Build CLI Binary (Cross Container)
         if: matrix.use_cross
         run: cross build --release --package huma-cli --target ${{ matrix.target }}
 
-      - name: Package CLI Binary (Unix)
+      - name: Package Binary (Unix)
         if: runner.os != 'Windows'
         run: |
           cd target/${{ matrix.target }}/release
           tar czf ../../../${{ matrix.artifact }} huma
           cd ../../..
 
-      - name: Package CLI Binary (Windows)
+      - name: Package Binary (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           Compress-Archive -Path "target/${{ matrix.target }}/release/huma.exe" -DestinationPath "${{ matrix.artifact }}"
 
-      - name: Upload CLI Binary to Release
-        uses: softprops/action-gh-release@v2
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
         with:
-          files: ${{ matrix.artifact }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # ── Build the Tauri IDE application ────────────────────────────────
-  build-ide:
-    needs: create-release
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: 'macos-latest'
-            os: 'macos'
-            args: '--target universal-apple-darwin'
-          - platform: 'ubuntu-latest'
-            os: 'linux'
-            args: ''
-          - platform: 'windows-latest'
-            os: 'windows'
-            args: ''
-
-    runs-on: ${{ matrix.platform }}
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
-
-      - name: Install Rust Stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
-
-      - name: Rust Cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            .
-            src-tauri
-
-      - name: Install Dependencies (Linux)
-        if: matrix.platform == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-
-      - name: Install Frontend Dependencies
-        working-directory: ide
-        run: npm install
-
-      - name: Build and Release Tauri App
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          releaseId: ${{ needs.create-release.outputs.release_id }}
-          projectPath: "src-tauri"
-          args: ${{ matrix.args }}
+          name: ${{ matrix.target }}
+          path: ${{ matrix.artifact }}
