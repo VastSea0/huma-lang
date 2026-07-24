@@ -545,7 +545,7 @@ impl Parser {
                         }
                     }
                     self.consume(Token::KapaliParantez);
-                    node = Ifade::Cagri { fonksiyon: Box::new(node), argumanlar: args };
+                    node = Ifade::Cagri { fonksiyon: Box::new(node), argumanlar: args, pos: self.current_pos };
                 }
                 Token::AcikKose => {
                     self.next_token();
@@ -585,6 +585,7 @@ impl Parser {
                             node = Ifade::Cagri {
                                 fonksiyon: Box::new(Ifade::NesneErisim { nesne: Box::new(node), ozellik: oz }),
                                 argumanlar: args,
+                                pos: self.current_pos,
                             };
                         } else {
                             break;
@@ -620,6 +621,7 @@ impl Parser {
                         node = Ifade::Cagri {
                             fonksiyon: Box::new(Ifade::Degisken(ad)),
                             argumanlar: args,
+                            pos: self.current_pos,
                         };
                     } else {
                         break;

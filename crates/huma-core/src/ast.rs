@@ -33,6 +33,7 @@ pub enum Ifade {
     Cagri {
         fonksiyon: Box<Ifade>,
         argumanlar: Vec<Ifade>,
+        pos: (usize, usize),
     },
     /// kendisi'nin özellik erişimi
     KendisiErisim {

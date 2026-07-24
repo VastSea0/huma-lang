@@ -138,3 +138,53 @@ fn test_bekle_http_istekleri() {
 
     assert_eq!(eval(&kod).trim(), "OK");
 }
+
+#[test]
+fn test_derin_rekursiyon_hatasi() {
+    let kod = r#"
+        rekursiyon fonksiyon olsun {
+            rekursiyon()
+        }
+        rekursiyon()
+    "#;
+    let mut interp = Yorumlayici::new();
+    let lexer = Lexer::new(kod);
+    let mut parser = Parser::new(lexer);
+    let program = parser.parse_program();
+    interp.yorumla(program);
+    assert_eq!(interp.call_depth, 0);
+}
+
+#[test]
+fn test_cagrilamayan_deger_hatasi() {
+    let kod = r#"
+        x = 42 olsun
+        x()
+    "#;
+    let mut interp = Yorumlayici::new();
+    let lexer = Lexer::new(kod);
+    let mut parser = Parser::new(lexer);
+    let program = parser.parse_program();
+    interp.yorumla(program);
+}
+
+#[test]
+fn test_vm_fonksiyon_cagrisi() {
+    let kod = r#"
+        yardimci fonksiyon olsun {
+            "Merhaba"'yı yazdır
+        }
+        selamla fonksiyon olsun {
+            yardimci()
+        }
+        selamla()
+    "#;
+    let lexer = Lexer::new(kod);
+    let mut parser = Parser::new(lexer);
+    let ast = parser.parse_program();
+    let mut derleyici = huma::compiler::Derleyici::new();
+    let prog = derleyici.derle(ast);
+    let mut vm = huma::vm::VM::new(prog);
+    vm.run();
+}
+

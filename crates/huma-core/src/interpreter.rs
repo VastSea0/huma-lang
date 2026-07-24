@@ -103,6 +103,7 @@ pub struct Yorumlayici {
     pub yuklenen_dosyalar: HashSet<String>,
     pub arama_yolları: Vec<String>,
     pub output_buffer: Option<Rc<RefCell<String>>>,
+    pub call_depth: usize,
 }
 
 pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
@@ -2202,6 +2203,7 @@ impl Yorumlayici {
             yuklenen_dosyalar: HashSet::new(), 
             arama_yolları: vec![".".to_string(), "./lib".to_string(), "./huma_modulleri".to_string()],
             output_buffer: None,
+            call_depth: 0,
         }
     }
 
@@ -2210,7 +2212,13 @@ impl Yorumlayici {
     }
 
     pub fn fonksiyon_cagrisi_detayli(&mut self, f: Deger, args: Vec<Deger>, nesne: Option<Deger>) -> Deger {
-        match f {
+        if self.call_depth >= 50 {
+            eprintln!("[Hüma Hatası] Azami özyineleme derinliği aşıldı");
+            return Deger::Hata("[Hüma Hatası] Azami özyineleme derinliği aşıldı".to_string());
+        }
+        self.call_depth += 1;
+
+        let res = match f {
             Deger::Sinif { ad, alan_baslangic, .. } => {
                 let alanlar = Rc::new(RefCell::new(HashMap::new()));
                 for (alan_ad, alan_ifade) in alan_baslangic {
@@ -2241,8 +2249,14 @@ impl Yorumlayici {
             Deger::DahiliFonksiyon(df) => {
                 df(args)
             }
-            _ => Deger::Bos
-        }
+            _ => {
+                eprintln!("[Hüma Hatası] Çağrılamayan değer: {}", f);
+                Deger::Hata(format!("[Hüma Hatası] Çağrılamayan değer: {}", f))
+            }
+        };
+
+        self.call_depth -= 1;
+        res
     }
 
     pub fn with_output_buffer(mut self, buffer: Rc<RefCell<String>>) -> Self {
@@ -2618,7 +2632,7 @@ impl Yorumlayici {
                 }
             }
             Ifade::FonksiyonIfadesi { parametreler, govde } => Deger::Fonksiyon { parametreler, govde },
-            Ifade::Cagri { fonksiyon, argumanlar } => {
+            Ifade::Cagri { fonksiyon, argumanlar, pos } => {
                 let mut method_instance = None;
                 let f = if let Ifade::NesneErisim { nesne, ozellik } = *fonksiyon.clone() {
                     let instance = self.ifade_hesapla(*nesne);
@@ -2666,6 +2680,10 @@ impl Yorumlayici {
                 } else { self.ifade_hesapla(*fonksiyon) };
 
                 let args = argumanlar.into_iter().map(|a| self.ifade_hesapla(a)).collect();
+                if !matches!(f, Deger::Fonksiyon { .. } | Deger::DahiliFonksiyon(_) | Deger::Sinif { .. }) {
+                    eprintln!("[Hüma Hatası] Satır {}, Sütun {}: Çağrılamayan değer: {}", pos.0, pos.1, f);
+                    return Deger::Hata(format!("[Hüma Hatası] Satır {}, Sütun {}: Çağrılamayan değer: {}", pos.0, pos.1, f));
+                }
                 self.fonksiyon_cagrisi_detayli(f, args, method_instance)
             }
             Ifade::IkiliIslem { sol, operator, sag } => {

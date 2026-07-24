@@ -95,7 +95,7 @@ impl Derleyici {
                 }
                 self.instructions.push(OpCode::MakeList(len));
             }
-            Ifade::Cagri { fonksiyon, argumanlar } => {
+            Ifade::Cagri { fonksiyon, argumanlar, .. } => {
                 let arg_len = argumanlar.len();
                 for arg in argumanlar {
                     self.ifade_derle(arg);

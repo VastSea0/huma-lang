@@ -12,6 +12,7 @@ pub struct VM {
     ip: usize,
     error_stack: Vec<usize>,
     yaprak: YaprakExecutor,
+    pub call_depth: usize,
 }
 
 #[allow(dead_code)]
@@ -63,6 +64,7 @@ impl VM {
             ip: 0,
             error_stack: Vec::new(),
             yaprak: YaprakExecutor::new(),
+            call_depth: 0,
         }
     }
 
@@ -104,22 +106,22 @@ impl VM {
                     }
                 }
                 OpCode::Sub => {
-                    let r = self.stack.pop().unwrap();
-                    let l = self.stack.pop().unwrap();
+                    let r = self.stack.pop().unwrap_or(Deger::Bos);
+                    let l = self.stack.pop().unwrap_or(Deger::Bos);
                     if let (Deger::Sayi(a), Deger::Sayi(b)) = (l, r) {
                         self.stack.push(Deger::Sayi(a - b));
                     }
                 }
                 OpCode::Mul => {
-                    let r = self.stack.pop().unwrap();
-                    let l = self.stack.pop().unwrap();
+                    let r = self.stack.pop().unwrap_or(Deger::Bos);
+                    let l = self.stack.pop().unwrap_or(Deger::Bos);
                     if let (Deger::Sayi(a), Deger::Sayi(b)) = (l, r) {
                         self.stack.push(Deger::Sayi(a * b));
                     }
                 }
                 OpCode::Div => {
-                    let r = self.stack.pop().unwrap();
-                    let l = self.stack.pop().unwrap();
+                    let r = self.stack.pop().unwrap_or(Deger::Bos);
+                    let l = self.stack.pop().unwrap_or(Deger::Bos);
                     if let (Deger::Sayi(a), Deger::Sayi(b)) = (l, r) {
                         if b == 0.0 {
                             self.hata_firlat("Sıfıra bölme hatası".to_string());
@@ -169,32 +171,39 @@ impl VM {
                     self.stack.push(Deger::Sayi(if l != r { 1.0 } else { 0.0 }));
                 }
                 OpCode::Call(arg_len) => {
-                    let callable = self.stack.pop().unwrap_or(Deger::Bos);
-                    let mut args = Vec::with_capacity(*arg_len);
-                    for _ in 0..*arg_len {
-                        args.push(self.stack.pop().unwrap_or(Deger::Bos));
-                    }
-                    args.reverse();
+                    if self.call_depth >= 50 {
+                        self.hata_firlat("Azami özyineleme derinliği aşıldı".to_string());
+                    } else {
+                        let callable = self.stack.pop().unwrap_or(Deger::Bos);
+                        let mut args = Vec::with_capacity(*arg_len);
+                        for _ in 0..*arg_len {
+                            args.push(self.stack.pop().unwrap_or(Deger::Bos));
+                        }
+                        args.reverse();
 
-                    match callable {
-                        Deger::DahiliFonksiyon(f) => {
-                            self.stack.push(f(args));
-                        }
-                        Deger::Fonksiyon { parametreler, govde } => {
-                            let mut sub_compiler = crate::compiler::Derleyici::new();
-                            let sub_prog = sub_compiler.derle(govde);
-                            let mut sub_vm = VM::new(sub_prog);
-                            for (i, p) in parametreler.iter().enumerate() {
-                                if i < args.len() {
-                                    sub_vm.globals.insert(p.clone(), args[i].clone());
-                                }
+                        match callable {
+                            Deger::DahiliFonksiyon(f) => {
+                                self.stack.push(f(args));
                             }
-                            sub_vm.run();
-                            let ret = sub_vm.stack.pop().unwrap_or(Deger::Bos);
-                            self.stack.push(ret);
-                        }
-                        other => {
-                            self.hata_firlat(format!("Çağrılamayan değer: {}", other));
+                            Deger::Fonksiyon { parametreler, govde } => {
+                                let mut sub_compiler = crate::compiler::Derleyici::new();
+                                let sub_prog = sub_compiler.derle(govde);
+                                let mut sub_vm = VM::new(sub_prog);
+                                sub_vm.call_depth = self.call_depth + 1;
+                                sub_vm.globals.extend(self.globals.clone());
+                                for (i, p) in parametreler.iter().enumerate() {
+                                    if i < args.len() {
+                                        sub_vm.globals.insert(p.clone(), args[i].clone());
+                                    }
+                                }
+                                sub_vm.run();
+                                self.globals.extend(sub_vm.globals);
+                                let ret = sub_vm.stack.pop().unwrap_or(Deger::Bos);
+                                self.stack.push(ret);
+                            }
+                            other => {
+                                self.hata_firlat(format!("Çağrılamayan değer: {}", other));
+                            }
                         }
                     }
                 }
@@ -255,8 +264,8 @@ impl VM {
                 OpCode::MakeMap(len) => {
                     let mut map = HashMap::new();
                     for _ in 0..*len {
-                        let val = self.stack.pop().unwrap();
-                        let key = self.stack.pop().unwrap();
+                        let val = self.stack.pop().unwrap_or(Deger::Bos);
+                        let key = self.stack.pop().unwrap_or(Deger::Bos);
                         if let Deger::Metin(k) = key {
                             map.insert(k, val);
                         }
@@ -306,7 +315,8 @@ impl VM {
             self.ip = handler_addr;
             self.stack.push(Deger::Hata(msg));
         } else {
-            panic!("Çalışma Zamanı Hatası: {}", msg);
+            eprintln!("[Hüma Hatası] {}", msg);
+            self.ip = self.program.instructions.len();
         }
     }
 
