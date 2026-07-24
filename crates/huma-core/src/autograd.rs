@@ -35,7 +35,7 @@ impl fmt::Display for TensorData {
 
 pub struct AutogradGraph {
     next_id: u64,
-    nodes: HashMap<u64, TensorData>,
+    pub nodes: HashMap<u64, TensorData>,
 }
 
 impl AutogradGraph {

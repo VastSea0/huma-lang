@@ -1,22 +1,32 @@
+// huma-core crate'i "huma" olarak takma adlandırıyoruz,
+// böylece bu dosyadaki "use huma::..." importları doğru çalışır.
+use huma_core as huma;
+
 use huma::lexer::Lexer;
 use huma::parser::Parser;
 use huma::interpreter::Yorumlayici;
 use std::rc::Rc;
 use std::cell::RefCell;
 
+// ─────────────────────────────────────────────
+// Yardımcı fonksiyon — kodu çalıştırıp çıktısını döndürür
+// ─────────────────────────────────────────────
 fn eval(kod: &str) -> String {
-    let output_buffer = Rc::new(RefCell::new(String::new()));
-    let mut yorumlayici = Yorumlayici::new().with_output_buffer(Rc::clone(&output_buffer));
-    
-    let tarayici = Lexer::new(kod);
-    let mut ayristirici = Parser::new(tarayici);
-    let program = ayristirici.parse_program();
-    
+    let buffer = Rc::new(RefCell::new(String::new()));
+    let mut yorumlayici = Yorumlayici::new().with_output_buffer(Rc::clone(&buffer));
+
+    let lexer = Lexer::new(kod);
+    let mut parser = Parser::new(lexer);
+    let program = parser.parse_program();
     yorumlayici.yorumla(program);
-    
-    let res = output_buffer.borrow().clone();
-    res
+
+    let sonuc = buffer.borrow().clone();
+    sonuc
 }
+
+// ─────────────────────────────────────────────
+// Temel dil özellikleri — mutlu yol (happy path)
+// ─────────────────────────────────────────────
 
 #[test]
 fn test_degisken_atama_ve_okuma() {
@@ -105,6 +115,72 @@ fn test_siniflar() {
     assert_eq!(eval(kod).trim(), "21");
 }
 
+// ─────────────────────────────────────────────
+// Görev 1 regresyon testleri — üç kritik crash
+// ─────────────────────────────────────────────
+
+/// REGRESYON: Derin özyineleme artık panik yerine anlamlı hata döndürmeli.
+/// call_depth sıfıra dönmeli ve program paniklememeli.
+#[test]
+fn test_derin_rekursiyon_hatasi() {
+    let kod = r#"
+        rekursiyon fonksiyon olsun {
+            rekursiyon()
+        }
+        rekursiyon()
+    "#;
+    let mut interp = Yorumlayici::new();
+    let lexer = Lexer::new(kod);
+    let mut parser = Parser::new(lexer);
+    let program = parser.parse_program();
+    // Panik atmamalı
+    interp.yorumla(program);
+    // Derinlik çıkıştan sonra sıfırlanmış olmalı
+    assert_eq!(interp.call_depth, 0);
+}
+
+/// REGRESYON: Sayı gibi çağrılamayan bir değer çağrıldığında panik değil,
+/// Deger::Hata döndürmeli; program sonlanabilmeli.
+#[test]
+fn test_cagrilamayan_deger_hatasi() {
+    let kod = r#"
+        x = 42 olsun
+        x()
+    "#;
+    let mut interp = Yorumlayici::new();
+    let lexer = Lexer::new(kod);
+    let mut parser = Parser::new(lexer);
+    let program = parser.parse_program();
+    // Panik atmadan tamamlanmalı
+    interp.yorumla(program);
+}
+
+/// REGRESYON: VM iç içe fonksiyon çağrılarında panik atmamalı.
+#[test]
+fn test_vm_fonksiyon_cagrisi() {
+    let kod = r#"
+        yardimci fonksiyon olsun {
+            "Merhaba"'yı yazdır
+        }
+        selamla fonksiyon olsun {
+            yardimci()
+        }
+        selamla()
+    "#;
+    let lexer = Lexer::new(kod);
+    let mut parser = Parser::new(lexer);
+    let ast = parser.parse_program();
+    let mut derleyici = huma::compiler::Derleyici::new();
+    let prog = derleyici.derle(ast);
+    let mut vm = huma::vm::VM::new(prog);
+    // Panik atmadan çalışmalı
+    vm.run();
+}
+
+// ─────────────────────────────────────────────
+// HTTP isteği — ağ bağlantısı gerektiren entegrasyon testi
+// ─────────────────────────────────────────────
+
 #[test]
 fn test_bekle_http_istekleri() {
     use std::io::{Read, Write};
@@ -138,53 +214,3 @@ fn test_bekle_http_istekleri() {
 
     assert_eq!(eval(&kod).trim(), "OK");
 }
-
-#[test]
-fn test_derin_rekursiyon_hatasi() {
-    let kod = r#"
-        rekursiyon fonksiyon olsun {
-            rekursiyon()
-        }
-        rekursiyon()
-    "#;
-    let mut interp = Yorumlayici::new();
-    let lexer = Lexer::new(kod);
-    let mut parser = Parser::new(lexer);
-    let program = parser.parse_program();
-    interp.yorumla(program);
-    assert_eq!(interp.call_depth, 0);
-}
-
-#[test]
-fn test_cagrilamayan_deger_hatasi() {
-    let kod = r#"
-        x = 42 olsun
-        x()
-    "#;
-    let mut interp = Yorumlayici::new();
-    let lexer = Lexer::new(kod);
-    let mut parser = Parser::new(lexer);
-    let program = parser.parse_program();
-    interp.yorumla(program);
-}
-
-#[test]
-fn test_vm_fonksiyon_cagrisi() {
-    let kod = r#"
-        yardimci fonksiyon olsun {
-            "Merhaba"'yı yazdır
-        }
-        selamla fonksiyon olsun {
-            yardimci()
-        }
-        selamla()
-    "#;
-    let lexer = Lexer::new(kod);
-    let mut parser = Parser::new(lexer);
-    let ast = parser.parse_program();
-    let mut derleyici = huma::compiler::Derleyici::new();
-    let prog = derleyici.derle(ast);
-    let mut vm = huma::vm::VM::new(prog);
-    vm.run();
-}
-
