@@ -433,10 +433,10 @@ export default async function StdlibPage({
             {dict.Docs.lists_errors.title}
           </Link>
           <Link
-            href={getPath("/docs/compiler")}
+            href={getPath("/docs/changelog")}
             className="flex items-center gap-2 text-sm text-on-surface-variant hover:text-primary transition-colors font-bold uppercase tracking-widest text-[10px]"
           >
-            {dict.Sidebar.items.compiler}
+            {dict.Sidebar.items.changelog}
             <span className="material-symbols-outlined text-base">
               arrow_forward
             </span>

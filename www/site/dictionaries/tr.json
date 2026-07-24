@@ -94,19 +94,11 @@
       "introduction": "Giriş ve Felsefe",
       "syntax": "Temel Sözdizimi",
       "grammar": "Dilbilgisi ve Ekler",
-      "cli": "CLI Referansı",
-      "functions": "Fonksiyonlar ve Sınıflar",
+      "functions": "Fonksiyonlar ve Yapılar",
       "lists": "Veri Yapıları ve Hatalar",
-      "stdlib": "Standart Kütüphane",
-      "compiler": "Derleyici İç Yapısı",
-      "ide": "Hüma IDE",
-      "gui": "GUI Kütüphanesi",
-      "ag_istekleri": "Ağ İstekleri (HTTP)",
-      "huma_sunucu": "Hüma Sunucu (HTTP)",
+      "cli": "CLI Referansı",
       "package_manager": "Paket Yöneticisi",
-      "my_first_package": "İlk Paketim",
-      "projects": "Proje Örnekleri",
-      "sqlite": "SQLite Veritabanı",
+      "stdlib": "Standart Kütüphane",
       "changelog": "Sürüm Notları"
     }
   },
@@ -352,142 +344,7 @@
         "desc": "Hüma derleyicisini kendi makinenizde derlemek için güncel bir Rust araç zinciri (rustup) gereklidir."
       }
     },
-    "network": {
-      "title": "Ağ ve Web",
-      "description": "HTTP istemcisi (ag_istekleri) ve yüksek performanslı web sunucusu (huma_sunucu).",
-      "hero_title": "Ağ ve Web Geliştirme",
-      "hero_desc": "Hüma, hem bir istemci hem de bir sunucu olarak web dünyasıyla konuşabilir. Bu bölümde ag_istekleri ile API tüketmeyi ve huma_sunucu ile kendi servislerinizi oluşturmayı göreceksiniz.",
-      "requests": {
-        "title": "Ağ İstekleri (Client)",
-        "desc": "ag_istekleri kütüphanesi, modern HTTP protokollerini (GET, POST, PUT, DELETE) destekler. v1.1.0 ile gelen Headers desteği sayesinde yetkilendirmeli (Bearer/Token) API iletişimini mümkün kılar."
-      },
-      "server": {
-        "title": "Hüma Sunucu (Server)",
-        "desc": "huma_sunucu, düşük gecikmeli ve yüksek performanslı bir backend çatısıdır. Dinamik rota parametreleri, CORS yönetimi ve statik dosya sunumu gibi özellikler kutudan çıktığı gibi gelir."
-      }
-    },
-    "gui": {
-      "title": "Görsel Arayüz (GUI)",
-      "description": "egui tabanlı yerel arayüz oluşturma araçları.",
-      "hero_title": "Görsel Arayüz Kütüphanesi",
-      "hero_desc": "Hüma, modern masaüstü uygulamaları geliştirmek için Rust'ın egui kütüphanesini temel alan yerel bir GUI katmanı sunar. Bu kütüphane ile pencereler oluşturabilir, butonlar, metin kutuları ve karmaşık düzenler ekleyebilirsiniz.",
-      "quick_start": {
-        "title": "Hızlı Başlangıç",
-        "desc": "'pencere_oluştur' fonksiyonu ile ana pencerenizi tanımlayın ve bir çizim fonksiyonu (callback) ile arayüzü inşa edin."
-      }
-    },
-     "package_manager": {
-      "title": "Paket Yöneticisi",
-      "description": "Hüma kütüphanelerini yönetin, güncelleyin ve topluluktan indirin.",
-      "hero_title": "Paket Yönetim Sistemi",
-      "hero_desc": "Hüma Paket Yöneticisi, projeleriniz için kütüphane yönetimini kolaylaştırır. 'huma.json' ve 'huma.lock' dosyaları ile bağımlılıklarınızı güvenli ve sürümü kilitli bir şekilde yönetebilirsiniz.",
-      "manifest_title": "Manifest Dosyası (huma.json)",
-      "manifest_desc": "Her Hüma paketi, kök dizininde bir 'huma.json' dosyası bulundurmalıdır. Bu dosya paketin adını, sürümünü ve bağımlılıklarını tanımlar.",
-      "dependencies_title": "Bağımlılık Yönetimi",
-      "dependencies_desc": "Hüma, hem GitHub üzerinden hem de yerel dizinlerden bağımlılık yüklemeyi destekler. huma.lock dosyası, projenizin her kurulumda aynı bağımlılık sürümlerini kullanmasını sağlar.",
-      "native_title": "Native (Doğal) Paketler",
-      "native_desc": "Hüma v0.5.0+, Rust kütüphanelerini (Crates) doğrudan Hüma projelerine dahil etmeyi destekler. Bu sayede veritabanı sürücüleri veya kriptografi gibi performans kritik işleri yerel hızda yapabilirsiniz.",
-      "publishing_title": "Paket Yayınlama",
-      "publishing_desc": "Kendi paketinizi yayınlamak için kodu GitHub'a yüklemeniz ve geçerli bir SemVer etiketi (v1.0.0 gibi) eklemeniz yeterlidir.",
-      "scripts_title": "Proje Betikleri (Scripts)",
-      "scripts_desc": "huma.json içinde otomasyon betikleri (npm tarzı) tanımlayabilir ve 'huma paket run <ad>' ile çalıştırabilirsiniz.",
-      "verify_title": "Paket Doğrulama",
-      "verify_desc": "Paylaşım öncesi paket meta verilerinin ve sürüm uyumluluğunun geçerliliğini otomatik kontrol edin.",
-      "pub_steps": [
-        "Kodunuzu bir GitHub deposuna yükleyin (huma.json zorunludur).",
-        "Geçerli bir sürüm numarası belirleyin (x.y.z).",
-        "Bir GitHub Release oluşturun ve v1.0.0 gibi bir etiket ekleyin."
-      ],
-      "commands": [
-        { "cmd": "huma paket ilkle", "desc": "Mevcut dizini bir Hüma projesi olarak başlatır." },
-        { "cmd": "huma paket yeni <isim>", "desc": "Yeni bir klasör açıp proje şablonu oluşturur." },
-        { "cmd": "huma paket kur [isim]", "desc": "Tüm bağımlılıkları veya belirtilen paketi kurar." },
-        { "cmd": "huma paket liste", "desc": "Kilitli sürümleriyle yüklü paketleri listeler." },
-        { "cmd": "huma paket sil <isim>", "desc": "Belirtilen paketi ve dosyalarını projeden kaldırır." },
-        { "cmd": "huma paket run <betik>", "desc": "huma.json içinde tanımlı bir otomasyon betiğini çalıştırır." }
-      ],
-      "platform": {
-        "title": "Resmi Paylaşım Platformu",
-        "desc": "Yüzlerce hazır kütüphaneye göz atın ve kendi çözümünüzü toplulukla paylaşın.",
-        "cta": "Kütüphaneleri Keşfet"
-      }
-    },
-    "guides": {
-      "my_first_package": {
-        "title": "İlk Paketim",
-        "description": "Adım adım Hüma kütüphanesi oluşturma ve GitHub üzerinden yayınlama rehberi.",
-        "hero_title": "Kendi Paketinizi Oluşturun",
-        "hero_desc": "Hüma topluluğuna katkıda bulunmak için kendi kütüphanelerinizi oluşturun ve paylaşın. Bu rehber size sıfırdan bir paketi nasıl inşa edeceğinizi gösterecektir."
-      }
-    },
-    "sqlite": {
-      "title": "SQLite Veritabanı",
-      "description": "Hüma'nın yerel SQLite kütüphanesi ile verilerinizi kalıcı hale getirin.",
-      "hero_title": "Veritabanı Yönetimi",
-      "hero_desc": "huma_sqlite modülü, Rust'ın rusqlite kütüphanesini temel alan, yüksek performanslı ve güvenli bir yerel veritabanı çözümüdür.",
-      "quick_start": {
-        "title": "Hızlı Başlangıç",
-        "desc": "Veritabanına bağlanmak için 'Veritabanı' sınıfını kullanın ve ardından SQL komutlarınızı yürütün."
-      },
-      "methods": {
-        "kur": "Veritabanı dosyasını açar veya oluşturur.",
-        "yürüt": "INSERT, UPDATE, DELETE gibi veri değiştiren komutları çalıştırır.",
-        "sorgula": "SELECT komutu ile verileri nesne listesi olarak döndürür."
-      }
-    },
-    "ide": {
-      "title": "Hüma IDE",
-      "description": "Resmi Hüma masaüstü editörü ve geliştirme ortamı.",
-      "hero_title": "Hüma IDE & Editör",
-      "hero_desc": "Hüma, birinci sınıf bir geliştirici deneyimi sunmak için kendi hafif masaüstü editörüyle birlikte gelir. Tauri ve React tabanlı bu modern yapı, performans ve kullanım kolaylığını hedefler.",
-      "architecture": {
-        "title": "Mimari Yapı",
-        "desc": "IDE, modern bir web yığını (Vite+React) ile Rust'ın (Tauri) gücünü birleştirerek güvenli ve hızlı bir masaüstü deneyimi sunar."
-      }
-    },
-    "projects": {
-      "title": "Proje Örnekleri",
-      "description": "Hüma'nın gücünü göstermek için gerçek dünya uygulamaları ve öğreticiler.",
-      "hero_title": "Proje Örnekleri & Öğreticiler",
-      "hero_desc": "Saf Hüma kodu kullanarak temel uygulamaların nasıl inşa edileceğini adım adım öğrenin. Aşağıdaki örnekler doğrudan kopyalanıp çalıştırılabilir.",
-      "todo": {
-        "title": "Görev Yöneticisi (CLI To-Do)",
-        "desc": "Dosya okuma, yazma ve koşullu ifadeleri kullanarak komut satırında çalışan kalıcı bir görev yöneticisi oluşturun. Bu örnek 'dosya.hb' kütüphanesini kullanır.",
-        "steps": [
-          "1. İlk olarak 'dosya.hb' kütüphanesini projeye dahil ediyoruz. Bu modül txt dosyaları okuma/yazma işlevi sunar.",
-          "2. 'dosya_var_mı' fonksiyonuyla diski kontrol ediyor, eğer varsa 'dosya_oku' ile görevlerin mevcut halini belleğe alıyoruz.",
-          "3. Yeni veriyi ekleyip 'dosya_yaz' ile tekrar dosyaya kaydediyoruz."
-        ]
-      },
-      "calculator": {
-        "title": "Gelişmiş Hesap Makinesi",
-        "desc": "Fonksiyonlar, matematik işlemleri ve karar yapılarını anlamak için basit bir hesap makinesi yapalım. 'matematik.hb' yeteneklerinden yararlanır.",
-        "steps": [
-          "1. Fonksiyona 3 argüman aktarılıyor: İşlem tipi, birinci sayı ve ikinci sayı.",
-          "2. 'ise / yoksa' (if / else) bloklarıyla girilen işlem tipinin türüne karar veriliyor.",
-          "3. İlgili operasyon gerçekleştirilip 'yazdır' komutu ile konsola iletiliyor."
-        ]
-      },
-      "grades": {
-        "title": "Öğrenci Not Takip Sistemi",
-        "desc": "Listeler (Arrays), döngüler ve dinamik parametre aktarımını gösteren pratik bir çalışma.",
-        "steps": [
-          "1. 'not_hesapla' adlı fonksiyona öğrenci ismi ve liste tipindeki (Array) notlar parametre olarak iletiliyor.",
-          "2. 'notlar'ın uzunluğu' diyerek dizideki toplam not sayısını buluyoruz.",
-          "3. 'dan e kadar' (range) döngüsüyle sıfırdan listenin uzunluğuna kadar iterasyon yaparak notları bir değişkene topluyoruz."
-        ]
-      },
-      "server": {
-        "title": "Basit Web Sunucusu (HTTP Server)",
-        "desc": "Hüma'nın yerleşik HTTP sunucu modülünü kullanarak basit bir web API oluşturma rehberi.",
-        "steps": [
-          "1. Gelişmiş ağ kontrolü sağlayan 'huma_sunucu.hb' kütüphanesinden Sunucu nesnesi başlatıyoruz.",
-          "2. İstek ve cevap (req, res) parametresi alan bir işleyici fonksiyon yazıyoruz ve router içerisine işliyoruz.",
-          "3. Belirttiğimiz 8080 portu ile sunucumuzu dinlemeye (Listening) başlıyoruz."
-        ]
-      },
-      "tutorial_title": "Adım Adım Nasıl Çalışır?"
-    },
+
     "changelog": {
       "title": "Sürüm Notları",
       "description": "Hüma dili ve araç zinciri resmi güncelleme geçmişi.",

@@ -50,7 +50,7 @@ export default async function IDEPage({
                 {dict.IDE_Page.cta_download}
               </button>
             </Link>
-            <Link href={`/${locale}/docs/ide`}>
+            <Link href={`/${locale}/docs/cli`}>
               <button className="px-8 py-4 font-bold rounded-sm border border-outline/20 text-on-surface hover:bg-surface-bright transition-all flex items-center gap-2">
                 <span className="material-symbols-outlined text-[1.2em]">menu_book</span>
                 {dict.IDE_Page.cta_docs}

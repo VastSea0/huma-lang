@@ -229,17 +229,17 @@ export default async function PackageManagerPage({
         {/* Navigation */}
         <div className="flex justify-between mt-24 pt-8 border-t border-outline-variant/10">
           <Link
-            href={getPath("/docs/gui")}
+            href={getPath("/docs/cli")}
             className="flex items-center gap-2 text-sm text-on-surface-variant hover:text-primary transition-colors font-bold uppercase tracking-widest text-[10px]"
           >
             <span className="material-symbols-outlined text-base">arrow_back</span>
-            {dict.Docs.gui.title}
+            {dict.Sidebar.items.cli}
           </Link>
           <Link
-            href={getPath("/docs/my-first-package")}
+            href={getPath("/docs/stdlib")}
             className="flex items-center gap-2 text-sm text-on-surface-variant hover:text-primary transition-colors font-bold uppercase tracking-widest text-[10px]"
           >
-            {dict.Sidebar.items.my_first_package}
+            {dict.Sidebar.items.stdlib}
             <span className="material-symbols-outlined text-base">arrow_forward</span>
           </Link>
         </div>

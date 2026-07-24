@@ -94,19 +94,11 @@
       "introduction": "Intro & Philosophy",
       "syntax": "Basic Syntax",
       "grammar": "Grammar & Suffixes",
-      "cli": "CLI Reference",
-      "functions": "Functions & Classes",
+      "functions": "Functions & Structs",
       "lists": "Data Structures & Errors",
-      "stdlib": "Standard Library",
-      "compiler": "Compiler Internals",
-      "ide": "Hüma IDE",
-      "gui": "GUI Library",
-      "ag_istekleri": "Network (HTTP)",
-      "huma_sunucu": "Server (HTTP)",
+      "cli": "CLI Reference",
       "package_manager": "Package Manager",
-      "my_first_package": "My First Package",
-      "projects": "Project Examples",
-      "sqlite": "SQLite Database",
+      "stdlib": "Standard Library",
       "changelog": "Changelog"
     }
   },
@@ -352,144 +344,7 @@
         "desc": "To build the Hüma compiler on your machine, a stable Rust toolchain (rustup) is required."
       }
     },
-    "network": {
-      "title": "Network & Web",
-      "description": "HTTP client (ag_istekleri) and high-performance web server (huma_sunucu).",
-      "hero_title": "Network & Web Development",
-      "hero_desc": "Hüma can communicate with the web world as both a client and a server. In this section, you'll learn how to consume APIs with ag_istekleri and build your own services with huma_sunucu.",
-      "requests": {
-        "title": "Network Requests (Client)",
-        "desc": "The ag_istekleri library supports modern HTTP protocols (GET, POST, PUT, DELETE). v1.1.0 introduces Headers support, enabling authenticated (Bearer/Token) API communication."
-      },
-      "server": {
-        "title": "Hüma Server (v1.0.0)",
-        "desc": "huma_sunucu is a low-latency, high-performance backend framework. Dynamic route parameters, CORS management, and static file serving come built-in."
-      }
-    },
-    "gui": {
-      "title": "Graphical User Interface (GUI)",
-      "description": "egui-based native interface creation tools.",
-      "hero_title": "Graphical User Interface Library",
-      "hero_desc": "Hüma provides a native GUI layer based on Rust's egui library for developing modern desktop applications. With this library, you can create windows, add buttons, text boxes, and complex layouts.",
-      "quick_start": {
-        "title": "Quick Start",
-        "desc": "Define your main window with the 'pencere_oluştur' function and build the interface with a drawing callback function."
-      }
-    },
-    "package_manager": {
-      "title": "Package Manager",
-      "description": "Manage, update, and download Hüma libraries from the community.",
-      "hero_title": "Package Management System",
-      "hero_desc": "Hüma Package Manager simplifies library management for your projects. You can manage your dependencies securely with version locking using 'huma.json' and 'huma.lock' files.",
-      "manifest_title": "Manifest File (huma.json)",
-      "manifest_desc": "Every Hüma package must contain a 'huma.json' file in its root directory. This file defines the package name, version, and dependencies.",
-      "dependencies_title": "Dependency Management",
-      "dependencies_desc": "Hüma supports installing dependencies from both GitHub and local directories. The huma.lock file ensures that your project uses the same dependency versions in every installation.",
-      "native_title": "Native Packages",
-      "native_desc": "Hüma v0.5.1+ supports direct integration of Rust crates into Hüma projects. This enables performance-critical tasks like database drivers or cryptography to run at native speeds.",
-      "publishing_title": "Publishing Packages",
-      "publishing_desc": "To publish your own package, simply upload the code to GitHub and add a valid SemVer tag (like v1.0.0).",
-      "scripts_title": "Project Scripts",
-      "scripts_desc": "You can define custom automation scripts in 'huma.json' just like in npm. Run them using 'huma paket run <name>'.",
-      "verify_title": "Package Verification",
-      "verify_desc": "Automatically verify if your package metadata and versioning are compliant before sharing.",
-      "security_title": "Security & Verification",
-      "security_desc": "Provides enterprise-level security via SHA-256 hash checks in huma.lock, cycle detection, and unsafe native code warnings. It also ensures package provenance using github and license metadata.",
-      "pub_steps": [
-        "Upload your code to a GitHub repository (must have huma.json).",
-        "Determine a valid version number (x.y.z).",
-        "Create a GitHub Release and add a tag like v1.0.0."
-      ],
-      "commands": [
-        { "cmd": "huma paket init", "desc": "Initializes the current directory as a Hüma project." },
-        { "cmd": "huma paket new <name>", "desc": "Creates a new folder and project template." },
-        { "cmd": "huma paket install [name]", "desc": "Installs all dependencies or a specific package." },
-        { "cmd": "huma paket list", "desc": "Lists installed packages with locked versions." },
-        { "cmd": "huma paket remove <name>", "desc": "Removes a specific package and its files." },
-        { "cmd": "huma paket run <script>", "desc": "Executes an automation script defined in huma.json." }
-      ],
-      "platform": {
-        "title": "Official Sharing Platform",
-        "desc": "Browse hundreds of ready-to-use libraries and share your own solutions with the community.",
-        "cta": "Explore Libraries"
-      }
-    },
-    "guides": {
-      "my_first_package": {
-        "title": "My First Package",
-        "description": "A step-by-step guide to creating a Hüma library and publishing it via GitHub.",
-        "hero_title": "Create Your Own Package",
-        "hero_desc": "Contribute to the Hüma community by creating and sharing your own libraries. This guide will show you how to build a package from scratch."
-      }
-    },
-    "sqlite": {
-      "title": "SQLite Database",
-      "description": "Persist your data with Hüma's native SQLite library.",
-      "hero_title": "Database Management",
-      "hero_desc": "The huma_sqlite module is a high-performance and secure local database solution built on top of Rust's rusqlite crate.",
-      "quick_start": {
-        "title": "Quick Start",
-        "desc": "Use the 'Veritabanı' class to connect to a database and execute your SQL commands."
-      },
-      "methods": {
-        "kur": "Opens or creates a database file.",
-        "yürüt": "Executes data-modifying commands like INSERT, UPDATE, DELETE.",
-        "sorgula": "Executes SELECT commands and returns data as a list of objects."
-      }
-    },
-    "ide": {
-      "title": "Hüma IDE",
-      "description": "Official Hüma desktop editor and development environment.",
-      "hero_title": "Hüma IDE & Editor",
-      "hero_desc": "Hüma comes with its own lightweight desktop editor to provide a first-class developer experience. This modern structure based on Tauri and React targets performance and ease of use.",
-      "architecture": {
-        "title": "Architectural Structure",
-        "desc": "The IDE provides a secure and fast desktop experience by combining a modern web stack (Vite+React) with the power of Rust (Tauri)."
-      }
-    },
-    "projects": {
-      "title": "Project Examples",
-      "description": "Real-world applications and tutorials to demonstrate the power of Hüma.",
-      "hero_title": "Project Examples & Tutorials",
-      "hero_desc": "Learn step-by-step how to build basic applications using pure Hüma code. The examples below can be copied and run directly.",
-      "todo": {
-        "title": "Task Manager (CLI To-Do)",
-        "desc": "Create a persistent command-line task manager using file reading, writing, and conditionals. This example uses the 'dosya.hb' library.",
-        "steps": [
-          "1. First, we import the 'dosya.hb' library. This module provides functions to read and write txt files.",
-          "2. We check the disk with the 'dosya_var_mı' function and, if it exists, read the existing tasks into memory using 'dosya_oku'.",
-          "3. We append the new task data and save it back to the file with 'dosya_yaz'."
-        ]
-      },
-      "calculator": {
-        "title": "Advanced Calculator",
-        "desc": "Let's build a simple calculator to understand functions, mathematical operations, and decision structures. It leverages 'matematik.hb' features.",
-        "steps": [
-          "1. The function takes 3 arguments: Operation type, the first number, and the second number.",
-          "2. We conditionally determine the operation logic using 'ise / yoksa' (if / else) blocks.",
-          "3. The corresponding operation calculates the result, and we flush it to the console using 'yazdır'."
-        ]
-      },
-      "grades": {
-        "title": "Student Grades Tracking System",
-        "desc": "A practical exercise demonstrating Lists (Arrays), loops, and dynamic parameter passing.",
-        "steps": [
-          "1. We pass the student name and an array payload of grades as parameters to the 'not_hesapla' function.",
-          "2. We find the total length of the array using the embedded 'uzunluğu' (length) syntax property.",
-          "3. We iterate through the scores and collect the sum using the 'dan e kadar' (range) loop syntax."
-        ]
-      },
-      "server": {
-        "title": "Simple Web Server (HTTP Server)",
-        "desc": "A guide to building a basic web API using Hüma's built-in HTTP server module.",
-        "steps": [
-          "1. We import the 'huma_sunucu.hb' library, instantiating the HTTP server class implementation.",
-          "2. We define a functional handler hook that takes the request and response (req, res) parameters to map routes.",
-          "3. We bootstrap the listener bindings specifically assigned to the 8080 port."
-        ]
-      },
-      "tutorial_title": "Step-by-Step Tutorial"
-    },
+
     "changelog": {
       "title": "Changelog",
       "description": "Official update history of the Hüma language and toolchain.",

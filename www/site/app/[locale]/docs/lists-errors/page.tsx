@@ -186,10 +186,10 @@ export default async function ListsErrorsPage({
             {dict.Docs.functions_classes.title}
           </Link>
           <Link
-            href={getPath("/docs/stdlib")}
+            href={getPath("/docs/cli")}
             className="flex items-center gap-2 text-sm text-on-surface-variant hover:text-primary transition-colors font-bold uppercase tracking-widest text-[10px]"
           >
-            {dict.Sidebar.items.stdlib}
+            {dict.Sidebar.items.cli}
             <span className="material-symbols-outlined text-base">
               arrow_forward
             </span>

@@ -139,19 +139,19 @@ export default async function CLIPage({
         {/* Navigation */}
         <div className="flex justify-between mt-16 pt-8 border-t border-outline-variant/10">
           <Link
-            href={getPath("/docs/syntax")}
+            href={getPath("/docs/lists-errors")}
             className="flex items-center gap-2 text-sm text-on-surface-variant hover:text-primary transition-colors font-bold uppercase tracking-widest text-[10px]"
           >
             <span className="material-symbols-outlined text-base">
               arrow_back
             </span>
-            {dict.Sidebar.items.syntax}
+            {dict.Sidebar.items.lists}
           </Link>
           <Link
-            href={getPath("/docs/functions-classes")}
+            href={getPath("/docs/package-manager")}
             className="flex items-center gap-2 text-sm text-on-surface-variant hover:text-primary transition-colors font-bold uppercase tracking-widest text-[10px]"
           >
-            {dict.Sidebar.items.functions}
+            {dict.Sidebar.items.package_manager}
             <span className="material-symbols-outlined text-base">
               arrow_forward
             </span>
