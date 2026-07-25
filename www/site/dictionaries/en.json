@@ -14,7 +14,7 @@
     "badge": "v0.6.0 CORE RELEASE",
     "headline": "Natural Code,",
     "subheadline": "Measurable Correctness.",
-    "description": "Hüma is an experimental programming language with Turkish keywords and a defined set of Turkish suffix forms. Its Rust-based interpreter is the stable execution path; the VM and AOT support documented subsets only.",
+    "description": "Hüma is an experimental programming language with Turkish keywords and a defined set of Turkish suffix forms. Its Rust-based interpreter is the canonical execution path; the VM and AOT support documented subsets only.",
     "cta_get_started": "Get Started",
     "cta_docs": "Read Docs"
   },
@@ -44,12 +44,12 @@
   },
   "CTA": {
     "headline": "Start Building Now",
-    "description": "Join the community of developers building the next generation of software with Hüma.",
+    "description": "Join the community experimenting with, testing, and developing Hüma.",
     "copy_install_command": "Copy Install Command",
     "available_platforms": "Buildable from source with the Rust toolchain"
   },
   "Footer": {
-    "copy": "© 2026 Hüma Foundation",
+    "copy": "© 2026 Hüma contributors",
     "license": "MIT License",
     "build": "Build v0.6.0",
     "github": "GitHub",
@@ -93,7 +93,7 @@
         },
         "agglutination": {
           "title": "Suffix System",
-          "desc": "Only defined suffix forms are accepted after an apostrophe. The system is not a complete morphology engine and does not infer vowel harmony."
+          "desc": "Only defined suffix forms are accepted after an apostrophe. Sound harmony is checked for names whose pronunciation follows from spelling; the system is not a complete natural-language analyzer."
         },
         "industrial": {
           "title": "Explicit Limits",
@@ -127,7 +127,7 @@
       "data_types": {
         "title": "Data Types",
         "types": {
-          "sayi": "Number (Integer/Float)",
+          "sayi": "Number (finite IEEE-754 f64)",
           "yazi": "String (UTF-8)",
           "mantik": "Boolean (1 or 0)",
           "liste": "List (Array/Vector)",
@@ -162,7 +162,7 @@
       },
       "suffixes": {
         "title": "Standard Suffixes",
-        "desc": "The forms below are supported as syntax delimiters. The programmer remains responsible for choosing a form that is semantically correct Turkish.",
+        "desc": "The forms below are supported as syntax delimiters. Sound harmony is checked when pronunciation follows from spelling; the programmer remains responsible for choosing a suffix with the intended sentence-level meaning.",
         "accusative": {
           "name": "Accusative (-i, -ı)",
           "suffixes": "'i, 'ı, 'u, 'ü",
@@ -179,7 +179,7 @@
           "name": "Ablative (-den, -dan)",
           "suffixes": "'den, 'dan, 'ten, 'tan",
           "usage": "Used for removing items or defining ranges.",
-          "example": "liste'den son_el'i çıkar;"
+          "example": "liste'den 0'ı çıkar;"
         },
         "genitive": {
           "name": "Genitive (-nin, -ın)",
@@ -244,9 +244,9 @@
     },
     "functions_classes": {
       "title": "Functions & Classes",
-      "description": "Functions, classes, and object-oriented structures.",
+      "description": "Hüma functions, classes, and object structures.",
       "hero_title": "Logic & Structuring",
-      "hero_desc": "Hüma supports both functional and object-oriented programming paradigms. In this section, you'll learn how to make your code modular and how to build complex data structures.",
+      "hero_desc": "Hüma supports functions, lexical closures, classes, and methods. This section documents those constructs and their current behavior.",
       "functions": {
         "title": "Functions",
         "desc": "Functions are the fundamental building blocks of Hüma. You can easily manage data flow with 'alsın' and 'döndür' structures."
@@ -262,9 +262,9 @@
     },
     "lists_errors": {
       "title": "Data Structures & Errors",
-      "description": "Advanced data structures (Dictionaries, Lists) and safe error handling techniques.",
-      "hero_title": "Data & Safety",
-      "hero_desc": "Hüma offers advanced tools for managing your application's data flow and handling unexpected situations. Handle data sets with Lists and Dictionaries, and prevent crashes with the 'dene...yakala' structure.",
+      "description": "List and dictionary values with catchable runtime errors.",
+      "hero_title": "Data & Errors",
+      "hero_desc": "Lists and dictionaries hold data sets. 'dene...yakala' can handle supported runtime errors in program flow; it is not an operating-system sandbox and cannot contain a process crash caused by an invalid FFI call.",
       "lists": {
         "title": "Lists & Dictionaries",
         "desc": "Hüma lists are dynamic; dictionaries store key-value pairs."
@@ -320,7 +320,7 @@
       },
       "build": {
         "title": "Build from Source",
-        "desc": "To build the Hüma compiler on your machine, a stable Rust toolchain (rustup) is required."
+        "desc": "Building the Hüma compiler requires stable Rust 1.92 or newer."
       }
     },
 
@@ -348,7 +348,7 @@
       "hero_desc": "This guide shows how to build the experimental Hüma 0.6.0 toolchain from source and run a first program with the interpreter.",
       "installation": {
         "title": "Installation",
-        "desc": "The verified installation path is a source build with a current stable Rust toolchain. Other platforms should be validated in CI separately.",
+        "desc": "The verified installation path is a source build with stable Rust 1.92 or newer. The CI matrix is configured to check Linux, macOS, and Windows builds.",
         "arch_title": "Rust-Based Toolchain",
         "arch_desc": "The core is implemented in Rust. The repository contains no benchmark supporting cross-architecture latency or performance guarantees."
       },
@@ -390,7 +390,7 @@
     "badge": "COMMUNITY",
     "get_involved": "How to Get Involved?",
     "contributing": "Contributing Guide",
-    "contributing_desc": "Contributing to the Hüma compiler is straightforward. You can clone the project, build it locally, and start working on your own additions immediately.",
+    "contributing_desc": "Clone the project and run its acceptance commands to prepare reproducible test, documentation, or code contributions.",
     "star_headline": "Like the Project?",
     "star_desc": "Support us by starring the repository on GitHub or forking it to build your own version.",
     "star_button": "Star on GitHub",

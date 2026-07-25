@@ -14,7 +14,7 @@
     "badge": "v0.6.0 ÇEKİRDEK SÜRÜM",
     "headline": "Doğal Kod,",
     "subheadline": "Ölçülebilir Doğruluk.",
-    "description": "Hüma, Türkçe anahtar sözcükler ve tanımlı Türkçe ek biçimleri kullanan deneysel bir programlama dilidir. Rust tabanlı yorumlayıcı kararlı yürütme yoludur; VM ve AOT yalnızca belgelenmiş alt kümeleri destekler.",
+    "description": "Hüma, Türkçe anahtar sözcükler ve tanımlı Türkçe ek biçimleri kullanan deneysel bir programlama dilidir. Rust tabanlı yorumlayıcı kanonik yürütme yoludur; VM ve AOT yalnızca belgelenmiş alt kümeleri destekler.",
     "cta_get_started": "Hemen Başlayın",
     "cta_docs": "Dokümanları Oku"
   },
@@ -44,12 +44,12 @@
   },
   "CTA": {
     "headline": "Hemen İnşa Etmeye Başlayın",
-    "description": "Hüma ile yeni nesil yazılımlar geliştiren topluluğa katılın.",
+    "description": "Hüma'yı deneyen, test eden ve geliştiren topluluğa katılın.",
     "copy_install_command": "Kurulum Komutunu Kopyala",
     "available_platforms": "Kaynak koddan Rust araç zinciriyle derlenebilir"
   },
   "Footer": {
-    "copy": "© 2026 Hüma Vakfı",
+    "copy": "© 2026 Hüma katkıcıları",
     "license": "MIT Lisansı",
     "build": "Sürüm v0.6.0",
     "github": "GitHub",
@@ -93,7 +93,7 @@
         },
         "agglutination": {
           "title": "Eklemeli Yapı (Suffix System)",
-          "desc": "Kesme işaretinden sonra yalnızca tanımlı ek biçimleri kabul edilir. Sistem tam doğal dil çözümlemesi veya otomatik ünlü uyumu yapmaz."
+          "desc": "Kesme işaretinden sonra yalnızca tanımlı ek biçimleri kabul edilir. Yazımdan telaffuzu çıkarılabilen adlarda ses uyumu denetlenir; sistem tam doğal dil çözümlemesi yapmaz."
         },
         "industrial": {
           "title": "Açık Sınırlar",
@@ -127,7 +127,7 @@
       "data_types": {
         "title": "Veri Tipleri",
         "types": {
-          "sayi": "Sayı (Integer/Float)",
+          "sayi": "Sayı (sonlu IEEE-754 f64)",
           "yazi": "Yazı (UTF-8 String)",
           "mantik": "Mantıksal (1 veya 0)",
           "liste": "Liste (Array/Vector)",
@@ -162,7 +162,7 @@
       },
       "suffixes": {
         "title": "Desteklenen Türkçe Ekler",
-        "desc": "Aşağıdaki biçimler sözdizimsel ayraç olarak desteklenir. Ek seçiminin Türkçe anlam bakımından doğruluğu programcıya aittir.",
+        "desc": "Aşağıdaki biçimler sözdizimsel ayraç olarak desteklenir. Yazımdan telaffuzu çıkarılabilen adlarda ses uyumu doğrulanır; ekin cümledeki anlam bakımından doğru seçimi yine programcıya aittir.",
         "accusative": {
           "name": "Belirtme Durumu (-i hali)",
           "suffixes": "'i, 'ı, 'u, 'ü, 'yi, 'yı, 'yu, 'yü",
@@ -173,13 +173,13 @@
           "name": "Yönelme Durumu (-e hali)",
           "suffixes": "'e, 'a, 'ye, 'ya",
           "usage": "Listelere veya sözlüklere yeni eleman eklerken hedef göstermek için idealdir.",
-          "example": "liste'ye ekle, sozluk'e atama_yap"
+          "example": "liste'ye 10'u ekle"
         },
         "ablative": {
           "name": "Ayrılma Durumu (-den hali)",
           "suffixes": "'den, 'dan, 'ten, 'tan",
           "usage": "Koleksiyonlardan veri çıkarırken veya nesne özelliklerini okurken kullanılır.",
-          "example": "liste'den çıkar, hafıza'dan oku"
+          "example": "liste'den 0'ı çıkar"
         },
         "genitive": {
           "name": "İlgi Durumu (-nin hali)",
@@ -208,7 +208,7 @@
       },
       "best_practices": {
         "title": "Doğru Kullanım (Best Practices)",
-        "desc": "İlgi eki özellik erişiminde yapısaldır; diğer eklerin çoğu okunabilirlik ayıracıdır. Hüma ek seçiminin doğal Türkçe bakımından doğruluğunu otomatik denetlemez."
+        "desc": "İlgi eki özellik erişiminde, yönelme ve ayrılma ekleri doğal liste işlemlerinde yapısaldır. Lexer çıkarılabilir köklerde ses kurallarını denetler; ekin cümledeki anlam bakımından doğru seçimini tam doğal dil çözümlemesiyle kanıtlamaz."
       }
     },
     "cli": {
@@ -244,9 +244,9 @@
     },
     "functions_classes": {
       "title": "Fonksiyonlar ve Sınıflar",
-      "description": "Hüma'nın nesne yönelimli programlama ve fonksiyonel yapısı.",
+      "description": "Hüma'nın fonksiyon, sınıf ve nesne yapıları.",
       "hero_title": "Fonksiyonlar ve Sınıflar",
-      "hero_desc": "Hüma, hem fonksiyonel hem de nesne yönelimli programlama paradigmasını destekler. Bu bölümde kodunuzu nasıl modüler hale getireceğinizi ve karmaşık veri yapılarını nasıl inşa edeceğinizi öğreneceksiniz.",
+      "hero_desc": "Hüma fonksiyonları, sözcüksel closure'ları, sınıfları ve metotları destekler. Bu bölüm bu yapıların belgelenmiş kullanımını gösterir.",
       "functions": {
         "title": "Fonksiyonlar",
         "desc": "Fonksiyonlar Hüma'nın temel yapı taşlarıdır. 'alsın' ve 'döndür' yapıları ile veri akışını kolayca yönetebilirsiniz."
@@ -262,9 +262,9 @@
     },
     "lists_errors": {
       "title": "Veri Yapıları ve Hatalar",
-      "description": "Gelişmiş veri yapıları (Sözlükler, Listeler) ve güvenli hata yönetimi teknikleri.",
-      "hero_title": "Veri ve Güvenlik",
-      "hero_desc": "Uygulamalarınızın veri akışını yönetmek ve beklenmedik durumlarla başa çıkmak için Hüma gelişmiş araçlar sunar. Listeler ve Sözlüklerle veri kümelerini işleyebilir, 'dene...yakala' yapısı ile programınızın çökmesini engelleyebilirsiniz.",
+      "description": "Liste ve sözlük veri yapıları ile yakalanabilir çalışma zamanı hataları.",
+      "hero_title": "Veri ve Hatalar",
+      "hero_desc": "Listeler ve sözlükler veri kümelerini işler. 'dene...yakala', desteklenen çalışma zamanı hatalarını yakalayıp program akışında ele almayı sağlar; işletim sistemi veya yanlış FFI kaynaklı süreç çökmelerine karşı sandbox değildir.",
       "lists": {
         "title": "Listeler ve Sözlükler",
         "desc": "Hüma listeleri dinamiktir; sözlükler anahtar-değer çiftlerini saklar."
@@ -320,7 +320,7 @@
       },
       "build": {
         "title": "Kaynaktan Derleme",
-        "desc": "Hüma derleyicisini kendi makinenizde derlemek için güncel bir Rust araç zinciri (rustup) gereklidir."
+        "desc": "Hüma derleyicisini kendi makinenizde derlemek için Rust 1.92 veya daha yeni bir stable araç zinciri gereklidir."
       }
     },
 
@@ -348,7 +348,7 @@
       "hero_desc": "Bu rehber, deneysel Hüma 0.6.0 araç takımını kaynak koddan derlemeyi ve yorumlayıcıyla ilk programı çalıştırmayı gösterir.",
       "installation": {
         "title": "Kurulum",
-        "desc": "Doğrulanan kurulum yolu güncel kararlı Rust araç zinciriyle kaynak koddan derlemedir. Diğer platformlar CI üzerinde ayrıca doğrulanmalıdır.",
+        "desc": "Doğrulanan kurulum yolu Rust 1.92 veya daha yeni stable araç zinciriyle kaynak koddan derlemedir. CI matrisi Linux, macOS ve Windows derlemelerini denetleyecek biçimde yapılandırılmıştır.",
         "arch_title": "Rust Tabanlı Araç Takımı",
         "arch_desc": "Çekirdek Rust ile yazılmıştır. Depoda mimariler arası gecikme veya performans garantisini destekleyen ölçüm bulunmaz."
       },
@@ -390,7 +390,7 @@
     "badge": "TOPLULUK",
     "get_involved": "Nasıl Katkı Sağlarsınız?",
     "contributing": "Katkı Kılavuzu",
-    "contributing_desc": "Hüma derleyicisine katkıda bulunmak çok basittir. Projeyi bilgisayarınıza klonlayıp kendi eklentilerinizi geliştirerek hemen başlayabilirsiniz.",
+    "contributing_desc": "Projeyi klonlayıp kabul komutlarını çalıştırarak yeniden üretilebilir test, belge veya kod katkısı hazırlayabilirsiniz.",
     "star_headline": "Projeyi Beğendiniz mi?",
     "star_desc": "Bize destek olmak için GitHub'da projeye yıldız verebilir veya kendi sürümünüzü oluşturabilirsiniz.",
     "star_button": "Yıldız Ver",

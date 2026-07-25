@@ -1,0 +1,22 @@
+name: Scheduled fuzzing
+
+on:
+  schedule:
+    - cron: "17 2 * * 1"
+  workflow_dispatch:
+
+jobs:
+  lexer-parser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Install cargo-fuzz
+        uses: taiki-e/install-action@cargo-fuzz
+
+      - name: Fuzz lexer and parser
+        run: cargo fuzz run lexer_parser -- -max_total_time=300 -max_len=65536

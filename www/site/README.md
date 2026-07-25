@@ -8,6 +8,7 @@ iddiaları kök dizindeki `README.md`, `docs/DIL_TANIMI.md` ve
 
 ```bash
 npm ci
+npm audit
 npm run lint
 npm run build
 ```
