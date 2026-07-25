@@ -5,4 +5,4 @@
 }
 
 hesap = İşlem() olsun
-"Toplama: " + (10 ile 20'yi hesap'ın topla'sı)'nı yazdır;
+"Toplama: " + hesap.topla(10, 20)'yi yazdır

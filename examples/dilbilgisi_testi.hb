@@ -1,13 +1,12 @@
 // ═══════════════════════════════════════════════════════════════════
-// dilbilgisi_testi.hb — Hüma Yeni Dilbilgisi Özellikleri Testi
+// dilbilgisi_testi.hb — Hüma Türkçe Sözdizimi Örneği
 // ═══════════════════════════════════════════════════════════════════
 
-"--- Çoğul ve Eşitlik Eki Testi ---"'yi yazdır
+"--- Belirtme Eki Testi ---"'ni yazdır
 sayılar = [1, 2, 3] olsun
-sayılar'ı yazdır                // 'ı belirtme
-sayılar'lar'ı yazdır            // 'lar çoğul (ekstrem test)
+sayılar'ı yazdır
 
-mesaj = "Hüma modernce bir dildir." olsun // 'ce eşitlik/denklik
+mesaj = "Hüma Türkçe odaklı bir sözdizimi dener." olsun
 mesaj'ı yazdır
 
 "--- Aralık Döngüsü (kadar) Testi ---"'yi yazdır
@@ -34,4 +33,4 @@ başarı_yaz = fonksiyon olsun m alsın {
     "\x1b[32m[BAŞARI] \x1b[0m" + m'yi yazdır
 }
 
-başarı_yaz("Dilbilgisi testleri tamamlandı!")
+başarı_yaz("Sözdizimi örneği tamamlandı!")

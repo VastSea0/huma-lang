@@ -16,20 +16,21 @@
 // Eski lib versiyonu kaldırıldı.
 
 güvenli_oku fonksiyon olsun yol alsın {
-    icerik = yol'u dosya_oku olsun
-    tipi(icerik) = "Boş" ise {
+    dene {
+        yol'u dosya_oku döndür
+    } yakala sorun {
         "Dosya okunamadı: " + yol'u hata_yaz
         ""'yi döndür
     }
-    icerik'i döndür
 }
 
 satırlara_ayır fonksiyon olsun metin alsın {
     satırlar = [] olsun
     gecici = "" olsun
     boy = metin'in uzunluğu olsun
+    boy = 0 ise { satırlar'ı döndür }
     
-    i = 0'dan boy'a kadar {
+    i = 0'dan (boy - 1)'e kadar {
         c = metin[i] olsun
         (c = "\n") ise {
             satırlar'a gecici'yi ekle

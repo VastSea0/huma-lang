@@ -54,7 +54,7 @@ gomme_tabakasi sınıf olsun {
 
     // Pozisyonel kodlama ekle (sinüs-kosinüs, transformer tarzı)
     pozisyonel_kodla fonksiyon olsun gomme_matrisi, maks_uzunluk alsın {
-        M = gomme_boyutu olsun
+        M = kendisi.gomme_boyutu olsun
         n = maks_uzunluk olsun
         i = 0'dan (n - 1)'e kadar {
             j = 0'dan (M - 1)'e kadar {

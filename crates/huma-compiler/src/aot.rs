@@ -4,13 +4,11 @@
 //! (ELF / Mach-O nesne dosyası) derler, ardından sistem bağlayıcısı (cc)
 //! ile linkleyerek bağımsız bir binary üretir.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process::Command;
 
-use cranelift_codegen::ir::{
-    condcodes::FloatCC, types, AbiParam, InstBuilder,
-};
+use cranelift_codegen::ir::{condcodes::FloatCC, types, AbiParam, InstBuilder};
 use cranelift_codegen::settings::{self, Configurable};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
 use cranelift_module::{FuncId, Linkage, Module};
@@ -58,6 +56,7 @@ pub fn compile_to_binary(source: &str, opts: &AotOptions<'_>) -> HumaResult<()> 
     if let Some(first) = diagnostics.into_iter().next() {
         return Err(first);
     }
+    validate_aot_subset(&ast)?;
 
     // ── 2. Cranelift kurulumu ────────────────────────────────────────────────
     let mut flag_builder = settings::builder();
@@ -96,7 +95,9 @@ pub fn compile_to_binary(source: &str, opts: &AotOptions<'_>) -> HumaResult<()> 
 
     for komut in &ast {
         match komut {
-            Komut::FonksiyonTanimla { ad, parametreler, .. } => {
+            Komut::FonksiyonTanimla {
+                ad, parametreler, ..
+            } => {
                 let mut sig = module.make_signature();
                 for _ in parametreler {
                     sig.params.push(AbiParam::new(types::F64));
@@ -104,7 +105,9 @@ pub fn compile_to_binary(source: &str, opts: &AotOptions<'_>) -> HumaResult<()> 
                 sig.returns.push(AbiParam::new(types::F64));
                 let fid = module
                     .declare_function(ad, Linkage::Local, &sig)
-                    .map_err(|e| HumaError::CompileError(format!("Fonksiyon beyan hatası '{ad}': {e}")))?;
+                    .map_err(|e| {
+                        HumaError::CompileError(format!("Fonksiyon beyan hatası '{ad}': {e}"))
+                    })?;
                 fn_registry.insert(ad.clone(), (fid, parametreler.clone()));
             }
             other => toplevel.push(other.clone()),
@@ -120,7 +123,12 @@ pub fn compile_to_binary(source: &str, opts: &AotOptions<'_>) -> HumaResult<()> 
     let mut builder_ctx = FunctionBuilderContext::new();
 
     for komut in &ast {
-        if let Komut::FonksiyonTanimla { ad, parametreler, govde } = komut {
+        if let Komut::FonksiyonTanimla {
+            ad,
+            parametreler,
+            govde,
+        } = komut
+        {
             let (fid, _) = fn_registry[ad];
             emit_user_function(
                 ad,
@@ -185,7 +193,7 @@ pub fn compile_to_binary(source: &str, opts: &AotOptions<'_>) -> HumaResult<()> 
         builder.switch_to_block(entry);
         builder.seal_block(entry);
 
-        let hm_ref = module.declare_func_in_func(huma_main_id, &mut builder.func);
+        let hm_ref = module.declare_func_in_func(huma_main_id, builder.func);
         builder.ins().call(hm_ref, &[]);
         let zero = builder.ins().iconst(types::I32, 0);
         builder.ins().return_(&[zero]);
@@ -251,6 +259,169 @@ pub fn compile_to_binary(source: &str, opts: &AotOptions<'_>) -> HumaResult<()> 
     Ok(())
 }
 
+/// AOT backend currently targets a deliberately small, numeric subset.
+///
+/// Unsupported syntax must be rejected before code generation. Silently
+/// replacing an expression with `0.0` would produce a valid-looking but
+/// incorrect executable, which is never acceptable for a stable compiler.
+fn validate_aot_subset(ast: &[Komut]) -> HumaResult<()> {
+    let function_names: HashSet<String> = ast
+        .iter()
+        .filter_map(|command| match command {
+            Komut::FonksiyonTanimla { ad, .. } => Some(ad.clone()),
+            _ => None,
+        })
+        .collect();
+
+    for command in ast {
+        if let Komut::FonksiyonTanimla {
+            ad,
+            parametreler,
+            govde,
+        } = command
+        {
+            let mut scope: HashSet<String> = parametreler.iter().cloned().collect();
+            validate_aot_commands(govde, &mut scope, &function_names).map_err(|message| {
+                HumaError::CompileError(format!("AOT fonksiyonu '{}': {}", ad, message))
+            })?;
+        }
+    }
+
+    let mut top_scope = HashSet::new();
+    validate_aot_commands(ast, &mut top_scope, &function_names).map_err(HumaError::CompileError)
+}
+
+fn validate_aot_commands(
+    commands: &[Komut],
+    scope: &mut HashSet<String>,
+    function_names: &HashSet<String>,
+) -> Result<(), String> {
+    for command in commands {
+        match command {
+            Komut::DegiskenTanimla { ad, deger } => {
+                validate_aot_expression(deger, scope, function_names)?;
+                scope.insert(ad.clone());
+            }
+            Komut::Atama { ad, deger } => {
+                if !scope.contains(ad) {
+                    return Err(format!("tanımsız değişkene atama: {}", ad));
+                }
+                validate_aot_expression(deger, scope, function_names)?;
+            }
+            Komut::YazdirKomutu(expression) | Komut::DondurKomutu(expression) => {
+                validate_aot_expression(expression, scope, function_names)?;
+            }
+            Komut::EgerKomutu {
+                kosul,
+                govde,
+                degilse_govde,
+            } => {
+                validate_aot_expression(kosul, scope, function_names)?;
+                validate_aot_commands(govde, scope, function_names)?;
+                if let Some(otherwise) = degilse_govde {
+                    validate_aot_commands(otherwise, scope, function_names)?;
+                }
+            }
+            Komut::DonguKomutu { kosul, govde } => {
+                validate_aot_expression(kosul, scope, function_names)?;
+                validate_aot_commands(govde, scope, function_names)?;
+            }
+            Komut::AralikDongusu {
+                degisken,
+                baslangic,
+                bitis,
+                govde,
+            } => {
+                validate_aot_expression(baslangic, scope, function_names)?;
+                validate_aot_expression(bitis, scope, function_names)?;
+                scope.insert(degisken.clone());
+                validate_aot_commands(govde, scope, function_names)?;
+            }
+            Komut::IfadeKomutu(Ifade::IkiliIslem {
+                sol,
+                operator: Token::Esittir,
+                sag,
+            }) => {
+                let Ifade::Degisken(name) = sol.as_ref() else {
+                    return Err("AOT atamasının sol tarafı değişken olmalıdır".to_string());
+                };
+                if !scope.contains(name) {
+                    return Err(format!("tanımsız değişkene atama: {}", name));
+                }
+                validate_aot_expression(sag, scope, function_names)?;
+            }
+            Komut::IfadeKomutu(expression) => {
+                validate_aot_expression(expression, scope, function_names)?;
+            }
+            Komut::FonksiyonTanimla { .. } => {}
+            unsupported => {
+                return Err(format!(
+                    "AOT sayısal alt kümesinde desteklenmeyen komut: {:?}",
+                    unsupported
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_aot_expression(
+    expression: &Ifade,
+    scope: &HashSet<String>,
+    function_names: &HashSet<String>,
+) -> Result<(), String> {
+    match expression {
+        Ifade::Sayi(_) | Ifade::Dogru | Ifade::Yanlis => Ok(()),
+        Ifade::Degisken(name) if scope.contains(name) => Ok(()),
+        Ifade::Degisken(name) => Err(format!("tanımsız değişken: {}", name)),
+        Ifade::IkiliIslem { sol, operator, sag } => {
+            if !matches!(
+                operator,
+                Token::Arti
+                    | Token::Eksi
+                    | Token::Carpi
+                    | Token::Bolnu
+                    | Token::Kucuktur
+                    | Token::Buyuktur
+                    | Token::KucukEsit
+                    | Token::BuyukEsit
+                    | Token::EsitEsittir
+                    | Token::Esittir
+                    | Token::EsitDegil
+            ) {
+                return Err(format!(
+                    "AOT tarafından desteklenmeyen operatör: {}",
+                    operator
+                ));
+            }
+            validate_aot_expression(sol, scope, function_names)?;
+            validate_aot_expression(sag, scope, function_names)
+        }
+        Ifade::Cagri {
+            fonksiyon,
+            argumanlar,
+            ..
+        } => {
+            let Ifade::Degisken(name) = fonksiyon.as_ref() else {
+                return Err(
+                    "AOT yalnızca adlandırılmış fonksiyon çağrılarını destekler".to_string()
+                );
+            };
+            if !function_names.contains(name) {
+                return Err(format!("AOT için bilinmeyen fonksiyon: {}", name));
+            }
+            for argument in argumanlar {
+                validate_aot_expression(argument, scope, function_names)?;
+            }
+            Ok(())
+        }
+        unsupported => Err(format!(
+            "AOT sayısal alt kümesinde desteklenmeyen ifade: {:?}",
+            unsupported
+        )),
+    }
+}
+
 // ── Kullanıcı fonksiyonu üretici ─────────────────────────────────────────────
 
 #[allow(clippy::too_many_arguments)]
@@ -282,8 +453,7 @@ fn emit_user_function(
         builder.append_block_params_for_function_params(entry);
         builder.seal_block(entry);
 
-        let params: Vec<cranelift_codegen::ir::Value> =
-            builder.block_params(entry).to_vec();
+        let params: Vec<cranelift_codegen::ir::Value> = builder.block_params(entry).to_vec();
 
         let mut vars: HashMap<String, Variable> = HashMap::new();
         let mut var_counter: u32 = 0;
@@ -376,12 +546,15 @@ impl<'a, 'b> Emitter<'a, 'b> {
                 let val = self
                     .emit_expr(ifade, module)
                     .unwrap_or_else(|| self.builder.ins().f64const(0.0));
-                let print_ref =
-                    module.declare_func_in_func(self.rt_print_id, &mut self.builder.func);
+                let print_ref = module.declare_func_in_func(self.rt_print_id, self.builder.func);
                 self.builder.ins().call(print_ref, &[val]);
             }
 
-            Komut::EgerKomutu { kosul, govde, degilse_govde } => {
+            Komut::EgerKomutu {
+                kosul,
+                govde,
+                degilse_govde,
+            } => {
                 let cond_val = match self.emit_expr(kosul, module) {
                     Some(v) => v,
                     None => return,
@@ -449,7 +622,12 @@ impl<'a, 'b> Emitter<'a, 'b> {
                 self.builder.seal_block(exit_bb);
             }
 
-            Komut::AralikDongusu { degisken, baslangic, bitis, govde } => {
+            Komut::AralikDongusu {
+                degisken,
+                baslangic,
+                bitis,
+                govde,
+            } => {
                 let start_val = match self.emit_expr(baslangic, module) {
                     Some(v) => v,
                     None => return,
@@ -470,7 +648,10 @@ impl<'a, 'b> Emitter<'a, 'b> {
                     Some(v) => v,
                     None => return,
                 };
-                let cond = self.builder.ins().fcmp(FloatCC::LessThanOrEqual, cur, end_val);
+                let cond = self
+                    .builder
+                    .ins()
+                    .fcmp(FloatCC::LessThanOrEqual, cur, end_val);
                 self.builder.ins().brif(cond, body_bb, &[], exit_bb, &[]);
 
                 self.builder.func.layout.append_block(body_bb);
@@ -501,7 +682,12 @@ impl<'a, 'b> Emitter<'a, 'b> {
             }
 
             Komut::IfadeKomutu(ifade) => {
-                if let Ifade::IkiliIslem { sol, operator: Token::Esittir, sag } = ifade {
+                if let Ifade::IkiliIslem {
+                    sol,
+                    operator: Token::Esittir,
+                    sag,
+                } = ifade
+                {
                     if let Ifade::Degisken(ad) = sol.as_ref() {
                         if let Some(val) = self.emit_expr(sag, module) {
                             let var = self.get_or_create_var(ad);
@@ -524,9 +710,9 @@ impl<'a, 'b> Emitter<'a, 'b> {
     ) -> Option<cranelift_codegen::ir::Value> {
         match ifade {
             Ifade::Sayi(n) => Some(self.builder.ins().f64const(*n)),
-            Ifade::Dogru  => Some(self.builder.ins().f64const(1.0)),
+            Ifade::Dogru => Some(self.builder.ins().f64const(1.0)),
             Ifade::Yanlis => Some(self.builder.ins().f64const(0.0)),
-            Ifade::Bos    => Some(self.builder.ins().f64const(0.0)),
+            Ifade::Bos => Some(self.builder.ins().f64const(0.0)),
 
             Ifade::Degisken(ad) => {
                 let var = self.get_or_create_var(ad);
@@ -539,7 +725,11 @@ impl<'a, 'b> Emitter<'a, 'b> {
                 self.emit_binop(operator, l, r)
             }
 
-            Ifade::Cagri { fonksiyon, argumanlar, .. } => {
+            Ifade::Cagri {
+                fonksiyon,
+                argumanlar,
+                ..
+            } => {
                 let mut arg_vals = Vec::with_capacity(argumanlar.len());
                 for arg in argumanlar {
                     arg_vals.push(self.emit_expr(arg, module)?);
@@ -547,7 +737,7 @@ impl<'a, 'b> Emitter<'a, 'b> {
 
                 if let Ifade::Degisken(fn_name) = fonksiyon.as_ref() {
                     if let Some(&(fid, _)) = self.fn_registry.get(fn_name) {
-                        let fref = module.declare_func_in_func(fid, &mut self.builder.func);
+                        let fref = module.declare_func_in_func(fid, self.builder.func);
                         let call = self.builder.ins().call(fref, &arg_vals);
                         let results = self.builder.inst_results(call);
                         return if results.is_empty() {
@@ -571,10 +761,10 @@ impl<'a, 'b> Emitter<'a, 'b> {
         r: cranelift_codegen::ir::Value,
     ) -> Option<cranelift_codegen::ir::Value> {
         match op {
-            Token::Arti   => Some(self.builder.ins().fadd(l, r)),
-            Token::Eksi   => Some(self.builder.ins().fsub(l, r)),
-            Token::Carpi  => Some(self.builder.ins().fmul(l, r)),
-            Token::Bolnu  => Some(self.builder.ins().fdiv(l, r)),
+            Token::Arti => Some(self.builder.ins().fadd(l, r)),
+            Token::Eksi => Some(self.builder.ins().fsub(l, r)),
+            Token::Carpi => Some(self.builder.ins().fmul(l, r)),
+            Token::Bolnu => Some(self.builder.ins().fdiv(l, r)),
 
             Token::Kucuktur => {
                 let b = self.builder.ins().fcmp(FloatCC::LessThan, l, r);
@@ -608,5 +798,59 @@ impl<'a, 'b> Emitter<'a, 'b> {
     fn bool_to_f64(&mut self, b: cranelift_codegen::ir::Value) -> cranelift_codegen::ir::Value {
         let i = self.builder.ins().uextend(types::I64, b);
         self.builder.ins().fcvt_from_uint(types::F64, i)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn aot_sayisal_alt_kume_gercek_ikili_uretir() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Sistem saati Unix epoch sonrasında olmalı")
+            .as_nanos();
+        let output =
+            std::env::temp_dir().join(format!("huma_aot_test_{}_{}", std::process::id(), nonce));
+        let source = r#"
+            kare fonksiyon olsun x alsın {
+                x * x'i döndür
+            }
+            sonuc = kare(5) olsun
+            sonuc'u yazdır
+        "#;
+
+        compile_to_binary(
+            source,
+            &AotOptions {
+                output_bin: &output,
+                opt_level: 0,
+            },
+        )
+        .expect("AOT sayısal alt kümesi ikili üretmeli");
+
+        let run = Command::new(&output)
+            .output()
+            .expect("Üretilen AOT ikilisi çalışmalı");
+        let _ = std::fs::remove_file(&output);
+        assert!(run.status.success());
+        assert_eq!(String::from_utf8_lossy(&run.stdout).trim(), "25");
+    }
+
+    #[test]
+    fn aot_desteklenmeyen_ifadeyi_acikca_reddeder() {
+        let output = std::env::temp_dir().join("huma_aot_reddet_test");
+        let error = compile_to_binary(
+            r#""metin"'i yazdır"#,
+            &AotOptions {
+                output_bin: &output,
+                opt_level: 0,
+            },
+        )
+        .expect_err("AOT metin ifadelerini kabul etmemeli");
+        assert!(error.to_string().contains("desteklenmeyen ifade"));
+        assert!(!output.exists());
     }
 }

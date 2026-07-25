@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OpCode {
@@ -10,11 +10,17 @@ pub enum OpCode {
     Sub,
     Mul,
     Div,
+    Mod,
     Greater,
+    GreaterOrEqual,
     Less,
     LessOrEqual,
     Equal,
     NotEqual,
+    And,
+    Or,
+    Not,
+    Length,
     Jump(usize),
     JumpIfFalse(usize),
     Call(usize),
@@ -28,8 +34,16 @@ pub enum OpCode {
     Await,
     Pop,
     Bos,
-    CallFFI { lib_ad: String, fn_ad: String, arg_len: usize },
-    MakeFunction { name: String, params: Vec<String>, body: Vec<crate::ast::Komut> },
+    CallFFI {
+        lib_ad: String,
+        fn_ad: String,
+        arg_len: usize,
+    },
+    MakeFunction {
+        name: String,
+        params: Vec<String>,
+        body: Vec<crate::ast::Komut>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

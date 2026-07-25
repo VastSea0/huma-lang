@@ -7,18 +7,16 @@
 //! hüma gen   <dosya.hb> [isim]       # Standalone Rust dosyası üret
 //! hüma repl                          # Etkileşimli REPL
 //! hüma test  [yol]                   # Testleri çalıştır (tests/ veya *_test.hb)
-//! hüma update                        # GitHub'dan son sürüme güncelle
 //! hüma version                       # Sürüm bilgisi
 //! ```
 
 mod commands;
-mod updater;
 mod package_manager;
 
+use anyhow::anyhow;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use tracing::error;
-use anyhow::anyhow;
 
 /// Standardised exit codes for CI/CD compatibility.
 #[allow(dead_code)]
@@ -28,7 +26,6 @@ pub mod exit_codes {
     pub const FILE_NOT_FOUND: i32 = 2;
     pub const COMPILATION_ERROR: i32 = 3;
     pub const RUNTIME_ERROR: i32 = 4;
-    pub const UPDATE_ERROR: i32 = 5;
 }
 
 // ─── CLI Definition ────────────────────────────────────────────────────────
@@ -116,7 +113,6 @@ enum Commands {
         opt_level: u8,
     },
 
-
     /// Etkileşimli REPL (Okuma-Değerlendirme-Yazdırma Döngüsü)
     #[command(alias = "kabuk")]
     Repl,
@@ -128,16 +124,7 @@ enum Commands {
         target: Option<String>,
     },
 
-
-    /// Hüma araç takımını GitHub'dan en son sürüme güncelle
-    #[command(alias = "güncelle")]
-    Update {
-        /// Mevcut sürümü kontrol et ancak güncelleme yapma
-        #[arg(long)]
-        check: bool,
-    },
-
-    /// Paket yöneticisi (kütüphane kurma, silme, güncelleme)
+    /// Paket yöneticisi (yerel kütüphane kurma, silme ve doğrulama)
     #[command(alias = "package")]
     Paket {
         #[command(subcommand)]
@@ -208,9 +195,6 @@ pub enum PackageAction {
     /// Projenin yayınlanmaya hazır olup olmadığını kontrol eder
     #[command(alias = "verify")]
     Doğrula,
-    /// Tüm paketleri günceller
-    #[command(alias = "update")]
-    Güncelle,
     /// Projedeki bir betiği çalıştırır (npm run gibi)
     #[command(alias = "çalıştır", alias = "betik")]
     Run {
@@ -218,7 +202,6 @@ pub enum PackageAction {
         name: String,
     },
 }
-
 
 // ─── Main ──────────────────────────────────────────────────────────────────
 
@@ -242,7 +225,11 @@ fn main() {
 fn run(cli: Cli) -> i32 {
     let result = match cli.command {
         Some(Commands::Run { target, vm }) => {
-            let runner = if vm { commands::run_vm_file } else { commands::run_file };
+            let runner = if vm {
+                commands::run_vm_file
+            } else {
+                commands::run_file
+            };
             if let Some(t) = target {
                 // Eğer bir .hb dosyası ise direkt çalıştır
                 if t.ends_with(".hb") && std::path::Path::new(&t).exists() {
@@ -279,29 +266,32 @@ fn run(cli: Cli) -> i32 {
                     // Giriş dosyasını dene
                     runner(&meta.giris)
                 } else {
-                    println!("{} Ne bir .hb dosyası belirtildi ne de bir huma.json projesi bulundu.", "Hata:".bright_red());
-                    Err(anyhow!("Ne bir .hb dosyası belirtildi ne de bir huma.json projesi bulundu."))
+                    println!(
+                        "{} Ne bir .hb dosyası belirtildi ne de bir huma.json projesi bulundu.",
+                        "Hata:".bright_red()
+                    );
+                    Err(anyhow!(
+                        "Ne bir .hb dosyası belirtildi ne de bir huma.json projesi bulundu."
+                    ))
                 }
             }
-        },
+        }
         Some(Commands::Build { file, output, json }) => commands::build_file(&file, &output, json),
         Some(Commands::Exec { file }) => commands::exec_bytecode(&file),
         Some(Commands::Gen { file, output }) => commands::generate_standalone(&file, &output),
-        Some(Commands::Aot { file, output, opt_level }) => commands::compile_aot(&file, &output, opt_level),
+        Some(Commands::Aot {
+            file,
+            output,
+            opt_level,
+        }) => commands::compile_aot(&file, &output, opt_level),
         Some(Commands::Repl) => commands::start_repl(),
 
         Some(Commands::Test { target }) => commands::run_tests(target.as_deref()),
-        Some(Commands::Update { check }) => {
-            if check {
-                updater::check_for_update()
-            } else {
-                updater::run_self_update()
-            }
-        }
         Some(Commands::Paket { action }) => match action {
-            PackageAction::Kur { name, trusted } => package_manager::install_package(name.as_deref(), trusted),
+            PackageAction::Kur { name, trusted } => {
+                package_manager::install_package(name.as_deref(), trusted)
+            }
             PackageAction::Sil { name } => package_manager::remove_package(&name),
-            PackageAction::Güncelle => package_manager::update_packages(),
             PackageAction::Yeni { name } => package_manager::create_package(&name),
             PackageAction::İlkle => package_manager::init_project(),
             PackageAction::Liste => package_manager::list_packages(),
@@ -309,7 +299,9 @@ fn run(cli: Cli) -> i32 {
             PackageAction::Run { name } => package_manager::run_script(&name),
         },
 
-        Some(Commands::Kur { name, trusted }) => package_manager::install_package(name.as_deref(), trusted),
+        Some(Commands::Kur { name, trusted }) => {
+            package_manager::install_package(name.as_deref(), trusted)
+        }
         Some(Commands::Yeni { name }) => package_manager::create_package(&name),
         Some(Commands::Listele) => package_manager::list_packages(),
         Some(Commands::İlkle) => package_manager::init_project(),

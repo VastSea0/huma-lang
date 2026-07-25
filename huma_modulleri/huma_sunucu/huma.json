@@ -1,7 +1,7 @@
 {
   "ad": "huma_sunucu",
   "surum": "1.0.0",
-  "aciklama": "Hüma için hızlı ve modern HTTP sunucusu kütüphanesi. GET/POST route tanımlama, JSON/HTML yanıt desteği.",
+  "aciklama": "GET/POST rotaları ile JSON ve HTML yanıtları için dahili sunucu işlevlerini sarmalayan deneysel HTTP API'si.",
   "yazar": "Egehan KAHRAMAN",
   "giris": "huma_sunucu.hb",
   "huma_surum": ">=0.5.0",

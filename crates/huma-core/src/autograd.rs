@@ -1,12 +1,18 @@
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Mutex};
 use std::fmt;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum OpType {
     Leaf,
     Add(u64, u64),
-    MatMul { left: u64, right: u64, r1: usize, c1: usize, c2: usize },
+    MatMul {
+        left: u64,
+        right: u64,
+        r1: usize,
+        c1: usize,
+        c2: usize,
+    },
     ReLU(u64),
 }
 
@@ -29,13 +35,23 @@ impl PartialEq for TensorData {
 
 impl fmt::Display for TensorData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "tensor[{}×{}, id={}]", self.satirlar, self.sutunlar, self.id)
+        write!(
+            f,
+            "tensor[{}×{}, id={}]",
+            self.satirlar, self.sutunlar, self.id
+        )
     }
 }
 
 pub struct AutogradGraph {
     next_id: u64,
     pub nodes: HashMap<u64, TensorData>,
+}
+
+impl Default for AutogradGraph {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl AutogradGraph {
@@ -46,7 +62,13 @@ impl AutogradGraph {
         }
     }
 
-    pub fn tensor_olustur(&mut self, satirlar: usize, sutunlar: usize, veri: Vec<f64>, requires_grad: bool) -> TensorData {
+    pub fn tensor_olustur(
+        &mut self,
+        satirlar: usize,
+        sutunlar: usize,
+        veri: Vec<f64>,
+        requires_grad: bool,
+    ) -> TensorData {
         let id = self.next_id;
         self.next_id += 1;
 
@@ -94,7 +116,10 @@ impl AutogradGraph {
 
     pub fn matris_carp(&mut self, t1: &TensorData, t2: &TensorData) -> Result<TensorData, String> {
         if t1.sutunlar != t2.satirlar {
-            return Err(format!("Matris boyut uyumsuzluğu: {}x{} * {}x{}", t1.satirlar, t1.sutunlar, t2.satirlar, t2.sutunlar));
+            return Err(format!(
+                "Matris boyut uyumsuzluğu: {}x{} * {}x{}",
+                t1.satirlar, t1.sutunlar, t2.satirlar, t2.sutunlar
+            ));
         }
 
         let id = self.next_id;
@@ -125,7 +150,13 @@ impl AutogradGraph {
             veri: Arc::new(Mutex::new(res)),
             gradyan: Arc::new(Mutex::new(vec![0.0; r1 * c2])),
             requires_grad: req_grad,
-            op: OpType::MatMul { left: t1.id, right: t2.id, r1, c1, c2 },
+            op: OpType::MatMul {
+                left: t1.id,
+                right: t2.id,
+                r1,
+                c1,
+                c2,
+            },
         };
 
         self.nodes.insert(id, t.clone());
@@ -197,8 +228,17 @@ impl AutogradGraph {
                             }
                         }
                     }
-                    OpType::MatMul { left: left_id, right: right_id, r1, c1, c2 } => {
-                        if let (Some(left), Some(right)) = (self.nodes.get(&left_id).cloned(), self.nodes.get(&right_id).cloned()) {
+                    OpType::MatMul {
+                        left: left_id,
+                        right: right_id,
+                        r1,
+                        c1,
+                        c2,
+                    } => {
+                        if let (Some(left), Some(right)) = (
+                            self.nodes.get(&left_id).cloned(),
+                            self.nodes.get(&right_id).cloned(),
+                        ) {
                             let v1 = left.veri.lock().unwrap();
                             let v2 = right.veri.lock().unwrap();
 
@@ -246,7 +286,9 @@ impl AutogradGraph {
     }
 
     fn topolojik_sirala(&self, curr_id: u64, visited: &mut HashSet<u64>, order: &mut Vec<u64>) {
-        if visited.contains(&curr_id) { return; }
+        if visited.contains(&curr_id) {
+            return;
+        }
         visited.insert(curr_id);
 
         if let Some(node) = self.nodes.get(&curr_id) {

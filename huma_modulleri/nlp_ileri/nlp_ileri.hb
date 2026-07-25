@@ -2,6 +2,5 @@
 // nlp_ileri/nlp_ileri.hb — İleri NLP Ana Giriş Noktası
 // ══════════════════════════════════════════════════════════════════════════════
 
-"bpe.hb"'yi yükle
 "tf_idf.hb"'yi yükle
 "gomme.hb"'yi yükle

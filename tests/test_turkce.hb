@@ -19,8 +19,7 @@ toplam fonksiyon olsun sayı_bir, sayı_iki alsın {
 yük_miktarı = toplam(öğrenci_sayısı, 80) olsun
 "Toplam yük: " + yük_miktarı'nı yazdır;
 
-// Kesme işareti ve ek desteği
-öğrenci_sayısı'nı 200 ile karşılaştır:
+// Kesme işareti ve belirtme durumu eki desteği
 öğrenci_sayısı < 200 ise {
     "Kapasite yeterli."'yi yazdır;
 }

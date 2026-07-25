@@ -88,9 +88,11 @@ mini_batch_olustur fonksiyon olsun veri, etiketler, batch_boyutu alsın {
         son > n ise { son = n olsun }
         batch_v = [] olsun
         batch_e = [] olsun
-        j = i'den (son - 1)'e kadar {
+        j = i olsun
+        j < son olduğu sürece {
             batch_v = listeye_ekle(batch_v, veri[j]) olsun
             batch_e = listeye_ekle(batch_e, etiketler[j]) olsun
+            j = j + 1 olsun
         }
         batch = {} olsun
         batch["veri"] = batch_v
@@ -107,13 +109,13 @@ mini_batch_olustur fonksiyon olsun veri, etiketler, batch_boyutu alsın {
 dogruluk_hesapla fonksiyon olsun tahminler, gercekler alsın {
     n = uzunluk(tahminler) olsun
     n = 0 ise { 0.0'ı döndür }
-    dogru = 0 olsun
+    dogru_sayisi = 0 olsun
     i = 0'dan (n - 1)'e kadar {
         tahmin_sinif = 0 olsun
         tahminler[i] >= 0.5 ise { tahmin_sinif = 1 olsun }
-        tahmin_sinif = gercekler[i] ise { dogru = dogru + 1 olsun }
+        tahmin_sinif = gercekler[i] ise { dogru_sayisi = dogru_sayisi + 1 olsun }
     }
-    dogru / n'yi döndür
+    dogru_sayisi / n'yi döndür
 }
 
 // MSE — Ortalama Kare Hata

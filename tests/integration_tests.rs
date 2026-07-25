@@ -2,11 +2,11 @@
 // böylece bu dosyadaki "use huma::..." importları doğru çalışır.
 use huma_core as huma;
 
+use huma::interpreter::Yorumlayici;
 use huma::lexer::Lexer;
 use huma::parser::Parser;
-use huma::interpreter::Yorumlayici;
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 // ─────────────────────────────────────────────
 // Yardımcı fonksiyon — kodu çalıştırıp çıktısını döndürür
@@ -17,8 +17,15 @@ fn eval(kod: &str) -> String {
 
     let lexer = Lexer::new(kod);
     let mut parser = Parser::new(lexer);
-    let program = parser.parse_program();
-    yorumlayici.yorumla(program);
+    let (program, diagnostics) = parser.parse_program_with_diagnostics();
+    assert!(
+        diagnostics.is_empty(),
+        "Kaynak ayrıştırılamadı: {:?}",
+        diagnostics
+    );
+    yorumlayici
+        .yorumla_kontrollu(program)
+        .expect("Kaynak çalışma zamanı hatası vermemeli");
 
     let sonuc = buffer.borrow().clone();
     sonuc
@@ -133,8 +140,10 @@ fn test_derin_rekursiyon_hatasi() {
     let lexer = Lexer::new(kod);
     let mut parser = Parser::new(lexer);
     let program = parser.parse_program();
-    // Panik atmamalı
-    interp.yorumla(program);
+    let error = interp
+        .yorumla_kontrollu(program)
+        .expect_err("Sınırsız özyineleme hata vermeli");
+    assert!(error.to_string().contains("özyineleme"));
     // Derinlik çıkıştan sonra sıfırlanmış olmalı
     assert_eq!(interp.call_depth, 0);
 }
@@ -151,8 +160,10 @@ fn test_cagrilamayan_deger_hatasi() {
     let lexer = Lexer::new(kod);
     let mut parser = Parser::new(lexer);
     let program = parser.parse_program();
-    // Panik atmadan tamamlanmalı
-    interp.yorumla(program);
+    let error = interp
+        .yorumla_kontrollu(program)
+        .expect_err("Çağrılamayan değer hata vermeli");
+    assert!(error.to_string().contains("Çağrılamayan değer"));
 }
 
 /// REGRESYON: VM iç içe fonksiyon çağrılarında panik atmamalı.
@@ -169,12 +180,14 @@ fn test_vm_fonksiyon_cagrisi() {
     "#;
     let lexer = Lexer::new(kod);
     let mut parser = Parser::new(lexer);
-    let ast = parser.parse_program();
+    let (ast, diagnostics) = parser.parse_program_with_diagnostics();
+    assert!(diagnostics.is_empty());
     let mut derleyici = huma::compiler::Derleyici::new();
-    let prog = derleyici.derle(ast);
+    let prog = derleyici
+        .derle_kontrollu(ast)
+        .expect("Fonksiyonlar bytecode'a derlenmeli");
     let mut vm = huma::vm::VM::new(prog);
-    // Panik atmadan çalışmalı
-    vm.run();
+    vm.run_checked().expect("VM programı çalışmalı");
 }
 
 // ─────────────────────────────────────────────

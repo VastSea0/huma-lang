@@ -52,7 +52,7 @@ kontroller_icerik_fks fonksiyon olsun {
     
     boşluk_bırak(20.0)
     buton_ekle("TUR EKLE", 0, 150, 255, 120, 40) ise {
-        // Zamanı metne çevirmek için parçalı toplama (Garantili Çalışması İçin)
+        // Zamanı metne çevirmek için parçalı toplama
         t_metin = "" + saat olsun
         t_metin = t_metin + ":"
         t_metin = t_metin + dakika

@@ -1,13 +1,12 @@
+use anyhow::{anyhow, Context, Result};
+use colored::Colorize;
+use semver::{Version, VersionReq};
+use serde::{Deserialize, Deserializer, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use anyhow::{Result, anyhow, Context};
-use colored::Colorize;
-use serde::{Deserialize, Serialize, Deserializer};
-use semver::{Version, VersionReq};
-use std::collections::{HashMap, HashSet};
-use chrono;
-use sha2::{Sha256, Digest};
 
 // ─── Hüma Paket Standardı (HPS) ────────────────────────────────────────────
 
@@ -20,23 +19,28 @@ pub struct PaketMetadata {
     pub yazar: String,
     pub giris: String,
     /// Bu paket için gereken minimum Hüma versiyonu (isteğe bağlı)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub huma_surum: Option<String>,
     /// Projenin bağımlılıkları (paket adı -> sürüm kısıtlaması)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bagimliliklar: Option<HashMap<String, String>>,
     /// Çalıştırılabilir betikler (betik adı -> komut)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub betikler: Option<HashMap<String, String>>,
     /// Native Rust bağımlılıkları (crate adı -> sürüm)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub crate_bagimliliklari: Option<HashMap<String, String>>,
     /// Transpilation (huma gen) sırasında enjekte edilecek Rust kodu
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub yerleşik_rust: Option<String>,
     /// Paketin GitHub kaynak URL'si (lock dosyasında izlenebilmesi için)
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kaynak: Option<String>,
     /// GitHub kullanıcı/repo bilgisi (örn: "VastSea0/ag_istekleri")
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub github: Option<String>,
     /// Lisans türü (örn: "MIT")
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lisans: Option<String>,
 }
 
@@ -80,7 +84,15 @@ impl<'de> Deserialize<'de> for KilitBilgisi {
                 hash: "".to_string(),
                 kaynak: None,
             }),
-            TempKilit::Map { surum, hash, kaynak } => Ok(KilitBilgisi { surum, hash, kaynak }),
+            TempKilit::Map {
+                surum,
+                hash,
+                kaynak,
+            } => Ok(KilitBilgisi {
+                surum,
+                hash,
+                kaynak,
+            }),
         }
     }
 }
@@ -92,25 +104,22 @@ const LOCK_FILE: &str = "huma.lock";
 const PROJECT_FILE: &str = "huma.json";
 const CURRENT_HUMA_VER: &str = env!("CARGO_PKG_VERSION");
 
-/// Hüma Dahili Paket Registry'si
-/// (paket_adı, github_repo_path, varsayılan_dal)
-const BUILTIN_REGISTRY: &[(&str, &str, &str)] = &[
-    ("nlp_temel",    "VastSea0/huma-lang/huma_modulleri/nlp_temel", "main"),
-    ("ag_istekleri", "VastSea0/huma-lang/huma_modulleri/ag_istekleri", "main"),
-    ("huma_sunucu",  "VastSea0/huma-lang/huma_modulleri/huma_sunucu", "main"),
-    ("huma_sqlite",  "VastSea0/huma-lang/huma_modulleri/huma_sqlite", "main"),
-    ("gui",          "VastSea0/huma-lang/huma_modulleri/gui", "main"),
+/// Kaynak ağacında dağıtılan ve yerel olarak kurulabilen paketler.
+const BUILTIN_PACKAGES: &[&str] = &[
+    "nlp_temel",
+    "nlp_ileri",
+    "yapay_zeka",
+    "ag_istekleri",
+    "huma_sunucu",
+    "huma_sqlite",
+    "gui",
 ];
 
 /// Paket adları ve dosya yollarında izin verilmeyen kalıplar
-const FORBIDDEN_PATH_PATTERNS: &[&str] = &[
-    "..", "//", "\\", "\0", "~",
-];
+const FORBIDDEN_PATH_PATTERNS: &[&str] = &["..", "//", "\\", "\0", "~"];
 
 /// Betiklerde tehlikeli kabuk meta-karakterleri
-const DANGEROUS_SHELL_CHARS: &[&str] = &[
-    "&&", "||", ";", "|", "$(", "`", ">", "<", "&",
-];
+const DANGEROUS_SHELL_CHARS: &[&str] = &["&&", "||", ";", "|", "$(", "`", ">", "<", "&"];
 
 // ─── [1] Path Sanitization ─────────────────────────────────────────────────
 
@@ -132,15 +141,16 @@ fn sanitize_package_name(name: &str) -> Result<()> {
         if name.contains(pattern) {
             return Err(anyhow!(
                 "Güvenlik Hatası: Paket adı '{}' tehlikeli karakter/kalıp içeriyor: '{}'",
-                name, pattern
+                name,
+                pattern
             ));
         }
     }
 
     // Sadece alfanümerik, alt çizgi, tire ve nokta (dosya uzantısı) karakterlerine izin ver
-    let is_valid = name.chars().all(|c| {
-        c.is_alphanumeric() || c == '_' || c == '-' || c == '.'
-    });
+    let is_valid = name
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == '.');
 
     if !is_valid {
         return Err(anyhow!(
@@ -153,18 +163,27 @@ fn sanitize_package_name(name: &str) -> Result<()> {
     Ok(())
 }
 
+fn uzak_paket_girdisi_mi(input: &str) -> bool {
+    input.contains('/') || input.starts_with("http:") || input.starts_with("https:")
+}
+
 /// Yazılacak dosyanın hedef dizin (huma_modulleri/) dışına çıkmadığını doğrular.
 fn verify_path_within_boundary(file_path: &Path, boundary_dir: &Path) -> Result<()> {
     // Boundary'yi oluştur (henüz yoksa)
     fs::create_dir_all(boundary_dir)?;
 
-    let canonical_boundary = boundary_dir.canonicalize()
-        .with_context(|| format!("Hedef dizin canonicalize edilemedi: {}", boundary_dir.display()))?;
+    let canonical_boundary = boundary_dir.canonicalize().with_context(|| {
+        format!(
+            "Hedef dizin canonicalize edilemedi: {}",
+            boundary_dir.display()
+        )
+    })?;
 
     // Dosyanın üst dizinini canonicalize et (dosya henüz yoksa üst dizini kullan)
     let parent = file_path.parent().unwrap_or(file_path);
     fs::create_dir_all(parent)?;
-    let canonical_parent = parent.canonicalize()
+    let canonical_parent = parent
+        .canonicalize()
         .with_context(|| format!("Dosya yolu canonicalize edilemedi: {}", parent.display()))?;
 
     if !canonical_parent.starts_with(&canonical_boundary) {
@@ -183,17 +202,31 @@ fn verify_path_within_boundary(file_path: &Path, boundary_dir: &Path) -> Result<
 /// Paketin native (Rust) kodu içerip içermediğini kontrol eder ve
 /// güvenilir modda değilse kullanıcıyı uyarır.
 fn check_native_code_safety(meta: &PaketMetadata, trusted: bool) -> Result<()> {
-    let has_native_rust = meta.yerleşik_rust.as_ref().map_or(false, |s| !s.is_empty());
-    let has_crate_deps = meta.crate_bagimliliklari.as_ref().map_or(false, |d| !d.is_empty());
+    let has_native_rust = meta.yerleşik_rust.as_ref().is_some_and(|s| !s.is_empty());
+    let has_crate_deps = meta
+        .crate_bagimliliklari
+        .as_ref()
+        .is_some_and(|d| !d.is_empty());
 
     if !has_native_rust && !has_crate_deps {
         return Ok(());
     }
 
     println!();
-    println!("{}", "╔══════════════════════════════════════════════════════════╗".bright_red());
-    println!("{}", "║  ⚠  GÜVENLİK UYARISI — NATIVE KOD TESPİT EDİLDİ  ⚠   ║".bright_red().bold());
-    println!("{}", "╚══════════════════════════════════════════════════════════╝".bright_red());
+    println!(
+        "{}",
+        "╔══════════════════════════════════════════════════════════╗".bright_red()
+    );
+    println!(
+        "{}",
+        "║  ⚠  GÜVENLİK UYARISI — NATIVE KOD TESPİT EDİLDİ  ⚠   ║"
+            .bright_red()
+            .bold()
+    );
+    println!(
+        "{}",
+        "╚══════════════════════════════════════════════════════════╝".bright_red()
+    );
 
     if has_native_rust {
         println!(
@@ -209,8 +242,13 @@ fn check_native_code_safety(meta: &PaketMetadata, trusted: bool) -> Result<()> {
     }
 
     if has_crate_deps {
-        let deps: Vec<String> = meta.crate_bagimliliklari.as_ref().unwrap()
-            .keys().cloned().collect();
+        let deps: Vec<String> = meta
+            .crate_bagimliliklari
+            .as_ref()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect();
         println!(
             "  {} Harici Rust crate bağımlılıkları: {}",
             "↳".bright_yellow(),
@@ -248,54 +286,57 @@ fn check_native_code_safety(meta: &PaketMetadata, trusted: bool) -> Result<()> {
 
 // ─── [3] Hash Doğrulaması ──────────────────────────────────────────────────
 
-/// İçerik ve metadata'dan SHA-256 hash hesaplar.
-fn calculate_hash(content: &str, meta_str: &str) -> String {
+/// Paket metadata'sı ve bütün dosyalarından tekrarlanabilir SHA-256 özeti hesaplar.
+fn calculate_package_hash(package_path: &Path, meta: &PaketMetadata) -> Result<String> {
+    fn collect_files(current: &Path, root: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
+        for entry in fs::read_dir(current)? {
+            let entry = entry?;
+            let path = entry.path();
+            let file_type = entry.file_type()?;
+            if file_type.is_symlink() {
+                return Err(anyhow!(
+                    "Paket bütünlüğü hesaplanırken sembolik bağlantı reddedildi: {}",
+                    path.display()
+                ));
+            }
+            if file_type.is_dir() {
+                collect_files(&path, root, files)?;
+            } else if path.parent() != Some(root)
+                || !matches!(
+                    path.file_name().and_then(|name| name.to_str()),
+                    Some("huma.json" | "paket.json")
+                )
+            {
+                files.push(path);
+            }
+        }
+        Ok(())
+    }
+
+    let mut files = Vec::new();
+    collect_files(package_path, package_path, &mut files)?;
+    files.sort_by(|a, b| {
+        a.strip_prefix(package_path)
+            .unwrap_or(a)
+            .cmp(b.strip_prefix(package_path).unwrap_or(b))
+    });
+
     let mut hasher = Sha256::new();
-    hasher.update(content.as_bytes());
-    hasher.update(meta_str.as_bytes());
-    hex::encode(hasher.finalize())
-}
-
-/// Kilit dosyasındaki hash ile mevcut dosyanın hash'ini karşılaştırır.
-/// Uyumsuzluk tespit edilirse uyarı verir.
-fn verify_lock_integrity(name: &str, current_hash: &str) -> Result<bool> {
-    if !Path::new(LOCK_FILE).exists() {
-        return Ok(false); // Lock yok, doğrulama gerekmez
+    let meta_bytes = serde_json::to_vec(meta)?;
+    hasher.update((meta_bytes.len() as u64).to_le_bytes());
+    hasher.update(meta_bytes);
+    for path in files {
+        let relative = path
+            .strip_prefix(package_path)
+            .with_context(|| format!("Paket yolu göreli hale getirilemedi: {}", path.display()))?;
+        let relative_bytes = relative.to_string_lossy();
+        let content = fs::read(&path)?;
+        hasher.update((relative_bytes.len() as u64).to_le_bytes());
+        hasher.update(relative_bytes.as_bytes());
+        hasher.update((content.len() as u64).to_le_bytes());
+        hasher.update(content);
     }
-
-    let lock_str = fs::read_to_string(LOCK_FILE)?;
-    let lock: PaketKilit = serde_json::from_str(&lock_str)
-        .unwrap_or_default();
-
-    if let Some(info) = lock.paketler.get(name) {
-        if !info.hash.is_empty() && info.hash != current_hash {
-            println!(
-                "\n  {} '{}' paketinin hash değeri kilit dosyasıyla uyuşmuyor!",
-                "⚠ UYARI:".bright_yellow().bold(),
-                name.bold()
-            );
-            println!(
-                "    Beklenen: {}",
-                &info.hash[..16.min(info.hash.len())].bright_black()
-            );
-            println!(
-                "    Hesaplanan: {}",
-                &current_hash[..16.min(current_hash.len())].bright_red()
-            );
-            println!(
-                "    {} Paket kaynağı değişmiş veya bozulmuş olabilir.\n",
-                "↳".bright_yellow()
-            );
-            return Ok(true); // Uyumsuzluk var
-        }
-
-        // Hash uyuşuyor — yeniden indirmeye gerek yok
-        if !info.hash.is_empty() && info.hash == current_hash {
-            return Ok(false);
-        }
-    }
-
-    Ok(false)
+    Ok(hex::encode(hasher.finalize()))
 }
 
 // ─── [5] Atomik Dosya Yazımı ───────────────────────────────────────────────
@@ -316,12 +357,13 @@ fn atomic_write(path: &Path, content: &[u8]) -> Result<()> {
         .with_context(|| format!("Geçici dosya yazılamadı: {}", tmp_path.display()))?;
 
     // Atomik taşıma
-    fs::rename(&tmp_path, path)
-        .with_context(|| format!(
+    fs::rename(&tmp_path, path).with_context(|| {
+        format!(
             "Dosya taşıma başarısız: {} → {}",
             tmp_path.display(),
             path.display()
-        ))?;
+        )
+    })?;
 
     Ok(())
 }
@@ -329,61 +371,6 @@ fn atomic_write(path: &Path, content: &[u8]) -> Result<()> {
 /// String içeriği atomik olarak yazar.
 fn atomic_write_str(path: &Path, content: &str) -> Result<()> {
     atomic_write(path, content.as_bytes())
-}
-
-// ─── [6] URL Parse — Tag/Branch Desteği ────────────────────────────────────
-
-/// GitHub URL'sini parse eder ve (owner, repo, branch/tag) bilgisini döndürür.
-///
-/// Desteklenen formatlar:
-/// - `github.com/user/repo` → (user, repo, "main")
-/// - `github.com/user/repo@v1.0.0` → (user, repo, "v1.0.0")
-/// - `github.com/user/repo#branch_name` → (user, repo, "branch_name")
-struct GitHubSource {
-    owner: String,
-    repo: String,
-    path: String,      // Repo içindeki alt dizin (isteğe bağlı)
-    reference: String, // branch, tag veya commit
-}
-
-fn parse_github_url(url: &str) -> Result<GitHubSource> {
-    let cleaned = url
-        .trim_start_matches("https://")
-        .trim_start_matches("http://")
-        .trim_start_matches("github.com/");
-
-    // @ veya # ile referans ayrımı
-    let (path_part, reference) = if let Some(idx) = cleaned.find('@') {
-        (&cleaned[..idx], cleaned[idx + 1..].to_string())
-    } else if let Some(idx) = cleaned.find('#') {
-        (&cleaned[..idx], cleaned[idx + 1..].to_string())
-    } else {
-        (cleaned, "main".to_string())
-    };
-
-    let parts: Vec<&str> = path_part.split('/').collect();
-    if parts.len() < 2 {
-        return Err(anyhow!(
-            "Geçersiz GitHub URL formatı: '{}'. \
-             Beklenen: github.com/kullanıcı/repo[/alt-dizin][@sürüm|#dal]",
-            url
-        ));
-    }
-
-    let owner = parts[0].to_string();
-    let repo = parts[1].to_string();
-    let path = if parts.len() > 2 {
-        parts[2..].join("/")
-    } else {
-        "".to_string()
-    };
-
-    Ok(GitHubSource {
-        owner,
-        repo,
-        path,
-        reference,
-    })
 }
 
 // ─── [9] Betik Güvenliği ───────────────────────────────────────────────────
@@ -406,7 +393,12 @@ fn check_script_safety(command: &str) -> Result<()> {
         println!("    Komut: {}", command.bright_white());
         println!(
             "    Tespit: {}",
-            detected.iter().map(|s| format!("'{}'", s)).collect::<Vec<_>>().join(", ").bright_red()
+            detected
+                .iter()
+                .map(|s| format!("'{}'", s))
+                .collect::<Vec<_>>()
+                .join(", ")
+                .bright_red()
         );
         print!(
             "  {} Yine de çalıştırmak istiyor musunuz? [e/H]: ",
@@ -419,7 +411,9 @@ fn check_script_safety(command: &str) -> Result<()> {
         let answer = input.trim().to_lowercase();
 
         if answer != "e" && answer != "evet" {
-            return Err(anyhow!("Betik çalıştırma kullanıcı tarafından iptal edildi."));
+            return Err(anyhow!(
+                "Betik çalıştırma kullanıcı tarafından iptal edildi."
+            ));
         }
     }
 
@@ -431,7 +425,9 @@ fn check_script_safety(command: &str) -> Result<()> {
 /// Kurulu tüm paketleri ve sürümlerini kilit dosyasından listeler
 pub fn list_packages() -> Result<()> {
     if !Path::new(PROJECT_FILE).exists() {
-        return Err(anyhow!("Bu dizinde bir Hüma projesi (huma.json) bulunamadı."));
+        return Err(anyhow!(
+            "Bu dizinde bir Hüma projesi (huma.json) bulunamadı."
+        ));
     }
 
     if !Path::new(LOCK_FILE).exists() {
@@ -447,7 +443,10 @@ pub fn list_packages() -> Result<()> {
         return Ok(());
     }
 
-    println!("{} Kurulu Hüma Paketleri (Kilitlenmiş Sürümler):", "Hüma:".bright_cyan());
+    println!(
+        "{} Kurulu Hüma Paketleri (Kilitlenmiş Sürümler):",
+        "Hüma:".bright_cyan()
+    );
     for (ad, bilgi) in &lock.paketler {
         let source_info = bilgi.kaynak.as_deref().unwrap_or("yerel");
         if !bilgi.hash.is_empty() {
@@ -534,7 +533,11 @@ pub fn create_package(name: &str) -> Result<()> {
         .current_dir(dir)
         .output();
 
-    println!("{} '{}' projesi oluşturuldu.", "Başarılı!".bright_green(), name.bold());
+    println!(
+        "{} '{}' projesi oluşturuldu.",
+        "Başarılı!".bright_green(),
+        name.bold()
+    );
     Ok(())
 }
 
@@ -543,7 +546,9 @@ pub fn create_package(name: &str) -> Result<()> {
 pub fn install_package(input: Option<&str>, trusted: bool) -> Result<()> {
     // 1. Proje dosyası kontrolü
     if !Path::new(PROJECT_FILE).exists() {
-        return Err(anyhow!("Bu dizinde huma.json bulunamadı. Önce 'huma paket ilkle' çalıştırın."));
+        return Err(anyhow!(
+            "Bu dizinde huma.json bulunamadı. Önce 'huma paket ilkle' çalıştırın."
+        ));
     }
 
     let input = match input {
@@ -556,7 +561,11 @@ pub fn install_package(input: Option<&str>, trusted: bool) -> Result<()> {
                     println!("{} Kurulacak bağımlılık yok.", "Bilgi:".bright_yellow());
                     return Ok(());
                 }
-                println!("{} {} bağımlılık kuruluyor...", "Hüma:".bright_cyan(), deps.len());
+                println!(
+                    "{} {} bağımlılık kuruluyor...",
+                    "Hüma:".bright_cyan(),
+                    deps.len()
+                );
                 let mut failures = Vec::new();
                 for (ad, _surum) in deps {
                     if let Err(e) = install_package(Some(&ad), trusted) {
@@ -583,43 +592,37 @@ pub fn install_package(input: Option<&str>, trusted: bool) -> Result<()> {
         }
     };
 
-    // [1] Güvenlik: İsim doğrulaması (GitHub URL'leri ayrı işlenir)
-    if !input.contains('/') {
-        sanitize_package_name(input)?;
+    if uzak_paket_girdisi_mi(input) {
+        return Err(anyhow!(
+            "Uzak paket kurulumu 0.6.0'da devre dışıdır: imzalı kayıt ve çok dosyalı \
+             paket doğrulaması henüz yok. Yalnızca kaynak ağacındaki yerel paketler kurulabilir."
+        ));
     }
+    sanitize_package_name(input)?;
 
-    // GitHub URL ile kurulum
-    if input.starts_with("github.com/") || input.starts_with("https://github.com/") {
-        return install_from_github(input, trusted);
-    }
-
-    // [4] Dahili Registry'den Kurulum
-    if let Some((_, repo_path, branch)) = BUILTIN_REGISTRY.iter().find(|(name, _, _)| *name == input) {
-        let github_url = format!("github.com/{}@{}", repo_path, branch);
+    // Kaynak ağacındaki dağıtılmış paketlerden kurulum.
+    if BUILTIN_PACKAGES.contains(&input) {
         println!(
-            "{} '{}' dahili registry'den kuruluyor ({})...",
+            "{} '{}' yerel dağıtılmış paketlerden aranıyor...",
             "Hüma:".bright_cyan(),
             input.bold(),
-            repo_path.dimmed()
         );
 
-        // Yerel kaynağı dene (workspace içindeyse)
         let local_paths = find_local_package(input);
         if let Some(local_path) = local_paths {
             return install_from_local(&local_path, input, trusted);
         }
-
-        // Yerel bulunamadı — GitHub'dan indir
-        return install_from_github(&github_url, trusted);
+        return Err(anyhow!(
+            "'{}' yerel kaynak ağacında bulunamadı. 0.6.0 uzak indirme yapmaz.",
+            input
+        ));
     }
 
     Err(anyhow!(
         "Paket '{}' bulunamadı. \n\
-         Kullanılabilir kaynaklar:\n\
-         • Dahili: {} \n\
-         • GitHub: huma kur github.com/kullanıcı/repo[@sürüm]",
+         Yerel kaynak ağacında dağıtılan paketler: {}",
         input,
-        BUILTIN_REGISTRY.iter().map(|(n, _, _)| *n).collect::<Vec<_>>().join(", ")
+        BUILTIN_PACKAGES.join(", ")
     ))
 }
 
@@ -649,10 +652,7 @@ fn find_local_package(name: &str) -> Option<PathBuf> {
         ];
 
         for candidate in &candidates {
-            let json_candidates = [
-                candidate.join("huma.json"),
-                candidate.join("paket.json"),
-            ];
+            let json_candidates = [candidate.join("huma.json"), candidate.join("paket.json")];
 
             for json_path in &json_candidates {
                 if json_path.exists() {
@@ -680,7 +680,10 @@ fn install_from_local(local_path: &Path, name: &str, trusted: bool) -> Result<()
     } else if local_path.join("paket.json").exists() {
         local_path.join("paket.json")
     } else {
-        return Err(anyhow!("'{}' dizininde huma.json veya paket.json bulunamadı.", local_path.display()));
+        return Err(anyhow!(
+            "'{}' dizininde huma.json veya paket.json bulunamadı.",
+            local_path.display()
+        ));
     };
 
     let meta_str = fs::read_to_string(&json_path)?;
@@ -693,7 +696,15 @@ fn install_from_local(local_path: &Path, name: &str, trusted: bool) -> Result<()
 
     let package_dir = PathBuf::from(PACKAGE_DIR);
     let package_path = package_dir.join(&meta.ad);
-    copy_dir_contents(local_path, &package_path)?;
+    let kaynak_hedefle_ayni = package_path.exists()
+        && local_path
+            .canonicalize()
+            .ok()
+            .zip(package_path.canonicalize().ok())
+            .is_some_and(|(kaynak, hedef)| kaynak == hedef);
+    if !kaynak_hedefle_ayni {
+        copy_dir_contents(local_path, &package_path)?;
+    }
 
     // Giriş dosyasını oku
     let entry_path = package_path.join(&meta.giris);
@@ -710,6 +721,12 @@ fn copy_dir_contents(src: &Path, dst: &Path) -> Result<()> {
     for entry in fs::read_dir(src)? {
         let entry = entry?;
         let entry_path = entry.path();
+        if entry.file_type()?.is_symlink() {
+            return Err(anyhow!(
+                "Paket kopyalanırken sembolik bağlantı reddedildi: {}",
+                entry_path.display()
+            ));
+        }
         let target_path = dst.join(entry.file_name());
         if entry_path.is_dir() {
             let name = entry.file_name();
@@ -723,88 +740,13 @@ fn copy_dir_contents(src: &Path, dst: &Path) -> Result<()> {
     Ok(())
 }
 
-/// [6] GitHub'dan paket kurar (tag/branch desteği ile)
-fn install_from_github(url: &str, trusted: bool) -> Result<()> {
-    let source = parse_github_url(url)?;
-
-    println!(
-        "{} GitHub üzerinden indiriliyor: {}/{}@{}...",
-        "Hüma:".bright_cyan(),
-        source.owner.bold(),
-        source.repo.bold(),
-        source.reference.dimmed()
-    );
-
-    // [6] Akıllı dal tespiti: önce belirtilen referansı dene
-    let mut raw_base = format!(
-        "https://raw.githubusercontent.com/{}/{}/{}",
-        source.owner, source.repo, source.reference
-    );
-    if !source.path.is_empty() {
-        raw_base = format!("{}/{}", raw_base, source.path);
-    }
-
-    // Metadata dosyasını indir (huma.json veya paket.json dene)
-    let meta_str = download_text(&format!("{}/paket.json", raw_base))
-        .or_else(|_| download_text(&format!("{}/huma.json", raw_base)))
-        .with_context(|| {
-            format!(
-                "Paket metadatası indirilemedi. '{}' referansı mevcut olmayabilir. \
-                 'main' veya 'master' dallarını deneyin.",
-                source.reference
-            )
-        })?;
-
-    let meta: PaketMetadata = serde_json::from_str(&meta_str)?;
-
-    // 1. Hüma Sürüm Kontrolü
-    if let Some(req_str) = &meta.huma_surum {
-        let req = VersionReq::parse(req_str)?;
-        let current_ver = Version::parse(CURRENT_HUMA_VER)?;
-        if !req.matches(&current_ver) {
-            return Err(anyhow!(
-                "Sürüm Uyumsuzluğu: '{}' paketi Hüma {} gerektiriyor (Sizdeki sürüm: v{}).",
-                meta.ad, req_str, CURRENT_HUMA_VER
-            ));
-        }
-    }
-
-    // [2] Güvenlik: Native kod kontrolü
-    check_native_code_safety(&meta, trusted)?;
-
-    // [1] Güvenlik: İndirilen metadata'daki isim ve giriş dosyasını doğrula
-    sanitize_package_name(&meta.ad)?;
-    sanitize_package_name(&meta.giris)?;
-
-    // 2. Giriş Dosyasını İndir
-    let entry_content = download_text(&format!("{}/{}", raw_base, meta.giris))?;
-    let pre_hash = calculate_hash(&entry_content, &serde_json::to_string(&meta)?);
-    if let Ok(false) = verify_lock_integrity(&meta.ad, &pre_hash) {
-        if let Ok(lock_str) = fs::read_to_string(LOCK_FILE) {
-            if let Ok(lock) = serde_json::from_str::<PaketKilit>(&lock_str) {
-                if let Some(info) = lock.paketler.get(&meta.ad) {
-                    if info.surum == meta.surum && !info.hash.is_empty() && info.hash == pre_hash {
-                        println!(
-                            "{} {} v{} zaten güncel, atlanıyor.",
-                            "Bilgi:".bright_yellow(),
-                            meta.ad.bold(),
-                            meta.surum
-                        );
-                        return Ok(());
-                    }
-                }
-            }
-        }
-    }
-
-    let source_label = format!("github.com/{}/{}", source.owner, source.repo);
-    save_package(meta, &entry_content, Some(&source_label), trusted)?;
-
-    Ok(())
-}
-
 /// Paketi diske kaydeder, kilit dosyasını günceller ve [7] alt bağımlılıkları kurar.
-fn save_package(meta: PaketMetadata, content: &str, source: Option<&str>, trusted: bool) -> Result<()> {
+fn save_package(
+    meta: PaketMetadata,
+    content: &str,
+    source: Option<&str>,
+    trusted: bool,
+) -> Result<()> {
     // [1] Güvenlik: Son kez doğrula
     sanitize_package_name(&meta.ad)?;
     sanitize_package_name(&meta.giris)?;
@@ -839,7 +781,7 @@ fn save_package(meta: PaketMetadata, content: &str, source: Option<&str>, truste
     atomic_write_str(&package_path.join("paket.json"), &meta_json)?;
 
     // 3. [3] Kilit Dosyasını güncelle (hash ile)
-    let hash = calculate_hash(content, &serde_json::to_string(&meta)?);
+    let hash = calculate_package_hash(&package_path, &meta)?;
     update_lock_file(&meta.ad, &meta.surum, &hash, source)?;
 
     println!(
@@ -870,7 +812,7 @@ fn install_dependencies_recursive(
     trusted: bool,
 ) -> Result<()> {
     let mut failures = Vec::new();
-    for (dep_name, _dep_version) in deps {
+    for dep_name in deps.keys() {
         if visited.contains(dep_name) {
             println!(
                 "  {} '{}' zaten işlendi, döngüsel bağımlılık atlandı.",
@@ -917,7 +859,9 @@ fn install_dependencies_recursive(
 /// Paketin yayınlanabilirliğini doğrular
 pub fn verify_package() -> Result<()> {
     if !Path::new(PROJECT_FILE).exists() {
-        return Err(anyhow!("Bu dizinde bir Hüma projesi (huma.json) bulunamadı."));
+        return Err(anyhow!(
+            "Bu dizinde bir Hüma projesi (huma.json) bulunamadı."
+        ));
     }
 
     let meta_content = fs::read_to_string(PROJECT_FILE)?;
@@ -970,8 +914,8 @@ pub fn verify_package() -> Result<()> {
 
         if Path::new(LOCK_FILE).exists() {
             let lock_content = fs::read_to_string(LOCK_FILE)?;
-            let lock: PaketKilit = serde_json::from_str(&lock_content)
-                .with_context(|| "huma.lock parse edilemedi")?;
+            let lock: PaketKilit =
+                serde_json::from_str(&lock_content).with_context(|| "huma.lock parse edilemedi")?;
             for dep_name in deps.keys() {
                 if !lock.paketler.contains_key(dep_name) {
                     return Err(anyhow!(
@@ -986,8 +930,8 @@ pub fn verify_package() -> Result<()> {
     // Lock dosyası varsa parse et ve paket bütünlüğünü doğrula
     if Path::new(LOCK_FILE).exists() {
         let lock_content = fs::read_to_string(LOCK_FILE)?;
-        let lock: PaketKilit = serde_json::from_str(&lock_content)
-            .with_context(|| "huma.lock parse edilemedi")?;
+        let lock: PaketKilit =
+            serde_json::from_str(&lock_content).with_context(|| "huma.lock parse edilemedi")?;
 
         for (pkg_name, lock_info) in &lock.paketler {
             let pkg_dir = PathBuf::from(PACKAGE_DIR).join(pkg_name);
@@ -1001,9 +945,13 @@ pub fn verify_package() -> Result<()> {
             }
 
             let pkg_meta_content = fs::read_to_string(&pkg_meta_path)?;
-            let pkg_meta: PaketMetadata = serde_json::from_str(&pkg_meta_content).with_context(|| {
-                format!("Paket metadata parse edilemedi: {}", pkg_meta_path.display())
-            })?;
+            let pkg_meta: PaketMetadata =
+                serde_json::from_str(&pkg_meta_content).with_context(|| {
+                    format!(
+                        "Paket metadata parse edilemedi: {}",
+                        pkg_meta_path.display()
+                    )
+                })?;
             sanitize_package_name(&pkg_meta.ad)?;
             sanitize_package_name(&pkg_meta.giris)?;
             let pkg_entry_path = pkg_dir.join(&pkg_meta.giris);
@@ -1016,9 +964,7 @@ pub fn verify_package() -> Result<()> {
                 ));
             }
 
-            let entry_content = fs::read_to_string(&pkg_entry_path)?;
-            let computed_hash =
-                calculate_hash(&entry_content, &serde_json::to_string(&pkg_meta)?);
+            let computed_hash = calculate_package_hash(&pkg_dir, &pkg_meta)?;
 
             if !lock_info.hash.is_empty() && lock_info.hash != computed_hash {
                 return Err(anyhow!(
@@ -1041,7 +987,7 @@ pub fn verify_package() -> Result<()> {
     }
 
     println!(
-        "{} Paket '{}' v{} yayına hazır.",
+        "{} Paket '{}' v{} için yerel manifest ve dosya denetimleri geçti.",
         "Doğrulandı:".bright_green(),
         meta.ad,
         meta.surum
@@ -1058,11 +1004,14 @@ fn update_lock_file(name: &str, version: &str, hash: &str, source: Option<&str>)
         PaketKilit::default()
     };
 
-    lock.paketler.insert(name.to_string(), KilitBilgisi {
-        surum: version.to_string(),
-        hash: hash.to_string(),
-        kaynak: source.map(|s| s.to_string()),
-    });
+    lock.paketler.insert(
+        name.to_string(),
+        KilitBilgisi {
+            surum: version.to_string(),
+            hash: hash.to_string(),
+            kaynak: source.map(|s| s.to_string()),
+        },
+    );
     lock.guncelleme_zamani = chrono::Local::now().to_rfc3339();
 
     // [5] Atomik yazım
@@ -1070,11 +1019,6 @@ fn update_lock_file(name: &str, version: &str, hash: &str, source: Option<&str>)
     atomic_write_str(Path::new(LOCK_FILE), &lock_json)?;
 
     Ok(())
-}
-
-fn download_text(url: &str) -> Result<String> {
-    let response = ureq::get(url).call()?;
-    Ok(response.into_string()?)
 }
 
 pub fn remove_package(name: &str) -> Result<()> {
@@ -1114,187 +1058,6 @@ pub fn remove_package(name: &str) -> Result<()> {
     }
 }
 
-// ─── [8] Gerçek Güncelleme Mekanizması ─────────────────────────────────────
-
-pub fn update_packages() -> Result<()> {
-    if !Path::new(PROJECT_FILE).exists() {
-        return Err(anyhow!("Bu dizinde bir Hüma projesi (huma.json) bulunamadı."));
-    }
-
-    if !Path::new(LOCK_FILE).exists() {
-        println!("{} Hiç paket kurulu değil.", "Bilgi:".bright_yellow());
-        return Ok(());
-    }
-
-    let lock_str = fs::read_to_string(LOCK_FILE)?;
-    let lock: PaketKilit = serde_json::from_str(&lock_str)?;
-
-    if lock.paketler.is_empty() {
-        println!("{} Güncellenecek paket yok.", "Bilgi:".bright_yellow());
-        return Ok(());
-    }
-
-    println!(
-        "{} {} paket kontrol ediliyor...",
-        "Hüma:".bright_cyan(),
-        lock.paketler.len()
-    );
-
-    let mut updated_count = 0;
-
-    for (ad, bilgi) in &lock.paketler {
-        // Kaynak bilgisi var mı kontrol et
-        let source = bilgi.kaynak.as_deref();
-
-        match source {
-            Some(src) if src.starts_with("github.com/") => {
-                // GitHub'dan güncellenebilir
-                println!("  {} {} kontrol ediliyor...", "↳".bright_black(), ad.bold());
-
-                match check_remote_version(src, ad) {
-                    Ok(Some(remote_version)) => {
-                        if let (Ok(current), Ok(remote)) = (
-                            Version::parse(&bilgi.surum),
-                            Version::parse(&remote_version)
-                        ) {
-                            if remote > current {
-                                println!(
-                                    "  {} {} {} → {}",
-                                    "⬆".bright_green(),
-                                    ad.bold(),
-                                    bilgi.surum.dimmed(),
-                                    remote_version.bright_green()
-                                );
-                                // Güncelle
-                                if let Err(e) = install_package(Some(ad), true) {
-                                    println!(
-                                        "  {} {} güncellenemedi: {}",
-                                        "✗".bright_red(),
-                                        ad,
-                                        e
-                                    );
-                                } else {
-                                    updated_count += 1;
-                                }
-                            } else {
-                                println!(
-                                    "  {} {} v{} güncel.",
-                                    "✓".bright_green(),
-                                    ad,
-                                    bilgi.surum.dimmed()
-                                );
-                            }
-                        }
-                    }
-                    Ok(None) => {
-                        println!(
-                            "  {} {} uzak sürüm bilgisi alınamadı.",
-                            "?".bright_yellow(),
-                            ad
-                        );
-                    }
-                    Err(e) => {
-                        println!(
-                            "  {} {} kontrol hatası: {}",
-                            "✗".bright_red(),
-                            ad,
-                            e
-                        );
-                    }
-                }
-            }
-            Some("yerel") => {
-                println!(
-                    "  {} {} yerel kaynak — güncelleme atlandı.",
-                    "↳".bright_black(),
-                    ad.dimmed()
-                );
-            }
-            _ => {
-                // Dahili registry'den deneyelim
-                if let Some((_, repo_path, _)) = BUILTIN_REGISTRY.iter().find(|(name, _, _)| name == ad) {
-                    println!("  {} {} (dahili) kontrol ediliyor...", "↳".bright_black(), ad.bold());
-                    let github_src = format!("github.com/{}", repo_path);
-                    match check_remote_version(&github_src, ad) {
-                        Ok(Some(remote_version)) => {
-                            if let Ok(current) = Version::parse(&bilgi.surum) {
-                                if let Ok(remote) = Version::parse(&remote_version) {
-                                    if remote > current {
-                                        println!(
-                                            "  {} {} {} → {}",
-                                            "⬆".bright_green(),
-                                            ad.bold(),
-                                            bilgi.surum.dimmed(),
-                                            remote_version.bright_green()
-                                        );
-                                        if let Err(e) = install_package(Some(ad), true) {
-                                            println!("  {} Güncelleme hatası: {}", "✗".bright_red(), e);
-                                        } else {
-                                            updated_count += 1;
-                                        }
-                                    } else {
-                                        println!("  {} {} v{} güncel.", "✓".bright_green(), ad, bilgi.surum.dimmed());
-                                    }
-                                }
-                            }
-                        }
-                        _ => {
-                            println!("  {} {} uzak kontrol yapılamadı.", "?".bright_yellow(), ad);
-                        }
-                    }
-                } else {
-                    println!(
-                        "  {} {} kaynak bilgisi eksik, güncelleme atlandı.",
-                        "?".bright_yellow(),
-                        ad.dimmed()
-                    );
-                }
-            }
-        }
-    }
-
-    if updated_count > 0 {
-        println!(
-            "\n{} {} paket güncellendi.",
-            "Başarılı!".bright_green(),
-            updated_count
-        );
-    } else {
-        println!(
-            "\n{} Tüm paketler kilitli sürümlerinde güncel.",
-            "✓".bright_green()
-        );
-    }
-
-    Ok(())
-}
-
-/// Uzak paketteki sürümü kontrol eder
-fn check_remote_version(source: &str, _name: &str) -> Result<Option<String>> {
-    let github_source = parse_github_url(source)?;
-    let mut raw_base = format!(
-        "https://raw.githubusercontent.com/{}/{}/{}",
-        github_source.owner, github_source.repo, github_source.reference
-    );
-    if !github_source.path.is_empty() {
-        raw_base = format!("{}/{}", raw_base, github_source.path);
-    }
-
-    let meta_str = download_text(&format!("{}/paket.json", raw_base))
-        .or_else(|_| download_text(&format!("{}/huma.json", raw_base)));
-
-    match meta_str {
-        Ok(s) => {
-            if let Ok(meta) = serde_json::from_str::<PaketMetadata>(&s) {
-                Ok(Some(meta.surum))
-            } else {
-                Ok(None)
-            }
-        }
-        Err(_) => Ok(None),
-    }
-}
-
 /// Mevcut dizinde bir Hüma projesi ilklendirir
 pub fn init_project() -> Result<()> {
     if Path::new(PROJECT_FILE).exists() {
@@ -1308,7 +1071,10 @@ pub fn init_project() -> Result<()> {
         .to_string();
 
     let mut betikler = HashMap::new();
-    betikler.insert("baslat".to_string(), format!("huma run {}.hb", default_name));
+    betikler.insert(
+        "baslat".to_string(),
+        format!("huma run {}.hb", default_name),
+    );
     betikler.insert("test".to_string(), "huma run tests/test.hb".to_string());
 
     let meta = PaketMetadata {
@@ -1341,9 +1107,7 @@ pub fn init_project() -> Result<()> {
     }
 
     // Git ilklendirmesi dene
-    let _ = std::process::Command::new("git")
-        .arg("init")
-        .output();
+    let _ = std::process::Command::new("git").arg("init").output();
 
     println!(
         "{} Proje '{}' olarak ilklendirildi.",
@@ -1356,7 +1120,9 @@ pub fn init_project() -> Result<()> {
 /// Mevcut dizindeki huma.json dosyasını okur
 pub fn get_local_metadata() -> Result<PaketMetadata> {
     if !Path::new(PROJECT_FILE).exists() {
-        return Err(anyhow!("Bu dizinde bir Hüma projesi (huma.json) bulunamadı."));
+        return Err(anyhow!(
+            "Bu dizinde bir Hüma projesi (huma.json) bulunamadı."
+        ));
     }
     let s = fs::read_to_string(PROJECT_FILE)?;
     let meta: PaketMetadata = serde_json::from_str(&s)?;
@@ -1402,9 +1168,67 @@ pub fn run_script(name: &str) -> Result<()> {
             }
             Ok(())
         } else {
-            Err(anyhow!("'{}' adlı bir betik huma.json içinde bulunamadı.", name))
+            Err(anyhow!(
+                "'{}' adlı bir betik huma.json içinde bulunamadı.",
+                name
+            ))
         }
     } else {
         Err(anyhow!("Bu projede hiç betik tanımlanmamış."))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        calculate_package_hash, sanitize_package_name, uzak_paket_girdisi_mi, PaketMetadata,
+    };
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn paket_adi_dizin_gecisini_reddeder() {
+        assert!(sanitize_package_name("../../etc").is_err());
+        assert!(sanitize_package_name("paket/alt").is_err());
+        assert!(sanitize_package_name("paket\\alt").is_err());
+        assert!(sanitize_package_name("gecerli_paket-1.0").is_ok());
+    }
+
+    #[test]
+    fn uzak_paket_kaynaklari_taninir() {
+        assert!(uzak_paket_girdisi_mi("github.com/kullanici/paket"));
+        assert!(uzak_paket_girdisi_mi("https://example.com/paket"));
+        assert!(!uzak_paket_girdisi_mi("nlp_temel"));
+    }
+
+    #[test]
+    fn paket_ozeti_alt_dosya_degisimini_yakalar() {
+        let benzersiz = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Sistem saati Unix epoch sonrasında olmalı")
+            .as_nanos();
+        let kok = std::env::temp_dir().join(format!(
+            "huma_paket_hash_test_{}_{}",
+            std::process::id(),
+            benzersiz
+        ));
+        fs::create_dir_all(kok.join("alt")).expect("Geçici paket dizini oluşturulmalı");
+        fs::write(kok.join("ana.hb"), "\"tamam\"'ı yazdır").expect("Giriş yazılmalı");
+        fs::write(kok.join("alt/yardimci.hb"), "x = 1 olsun").expect("Alt dosya yazılmalı");
+        let meta: PaketMetadata = serde_json::from_value(serde_json::json!({
+            "ad": "ornek",
+            "surum": "1.0.0",
+            "aciklama": "test",
+            "yazar": "test",
+            "giris": "ana.hb"
+        }))
+        .expect("Test metadata'sı geçerli olmalı");
+
+        let once = calculate_package_hash(&kok, &meta).expect("İlk özet hesaplanmalı");
+        fs::write(kok.join("alt/yardimci.hb"), "x = 2 olsun").expect("Alt dosya değiştirilmeli");
+        let sonra = calculate_package_hash(&kok, &meta).expect("İkinci özet hesaplanmalı");
+        fs::remove_dir_all(&kok).expect("Geçici paket dizini temizlenmeli");
+
+        assert_ne!(once, sonra);
     }
 }

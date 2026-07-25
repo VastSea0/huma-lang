@@ -15,12 +15,12 @@ use std::time::Duration;
 
 /// Run a `.hb` source file through the tree-walking interpreter.
 pub fn run_file(path: &str) -> Result<()> {
-    let source = std::fs::read_to_string(path)
-        .with_context(|| format!("'{}' dosyası okunamadı", path))?;
+    let source =
+        std::fs::read_to_string(path).with_context(|| format!("'{}' dosyası okunamadı", path))?;
 
     let interp = Yorumlayici::new();
     let mut interp = interp;
-    execute_source(&source, &mut interp);
+    execute_source(&source, &mut interp)?;
 
     // GUI isteği var mı kontrol et
     if huma_core::gui::gui_istegi_var_mi() {
@@ -32,18 +32,23 @@ pub fn run_file(path: &str) -> Result<()> {
 
 /// Run a `.hb` source file by compiling to Bytecode and executing in Bytecode VM.
 pub fn run_vm_file(path: &str) -> Result<()> {
-    let source = std::fs::read_to_string(path)
-        .with_context(|| format!("'{}' dosyası okunamadı", path))?;
+    let source =
+        std::fs::read_to_string(path).with_context(|| format!("'{}' dosyası okunamadı", path))?;
 
     let lexer = Lexer::new(&source);
     let mut parser = Parser::new(lexer);
-    let program_ast = parser.parse_program();
+    let (program_ast, diagnostics) = parser.parse_program_with_diagnostics();
+    if let Some(first) = diagnostics.into_iter().next() {
+        return Err(first.into());
+    }
 
     let mut derleyici = huma_core::compiler::Derleyici::new();
-    let bytecode_prog = derleyici.derle(program_ast);
+    let bytecode_prog = derleyici
+        .derle_kontrollu(program_ast)
+        .map_err(huma_core::HumaError::CompileError)?;
 
     let mut vm = VM::new(bytecode_prog);
-    vm.run();
+    vm.run_checked()?;
     Ok(())
 }
 
@@ -72,7 +77,7 @@ pub fn exec_bytecode(path: &str) -> Result<()> {
         .with_context(|| format!("'{}' bytecode dosyası yüklenirken hata oluştu", path))?;
 
     let mut vm = VM::new(program);
-    vm.run();
+    vm.run_checked()?;
     Ok(())
 }
 
@@ -92,8 +97,8 @@ pub fn generate_standalone(input: &str, output_name: &str) -> Result<()> {
 
 /// Compile a `.hb` file to a native machine code binary using Cranelift AOT.
 pub fn compile_aot(input: &str, output_name: &str, opt_level: u8) -> Result<()> {
-    let source = std::fs::read_to_string(input)
-        .with_context(|| format!("'{}' dosyası okunamadı", input))?;
+    let source =
+        std::fs::read_to_string(input).with_context(|| format!("'{}' dosyası okunamadı", input))?;
 
     let out_path = std::path::Path::new(output_name);
     let opts = huma_compiler::aot::AotOptions {
@@ -111,7 +116,6 @@ pub fn compile_aot(input: &str, output_name: &str, opt_level: u8) -> Result<()> 
     );
     Ok(())
 }
-
 
 /// Start the interactive REPL.
 pub fn start_repl() -> Result<()> {
@@ -147,7 +151,9 @@ pub fn start_repl() -> Result<()> {
             continue;
         }
 
-        execute_source(trimmed, &mut interp);
+        if let Err(error) = execute_source(trimmed, &mut interp) {
+            eprintln!("{}", error);
+        }
     }
     Ok(())
 }
@@ -159,6 +165,7 @@ pub fn start_repl() -> Result<()> {
 /// - If `target` is a directory: scan it recursively.
 /// - If `target` is not given:
 ///   - Prefer `tests/` if it exists, otherwise scan current directory.
+///
 /// Test file matching:
 /// - `*_test.hb`
 /// - OR any `.hb` file under a `tests/` directory
@@ -167,7 +174,11 @@ pub fn run_tests(target: Option<&str>) -> Result<()> {
         Some(t) => PathBuf::from(t),
         None => {
             let tests_dir = PathBuf::from("tests");
-            if tests_dir.exists() { tests_dir } else { PathBuf::from(".") }
+            if tests_dir.exists() {
+                tests_dir
+            } else {
+                PathBuf::from(".")
+            }
         }
     };
 
@@ -205,7 +216,11 @@ pub fn run_tests(target: Option<&str>) -> Result<()> {
 
     for file in &files {
         let file_str = file.display().to_string();
-        print!("{} {} ... ", "[TEST]".bright_cyan().bold(), file_str.bright_white());
+        print!(
+            "{} {} ... ",
+            "[TEST]".bright_cyan().bold(),
+            file_str.bright_white()
+        );
         io::stdout().flush().ok();
 
         match run_test_file(file) {
@@ -225,7 +240,11 @@ pub fn run_tests(target: Option<&str>) -> Result<()> {
             Err(e) => {
                 failed_files += 1;
                 println!("{}", "ERROR".bright_red().bold());
-                println!("  {} {}", "↳".bright_black(), format!("{:#}", e).bright_red());
+                println!(
+                    "  {} {}",
+                    "↳".bright_black(),
+                    format!("{:#}", e).bright_red()
+                );
             }
         }
     }
@@ -238,7 +257,10 @@ pub fn run_tests(target: Option<&str>) -> Result<()> {
     println!("{}", "-----------------------------".bright_black());
 
     if failed_files > 0 {
-        anyhow::bail!("Bazı test dosyaları başarısız oldu ({} adet).", failed_files);
+        anyhow::bail!(
+            "Bazı test dosyaları başarısız oldu ({} adet).",
+            failed_files
+        );
     }
 
     Ok(())
@@ -266,11 +288,12 @@ fn run_test_file(path: &Path) -> Result<TestOutcome> {
         let mut interp = Yorumlayici::new().with_output_buffer(output.clone());
 
         let run_res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            execute_source(&src, &mut interp);
+            execute_source(&src, &mut interp)
         }));
 
         let send_res = match run_res {
-            Ok(()) => Ok(output.borrow().clone()),
+            Ok(Ok(())) => Ok(output.borrow().clone()),
+            Ok(Err(error)) => Err(error),
             Err(p) => {
                 let msg = if let Some(s) = p.downcast_ref::<&str>() {
                     s.to_string()
@@ -298,7 +321,9 @@ fn run_test_file(path: &Path) -> Result<TestOutcome> {
     };
 
     if let Some(failed) = parse_birim_test_failed_count(&out) {
-        return Ok(TestOutcome::Passed { failed_tests: failed });
+        return Ok(TestOutcome::Passed {
+            failed_tests: failed,
+        });
     }
 
     // Fallback: If framework printed explicit failure marker, treat as failed.
@@ -337,8 +362,8 @@ fn collect_test_files(root: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
         return Ok(());
     }
 
-    for entry in std::fs::read_dir(root)
-        .with_context(|| format!("Dizin okunamadı: {}", root.display()))?
+    for entry in
+        std::fs::read_dir(root).with_context(|| format!("Dizin okunamadı: {}", root.display()))?
     {
         let entry = entry?;
         let path = entry.path();
@@ -367,9 +392,13 @@ fn is_test_file(path: &Path) -> bool {
 }
 
 /// Helper: lex → parse → interpret.
-fn execute_source(source: &str, interp: &mut Yorumlayici) {
+fn execute_source(source: &str, interp: &mut Yorumlayici) -> Result<()> {
     let lexer = Lexer::new(source);
     let mut parser = Parser::new(lexer);
-    let program = parser.parse_program();
-    interp.yorumla(program);
+    let (program, diagnostics) = parser.parse_program_with_diagnostics();
+    if let Some(first) = diagnostics.into_iter().next() {
+        return Err(first.into());
+    }
+    interp.yorumla_kontrollu(program)?;
+    Ok(())
 }

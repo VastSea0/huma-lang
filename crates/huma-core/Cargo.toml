@@ -1,6 +1,6 @@
 [package]
 name = "huma-core"
-version = "0.5.2"
+version = "0.6.0"
 description = "Core language primitives for Hüma: tokens, AST, lexer, parser, values, bytecode, VM, and interpreter."
 authors = ["VastSea0 <vastseaoffical0@outlook.com>"]
 license = "MIT"
@@ -32,3 +32,7 @@ path = "../../tests/integration_tests.rs"
 [[test]]
 name = "module_tests"
 path = "../../tests/module_tests.rs"
+
+[[test]]
+name = "source_corpus_tests"
+path = "../../tests/source_corpus_tests.rs"

@@ -94,7 +94,7 @@ sinir_agi sınıf olsun {
     // Doğruluk hesapla — skalar çıkışlı model için (0/1 sınıflandırma)
     dogruluk_degerlendir fonksiyon olsun veri, etiketler alsın {
         n = uzunluk(veri) olsun
-        dogru = 0 olsun
+        dogru_sayisi = 0 olsun
         i = 0'dan (n - 1)'e kadar {
             giris_v = listeye_vektor(veri[i]) olsun
             tahmin = kendisi.tahmin_et(giris_v) olsun
@@ -102,9 +102,9 @@ sinir_agi sınıf olsun {
             gercek = etiketler[i] olsun
             tahmin_sinif = 0 olsun
             tahmin_val >= 0.5 ise { tahmin_sinif = 1 olsun }
-            tahmin_sinif = gercek ise { dogru = dogru + 1 olsun }
+            tahmin_sinif = gercek ise { dogru_sayisi = dogru_sayisi + 1 olsun }
         }
-        dogru / n'yi döndür
+        dogru_sayisi / n'yi döndür
     }
 
     // Model kaydet — ağırlıkları JSON formatında dosyaya yazar
@@ -136,7 +136,7 @@ sinir_agi sınıf olsun {
     }
 
     // Model yükle — JSON dosyasından ağırlıkları okur
-    yukle fonksiyon olsun yol alsın {
+    model_yukle fonksiyon olsun yol alsın {
         icerik = dosya_oku(yol) olsun
         icerik = Boş ise { yazdır "Hata: Model dosyası bulunamadı: " + yol }
         veri = metinden_nesneye(icerik) olsun

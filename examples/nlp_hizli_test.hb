@@ -1,5 +1,5 @@
-// minimal_test.hb — minimal durak test
-yükle "nlp.hb";
+// Türkçe durak kelime filtresi için hızlı doğrulama.
+"nlp_temel"'i yükle
 
 "İçeriyor testi:"'i yazdır
 metin = " | bir | bu | " olsun
@@ -18,14 +18,14 @@ d2 = durak_mı("kitap") olsun
 "kitap durak mı: " + d2'yi yazdır
 
 "filtreleme testi:"'i yazdır
-liste = ["bir", "kitap", "bu", "güzel"] olsun
+kelimeler = ["bir", "kitap", "bu", "güzel"] olsun
 sonuc = [] olsun
 i = 0 olsun
-i < uzunluk(liste) olduğu sürece {
-    durum = durak_mı(liste[i]) olsun
-    "  " + liste[i] + " → durak: " + durum'u yazdır
+i < uzunluk(kelimeler) olduğu sürece {
+    durum = durak_mı(kelimeler[i]) olsun
+    "  " + kelimeler[i] + " → durak: " + durum'u yazdır
     durum = 0 ise {
-        sonuc'a [liste[i]]'ni ekle
+        sonuc = listeye_ekle(sonuc, kelimeler[i]) olsun
     }
     i = i + 1 olsun
 }

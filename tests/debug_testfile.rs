@@ -1,1 +1,0 @@
-use huma::lexer::Lexer; use huma::parser::Parser; fn main() { let code = std::fs::read_to_string("tests/test_liste_dongu.hb").unwrap(); let mut parser = Parser::new(Lexer::new(&code)); let program = parser.parse_program(); println!("{:?}", program); }

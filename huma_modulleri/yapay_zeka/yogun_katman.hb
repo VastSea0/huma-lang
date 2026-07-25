@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// yapay_zeka/yogun_katman.hb — Tam Bağlı (Dense) Katman — Hız Optimize v2.0
+// yapay_zeka/yogun_katman.hb — Tam Bağlı (Dense) Katman — v2.0
 // ══════════════════════════════════════════════════════════════════════════════
 //
 // Değişiklikler v2.0:
@@ -10,7 +10,6 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 "yapay_zeka_temel.hb"'yi yükle
-"optimizor.hb"'yi yükle
 
 yogun_katman sınıf olsun {
 
@@ -105,7 +104,7 @@ yogun_katman sınıf olsun {
         // Her satıra bias ekle — matris_satirlara_ekle built-in (Rust'ta O(n), döngüsüz)
         Z = matris_satirlara_ekle(Z, kendisi.b) olsun
 
-        // Batch aktivasyon — tamamen Rust'ta, tek bir element-wise geçiş
+        // Batch aktivasyon — yerleşik Rust işleviyle tek geçiş
         (kendisi.aktivasyon = "relu") ise {
             matris_relu(Z)'yı döndür
         }

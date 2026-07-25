@@ -1,3 +1,0 @@
-Hüma ile dosya yazma testi.
-İkinci satır.
-Son.

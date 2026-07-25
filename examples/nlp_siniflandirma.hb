@@ -81,7 +81,7 @@ model.egit(veri, etiket_vektorleri, 50, 0.01) olsun
 // ─── Değerlendirme ────────────────────────────────────────────────────────────
 yazdır ""
 yazdır "══════════════════════════════════════════════════"
-dogru = 0 olsun
+dogru_sayisi = 0 olsun
 toplam = uzunluk(veri) olsun
 i = 0'dan (toplam - 1)'e kadar {
     giris = listeye_vektor(veri[i]) olsun
@@ -93,13 +93,13 @@ i = 0'dan (toplam - 1)'e kadar {
     durum = "✗" olsun
     tahmin_sinif = etiket ise {
         durum = "✓" olsun
-        dogru = dogru + 1 olsun
+        dogru_sayisi = dogru_sayisi + 1 olsun
     }
     yazdır durum + " " + yorumlar[i] + " → " + tahmin_sinif
 }
 yazdır "══════════════════════════════════════════════════"
-dogruluk = dogru / toplam olsun
-yazdır "Eğitim Doğruluğu: " + dogru + "/" + toplam + " (" + (dogruluk * 100) + "%)"
+dogruluk = dogru_sayisi / toplam olsun
+yazdır "Eğitim Doğruluğu: " + dogru_sayisi + "/" + toplam + " (" + (dogruluk * 100) + "%)"
 
 // ─── Model Kaydet ─────────────────────────────────────────────────────────────
 model.kaydet("nlp_sinif_model.json") olsun

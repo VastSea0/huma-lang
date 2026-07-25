@@ -27,18 +27,57 @@ fn is_turkish_alnum(ch: char) -> bool {
 
 /// Bilinen Türkçe ek kalıpları — suffix stripping için
 fn is_turkish_suffix(s: &str) -> bool {
-    matches!(s,
-        "i" | "ı" | "u" | "ü" | "yi" | "yı" | "yu" | "yü" |
-        "ni" | "nı" | "nu" | "nü" |
-        "si" | "sı" | "su" | "sü" |
-        "a" | "e" | "ya" | "ye" |
-        "dan" | "den" | "tan" | "ten" |
-        "da" | "de" | "ta" | "te" |
-        "lar" | "ler" |
-        "ca" | "ce" | "ça" | "çe" |
-        "nin" | "nın" | "nun" | "nün" | "in" | "ın" | "un" | "ün" |
-        "daki" | "deki" | "taki" | "teki" |
-        "la" | "le" | "yla" | "yle"
+    matches!(
+        s,
+        "i" | "ı"
+            | "u"
+            | "ü"
+            | "yi"
+            | "yı"
+            | "yu"
+            | "yü"
+            | "ni"
+            | "nı"
+            | "nu"
+            | "nü"
+            | "si"
+            | "sı"
+            | "su"
+            | "sü"
+            | "a"
+            | "e"
+            | "ya"
+            | "ye"
+            | "dan"
+            | "den"
+            | "tan"
+            | "ten"
+            | "da"
+            | "de"
+            | "ta"
+            | "te"
+            | "lar"
+            | "ler"
+            | "ca"
+            | "ce"
+            | "ça"
+            | "çe"
+            | "nin"
+            | "nın"
+            | "nun"
+            | "nün"
+            | "in"
+            | "ın"
+            | "un"
+            | "ün"
+            | "daki"
+            | "deki"
+            | "taki"
+            | "teki"
+            | "la"
+            | "le"
+            | "yla"
+            | "yle"
     )
 }
 
@@ -56,7 +95,6 @@ impl Lexer {
     fn peek(&self) -> Option<char> {
         self.input.get(self.pos).copied()
     }
-
 
     fn advance(&mut self) -> Option<char> {
         let ch = self.peek();
@@ -111,7 +149,9 @@ impl Lexer {
             '/' => {
                 if self.peek() == Some('/') {
                     while let Some(c) = self.advance() {
-                        if c == '\n' { break; }
+                        if c == '\n' {
+                            break;
+                        }
                     }
                     self.next_token()
                 } else {
@@ -154,9 +194,7 @@ impl Lexer {
             '"' => self.read_string(),
             '\'' | '’' => self.handle_apostrophe(),
             '0'..='9' => self.read_number(ch),
-            _ if is_turkish_alpha(ch) => {
-                self.read_identifier(ch)
-            }
+            _ if is_turkish_alpha(ch) => self.read_identifier(ch),
             _ => Token::Hata(format!("Bilinmeyen karakter: {}", ch)),
         }
     }
@@ -190,18 +228,23 @@ impl Lexer {
             // İyelik eki — sadece `Nin` erişiminden sonra beklenir.
             // Örn: ayarlar'ın tema'sı  /  k1'in yas'ı
             if self.nin_state == NinState::AfterNinProperty
-                && matches!(suffix.as_str(), "si" | "sı" | "su" | "sü" | "i" | "ı" | "u" | "ü" | "ni" | "nı" | "nu" | "nü")
+                && matches!(
+                    suffix.as_str(),
+                    "si" | "sı" | "su" | "sü" | "i" | "ı" | "u" | "ü" | "ni" | "nı" | "nu" | "nü"
+                )
             {
                 self.nin_state = NinState::None;
                 return Token::Iyelik;
             }
 
             // "nin", "nın", "nun", "nün", "in", "ın", "un", "ün" ekleri → Nin token döndür
-            if matches!(suffix.as_str(), "nin" | "nın" | "nun" | "nün" | "in" | "ın" | "un" | "ün") {
+            if matches!(
+                suffix.as_str(),
+                "nin" | "nın" | "nun" | "nün" | "in" | "ın" | "un" | "ün"
+            ) {
                 self.nin_state = NinState::AfterNin;
                 return Token::Nin;
             }
-
 
             // Bilinen bir Türkçe ek mi?
             if is_turkish_suffix(&suffix) {
@@ -240,7 +283,9 @@ impl Lexer {
                             break;
                         }
                     }
-                    // Eki yok say, suffix zaten strip edildi
+                    if !is_turkish_suffix(&suffix) {
+                        return Token::Hata(format!("Bilinmeyen ek: '{}", suffix));
+                    }
                 }
                 return Token::Metin(s);
             }
@@ -261,7 +306,10 @@ impl Lexer {
                                 s.push(code as char);
                             }
                         }
-                        _ => { s.push('\\'); s.push(next); }
+                        _ => {
+                            s.push('\\');
+                            s.push(next);
+                        }
                     }
                 } else {
                     s.push('\\');
@@ -275,11 +323,51 @@ impl Lexer {
 
     fn read_number(&mut self, first_ch: char) -> Token {
         let mut s = first_ch.to_string();
-        while let Some(ch) = self.peek() {
-            if ch.is_ascii_digit() || ch == '.' {
-                s.push(self.advance().unwrap());
+        while self.peek().is_some_and(|ch| ch.is_ascii_digit()) {
+            if let Some(ch) = self.advance() {
+                s.push(ch);
+            }
+        }
+
+        if self.peek() == Some('.')
+            && self
+                .input
+                .get(self.pos + 1)
+                .is_some_and(|ch| ch.is_ascii_digit())
+        {
+            if let Some(ch) = self.advance() {
+                s.push(ch);
+            }
+            while self.peek().is_some_and(|ch| ch.is_ascii_digit()) {
+                if let Some(ch) = self.advance() {
+                    s.push(ch);
+                }
+            }
+        }
+
+        if matches!(self.peek(), Some('e' | 'E')) {
+            let exponent_start = self.pos;
+            let exponent_marker = self.advance();
+            let sign = if matches!(self.peek(), Some('+' | '-')) {
+                self.advance()
             } else {
-                break;
+                None
+            };
+            if self.peek().is_some_and(|ch| ch.is_ascii_digit()) {
+                if let Some(ch) = exponent_marker {
+                    s.push(ch);
+                }
+                if let Some(ch) = sign {
+                    s.push(ch);
+                }
+                while self.peek().is_some_and(|ch| ch.is_ascii_digit()) {
+                    if let Some(ch) = self.advance() {
+                        s.push(ch);
+                    }
+                }
+            } else {
+                self.pos = exponent_start;
+                self.col = self.col.saturating_sub(1 + usize::from(sign.is_some()));
             }
         }
 
@@ -298,7 +386,9 @@ impl Lexer {
                     break;
                 }
             }
-            if !is_turkish_suffix(&suffix) && !matches!(suffix.as_str(), "nin" | "nın" | "nun" | "nün") {
+            if !is_turkish_suffix(&suffix)
+                && !matches!(suffix.as_str(), "nin" | "nın" | "nun" | "nün")
+            {
                 // Bilinmeyen ek — geri al
                 self.pos = save_pos;
                 self.line = save_line;
@@ -308,7 +398,8 @@ impl Lexer {
         }
 
         match s.parse::<f64>() {
-            Ok(val) => Token::Sayi(val),
+            Ok(val) if val.is_finite() => Token::Sayi(val),
+            Ok(_) => Token::Hata(format!("Sonlu olmayan sayı: {}", s)),
             Err(_) => Token::Hata(format!("Geçersiz sayı: {}", s)),
         }
     }
@@ -322,7 +413,7 @@ impl Lexer {
                 break;
             }
         }
-        
+
         let tok = match s.as_str() {
             // Yeni Türkçe anahtar kelimeler
             "yazdır" | "yazdir" => Token::Yazdir,
@@ -355,6 +446,8 @@ impl Lexer {
             "ile" => Token::Ile,
             "bekle" => Token::Bekle,
             "çağır" => Token::Cagir,
+            "devam" => Token::Devam,
+            "kır" | "kir" => Token::Kir,
             _ => Token::Tanimlayici(s),
         };
 

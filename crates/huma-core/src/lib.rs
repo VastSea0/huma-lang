@@ -4,21 +4,21 @@
 //! tokens, AST definitions, lexer, parser, values, bytecode,
 //! bytecode compiler, virtual machine, and tree-walking interpreter.
 
-pub mod error;
-pub mod token;
-pub mod lexer;
 pub mod ast;
-pub mod parser;
-pub mod value;
-pub mod interpreter;
+pub mod autograd;
+pub mod builtin_files;
 pub mod bytecode;
 pub mod compiler;
-pub mod vm;
-pub mod gui;
+pub mod error;
 pub mod ffi;
-pub mod autograd;
+pub mod gui;
+pub mod interpreter;
+pub mod lexer;
+pub mod parser;
+pub mod token;
 pub mod tokenizer;
-pub mod builtin_files;
+pub mod value;
+pub mod vm;
 
 /// Re-export most-used items at the crate root for convenience.
 pub use error::{HumaError, HumaResult};
@@ -26,22 +26,43 @@ pub use error::{HumaError, HumaResult};
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::rc::Rc;
     use std::cell::RefCell;
+    use std::rc::Rc;
 
     // ─────────────────────────────────────────────
     // Yardımcı: kodu yorumlayıp string çıktısını döndürür
     // ─────────────────────────────────────────────
     fn eval(kod: &str) -> String {
         let buf = Rc::new(RefCell::new(String::new()));
-        let mut yorumlayici = interpreter::Yorumlayici::new()
-            .with_output_buffer(Rc::clone(&buf));
+        let mut yorumlayici = interpreter::Yorumlayici::new().with_output_buffer(Rc::clone(&buf));
         let lx = lexer::Lexer::new(kod);
         let mut p = parser::Parser::new(lx);
-        let prog = p.parse_program();
-        yorumlayici.yorumla(prog);
+        let (prog, diagnostics) = p.parse_program_with_diagnostics();
+        assert!(
+            diagnostics.is_empty(),
+            "Kaynak ayrıştırılamadı: {:?}",
+            diagnostics
+        );
+        yorumlayici
+            .yorumla_kontrollu(prog)
+            .expect("Kaynak çalışma zamanı hatası vermemeli");
         let sonuc = buf.borrow().clone();
         sonuc
+    }
+
+    fn eval_hatasi(kod: &str) -> String {
+        let mut yorumlayici = interpreter::Yorumlayici::new();
+        let mut parser = parser::Parser::new(lexer::Lexer::new(kod));
+        let (program, diagnostics) = parser.parse_program_with_diagnostics();
+        assert!(
+            diagnostics.is_empty(),
+            "Kaynak ayrıştırılamadı: {:?}",
+            diagnostics
+        );
+        yorumlayici
+            .yorumla_kontrollu(program)
+            .expect_err("Kaynak çalışma zamanı hatası vermeliydi")
+            .to_string()
     }
 
     // ─────────────────────────────────────────────
@@ -55,8 +76,14 @@ mod tests {
         let lx = lexer::Lexer::new(kod);
         let mut p = parser::Parser::new(lx);
         let program = p.parse_program();
-        interp.yorumla(program);
-        assert_eq!(interp.call_depth, 0, "call_depth çıkıştan sonra sıfırlanmalı");
+        let error = interp
+            .yorumla_kontrollu(program)
+            .expect_err("Sınırsız özyineleme çalışma zamanı hatası vermeli");
+        assert!(error.to_string().contains("özyineleme"));
+        assert_eq!(
+            interp.call_depth, 0,
+            "call_depth çıkıştan sonra sıfırlanmalı"
+        );
     }
 
     #[test]
@@ -66,8 +93,35 @@ mod tests {
         let lx = lexer::Lexer::new(kod);
         let mut p = parser::Parser::new(lx);
         let program = p.parse_program();
-        // Panik atmadan tamamlanmalı
-        interp.yorumla(program);
+        let error = interp
+            .yorumla_kontrollu(program)
+            .expect_err("Çağrılamayan değer çalışma zamanı hatası vermeli");
+        assert!(error.to_string().contains("Çağrılamayan değer"));
+    }
+
+    #[test]
+    fn ai_boyutlari_guvenli_sinirlarla_dogrulanir() {
+        assert!(eval_hatasi("vektor_olustur(-1, 0)").contains("boyut"));
+        assert!(eval_hatasi("matris_olustur(10000000, 2)").contains("güvenlik sınırını"));
+        assert!(eval_hatasi("adam_durum_olustur(10000000, 2)").contains("güvenlik sınırını"));
+    }
+
+    #[test]
+    fn ai_indeksleri_sessizce_yutulmaz() {
+        assert!(
+            eval_hatasi("v = vektor_olustur(2, 0) olsun\nvektor_al(v, 2)")
+                .contains("sınır dışında")
+        );
+        assert!(
+            eval_hatasi("m = matris_olustur(2, 2) olsun\nmatris_ata(m, 0, 2, 1)")
+                .contains("sınır dışında")
+        );
+        assert!(eval_hatasi(
+            "m = matris_olustur(2, 2) olsun\n\
+                 k = vektor_olustur(1, 0) olsun\n\
+                 matris_satir_ata(m, 0, k)"
+        )
+        .contains("vektör uzunluğu"));
     }
 
     #[test]
@@ -75,12 +129,14 @@ mod tests {
         let kod = "yardimci fonksiyon olsun { \"Merhaba\"'yı yazdır }\nselamla fonksiyon olsun { yardimci() }\nselamla()";
         let lx = lexer::Lexer::new(kod);
         let mut p = parser::Parser::new(lx);
-        let ast = p.parse_program();
+        let (ast, diagnostics) = p.parse_program_with_diagnostics();
+        assert!(diagnostics.is_empty());
         let mut derleyici = compiler::Derleyici::new();
-        let prog = derleyici.derle(ast);
+        let prog = derleyici
+            .derle_kontrollu(ast)
+            .expect("Fonksiyonlar bytecode'a derlenmeli");
         let mut vm = vm::VM::new(prog);
-        // Panik atmadan çalışmalı
-        vm.run();
+        vm.run_checked().expect("VM programı hatasız çalışmalı");
     }
 
     // ─────────────────────────────────────────────
@@ -92,6 +148,27 @@ mod tests {
         let mut lx = lexer::Lexer::new("42");
         assert_eq!(lx.next_token(), token::Token::Sayi(42.0));
         assert_eq!(lx.next_token(), token::Token::Son);
+    }
+
+    #[test]
+    fn lexer_bilimsel_sayi_tokenize() {
+        let mut lx = lexer::Lexer::new("1e-7 1.0e308 2E+3");
+        assert_eq!(lx.next_token(), token::Token::Sayi(1e-7));
+        assert_eq!(lx.next_token(), token::Token::Sayi(1.0e308));
+        assert_eq!(lx.next_token(), token::Token::Sayi(2e3));
+        assert_eq!(lx.next_token(), token::Token::Son);
+    }
+
+    #[test]
+    fn lexer_sonlu_olmayan_sayiyi_reddeder() {
+        let mut lx = lexer::Lexer::new("1e309");
+        assert!(matches!(lx.next_token(), token::Token::Hata(_)));
+    }
+
+    #[test]
+    fn lexer_bilinmeyen_metin_ekini_reddeder() {
+        let mut lx = lexer::Lexer::new(r#""metin"'xyz"#);
+        assert!(matches!(lx.next_token(), token::Token::Hata(_)));
     }
 
     #[test]
@@ -160,65 +237,147 @@ mod tests {
 
     #[test]
     fn interpreter_esitlik_karsilastirma() {
-        let out = eval(r#"
+        let out = eval(
+            r#"
             a = 5 olsun
             a == 5 ise { "evet"'i yazdır }
-        "#);
+        "#,
+        );
         assert_eq!(out.trim(), "evet");
     }
 
     #[test]
     fn interpreter_yoksa_kolu() {
-        let out = eval(r#"
+        let out = eval(
+            r#"
             x = 3 olsun
             x > 10 ise {
                 "buyuk"'u yazdır
             } yoksa {
                 "kucuk"'u yazdır
             }
-        "#);
+        "#,
+        );
         assert_eq!(out.trim(), "kucuk");
     }
 
     #[test]
     fn interpreter_fonksiyon_parametreli() {
-        let out = eval(r#"
+        let out = eval(
+            r#"
             kare fonksiyon olsun n alsın {
                 n * n'i döndür
             }
             kare(7)'yi yazdır
-        "#);
+        "#,
+        );
         assert_eq!(out.trim(), "49");
     }
 
     #[test]
     fn interpreter_liste_islemi() {
-        // Liste[indeks]'i yazdır formunu kullan — entegrasyon testinde çalıştığı bilinen sözdizimi
-        let out = eval(r#"
+        let out = eval(
+            r#"
             dizi = [10, 20, 30] olsun
             dizi[2]'yi yazdır
-        "#);
-        // Bu sözdizimi yorumlayıcıda çalışıyorsa "30" döner; aksi takdirde "Boş" döner.
-        // İkisi de kabul edilir — amacımız paniklememek ve davranışı belgelemek.
-        let trim = out.trim();
-        assert!(
-            trim == "30" || trim == "Boş",
-            "Liste erişimi sonucu beklenmedik: {:?}", trim
+        "#,
         );
+        assert_eq!(out.trim(), "30");
+    }
+
+    #[test]
+    fn interpreter_liste_elemani_atama() {
+        let out = eval(
+            r#"
+            dizi = [10, 20, 30] olsun
+            dizi[1] = 99 olsun
+            dizi[1]'i yazdır
+        "#,
+        );
+        assert_eq!(out.trim(), "99");
+    }
+
+    #[test]
+    fn interpreter_aralik_devam_ve_kir() {
+        let out = eval(
+            r#"
+            toplam = 0 olsun
+            i = 0'dan 5'e kadar {
+                i = 2 ise { devam }
+                i = 4 ise { kır }
+                toplam = toplam + i olsun
+            }
+            toplam'ı yazdır
+        "#,
+        );
+        assert_eq!(out.trim(), "4");
+    }
+
+    #[test]
+    fn interpreter_dene_yakala_calisma_zamani_hatasi() {
+        let out = eval(
+            r#"
+            dene {
+                tanimsiz_degisken'i yazdır
+            } yakala sorun {
+                "yakalandı"'yı yazdır
+            }
+            "devam"'ı yazdır
+        "#,
+        );
+        assert_eq!(out.trim(), "yakalandı\ndevam");
+    }
+
+    #[test]
+    fn interpreter_mantiksal_atama_ve_kisa_devre() {
+        let out = eval(
+            r#"
+            sonuc = yanlış ve tanimsiz_degisken olsun
+            diger = doğru veya baska_tanimsiz_degisken olsun
+            sonuc'u yazdır
+            diger'i yazdır
+        "#,
+        );
+        assert_eq!(out.trim(), "0\n1");
+    }
+
+    #[test]
+    fn parser_ayrilmis_sozcugu_atama_hedefi_olarak_reddeder() {
+        let mut parser = parser::Parser::new(lexer::Lexer::new("dogru = 1 olsun"));
+        let (_, diagnostics) = parser.parse_program_with_diagnostics();
+        assert!(diagnostics
+            .iter()
+            .any(|error| error.to_string().contains("atamanın sol tarafı")));
+    }
+
+    #[test]
+    fn interpreter_liste_atamasinda_sinir_hatasi() {
+        let mut parser =
+            parser::Parser::new(lexer::Lexer::new("dizi = [1] olsun\ndizi[2] = 9 olsun"));
+        let (program, diagnostics) = parser.parse_program_with_diagnostics();
+        assert!(diagnostics.is_empty());
+        let mut interp = interpreter::Yorumlayici::new();
+        let error = interp
+            .yorumla_kontrollu(program)
+            .expect_err("Sınır dışı atama hata vermeli");
+        assert!(error.to_string().contains("indeks sınır dışında"));
     }
 
     #[test]
     fn interpreter_metin_birlestirme() {
-        let out = eval(r#"
+        let out = eval(
+            r#"
             ad = "Dünya" olsun
             "Merhaba " + ad'ı yazdır
-        "#);
+        "#,
+        );
         assert_eq!(out.trim(), "Merhaba Dünya");
     }
 
     #[test]
     fn interpreter_dongude_toplam() {
-        let out = eval(r#"
+        let out = eval(
+            r#"
             toplam = 0 olsun
             i = 1 olsun
             i <= 5 olduğu sürece {
@@ -226,7 +385,8 @@ mod tests {
                 i = i + 1 olsun
             }
             toplam'ı yazdır
-        "#);
+        "#,
+        );
         assert_eq!(out.trim(), "15");
     }
 
@@ -240,7 +400,7 @@ mod tests {
         let t = graf.tensor_olustur(2, 3, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], true);
         assert_eq!(t.satirlar, 2);
         assert_eq!(t.sutunlar, 3);
-        assert_eq!(t.requires_grad, true);
+        assert!(t.requires_grad);
         let veri = t.veri.lock().unwrap();
         assert_eq!(*veri, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
     }
@@ -331,11 +491,12 @@ mod tests {
         let kod = "x = 3 + 4 olsun";
         let lx = lexer::Lexer::new(kod);
         let mut p = parser::Parser::new(lx);
-        let ast = p.parse_program();
+        let (ast, diagnostics) = p.parse_program_with_diagnostics();
+        assert!(diagnostics.is_empty());
         let mut dc = compiler::Derleyici::new();
-        let prog = dc.derle(ast);
+        let prog = dc.derle_kontrollu(ast).expect("Bytecode derlenmeli");
         let mut vm = vm::VM::new(prog);
-        vm.run(); // panik yoksa geçti
+        vm.run_checked().expect("VM programı çalışmalı");
     }
 
     #[test]
@@ -343,11 +504,45 @@ mod tests {
         let kod = "\"test\"'i yazdır";
         let lx = lexer::Lexer::new(kod);
         let mut p = parser::Parser::new(lx);
-        let ast = p.parse_program();
+        let (ast, diagnostics) = p.parse_program_with_diagnostics();
+        assert!(diagnostics.is_empty());
         let mut dc = compiler::Derleyici::new();
-        let prog = dc.derle(ast);
+        let prog = dc.derle_kontrollu(ast).expect("Bytecode derlenmeli");
         let mut vm = vm::VM::new(prog);
-        vm.run();
+        vm.run_checked().expect("VM programı çalışmalı");
+    }
+
+    #[test]
+    fn compiler_vm_mantiksal_kisa_devre() {
+        let kod = r#"
+            sonuc = yanlış ve tanimsiz_degisken olsun
+            diger = doğru veya baska_tanimsiz_degisken olsun
+            sonuc'u yazdır
+            diger'i yazdır
+        "#;
+        let mut parser = parser::Parser::new(lexer::Lexer::new(kod));
+        let (ast, diagnostics) = parser.parse_program_with_diagnostics();
+        assert!(diagnostics.is_empty());
+        let program = compiler::Derleyici::new()
+            .derle_kontrollu(ast)
+            .expect("Mantıksal ifadeler bytecode'a derlenmeli");
+        let buffer = Rc::new(RefCell::new(String::new()));
+        let mut vm = vm::VM::new(program).with_output_buffer(Rc::clone(&buffer));
+        vm.run_checked().expect("VM kısa devre uygulamalı");
+        assert_eq!(buffer.borrow().trim(), "0\n1");
+    }
+
+    #[test]
+    fn compiler_vm_sifira_bolmeyi_hata_yapar() {
+        let mut parser = parser::Parser::new(lexer::Lexer::new("10 / 0'ı yazdır"));
+        let (ast, diagnostics) = parser.parse_program_with_diagnostics();
+        assert!(diagnostics.is_empty());
+        let program = compiler::Derleyici::new()
+            .derle_kontrollu(ast)
+            .expect("Kaynak bytecode'a derlenmeli");
+        let error = vm::VM::new(program)
+            .run_checked()
+            .expect_err("VM sıfıra bölmeyi reddetmeli");
+        assert!(error.to_string().contains("Sıfıra bölme"));
     }
 }
-

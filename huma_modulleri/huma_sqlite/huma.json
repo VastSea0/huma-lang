@@ -1,16 +1,12 @@
 {
   "ad": "huma_sqlite",
-  "surum": "1.0.0",
-  "aciklama": "Hüma için yerleşik SQLite veritabanı desteği. Sınıf tabanlı API ile SQL sorguları çalıştırın.",
+  "surum": "2.0.0",
+  "aciklama": "SQLite bağlantısı, komut yürütme ve satır sorgulama işlevlerini sarmalayan sınıf tabanlı API.",
   "yazar": "Egehan KAHRAMAN",
   "giris": "huma_sqlite.hb",
-  "huma_surum": ">=0.5.0",
+  "huma_surum": ">=0.6.0",
   "bagimliliklar": {},
   "betikler": {},
-  "crate_bagimliliklari": {
-    "rusqlite": "0.31"
-  },
-  "yerleşik_rust": "use rusqlite::{params, Connection};\n\nstatic SQL_CONNECTIONS: std::sync::Mutex<std::collections::HashMap<u64, Connection>> = std::sync::Mutex::new(std::collections::HashMap::new());\n\nfn dahili_sql_bağlan(path: &str) -> u64 {\n    if let Ok(conn) = Connection::open(path) {\n        let id = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos() as u64;\n        SQL_CONNECTIONS.lock().unwrap().insert(id, conn);\n        return id;\n    }\n    0\n}\n\nfn dahili_sql_yürüt(id: u64, sql: &str) -> f64 {\n    if let Some(conn) = SQL_CONNECTIONS.lock().unwrap().get(&id) {\n        if conn.execute(sql, []).is_ok() { return 1.0; }\n    }\n    0.0\n}\n",
   "github": "VastSea0/huma-lang",
   "lisans": "MIT",
   "kaynak": "github.com/VastSea0/huma-lang"

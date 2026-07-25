@@ -1,8 +1,13 @@
 {
   "ad": "nlp_ileri",
   "surum": "1.0.0",
-  "aciklama": "Hüma İleri NLP Modülü — BPE, TF-IDF, Attention, Embedding, Transformer Blokları",
+  "aciklama": "Hüma ileri NLP modülü: TF-IDF ve CPU tabanlı sözcük gömme araçları.",
   "yazar": "Egehan KAHRAMAN",
-  "ana_dosya": "nlp_ileri.hb",
-  "bagimliliklar": { "nlp_temel": "*", "yapay_zeka": "*" }
+  "giris": "nlp_ileri.hb",
+  "huma_surum": ">=0.6.0",
+  "bagimliliklar": {
+    "nlp_temel": "^3.2.0"
+  },
+  "betikler": {},
+  "lisans": "MIT"
 }

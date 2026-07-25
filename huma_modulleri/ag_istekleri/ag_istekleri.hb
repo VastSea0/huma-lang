@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════
 // ag_istekleri.hb — Hüma HTTP İstek Kütüphanesi
-// Sürüm: 2.0.0 (Modern Syntax Edition)
+// Sürüm: 2.0.0
 // ═══════════════════════════════════════════════════════════════════
 
 getir fonksiyon olsun url, basliklar alsın {

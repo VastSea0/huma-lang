@@ -39,7 +39,13 @@ fn safe_pkg_name(output_name: &str) -> String {
     // Replace characters that are invalid in a Cargo package name
     let sanitised: String = base
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
 
     // Cargo package names must start with a letter; prepend 'p' if needed
@@ -55,37 +61,50 @@ fn safe_pkg_name(output_name: &str) -> String {
 /// generated code compiles without `&str` / `String` mismatches.
 fn render_opcode(op: &OpCode) -> String {
     match op {
-        OpCode::PushConstant(n)  => format!("I::K({})", n),
-        OpCode::LoadVar(n)       => format!("I::LV({}.to_string())", quote(n)),
-        OpCode::StoreVar(n)      => format!("I::SV({}.to_string())", quote(n)),
-        OpCode::DefineVar(n)     => format!("I::DV({}.to_string())", quote(n)),
-        OpCode::Add              => "I::Add".into(),
-        OpCode::Sub              => "I::Sub".into(),
-        OpCode::Mul              => "I::Mul".into(),
-        OpCode::Div              => "I::Div".into(),
-        OpCode::Greater          => "I::Gt".into(),
-        OpCode::Less             => "I::Lt".into(),
-        OpCode::LessOrEqual      => "I::Le".into(),
-        OpCode::Equal            => "I::Eq".into(),
-        OpCode::NotEqual         => "I::Ne".into(),
-        OpCode::Jump(n)          => format!("I::J({})", n),
-        OpCode::JumpIfFalse(n)   => format!("I::JF({})", n),
-        OpCode::Call(n)          => format!("I::Call({})", n),
-        OpCode::Return           => "I::Ret".into(),
-        OpCode::Print            => "I::Print".into(),
-        OpCode::Pop              => "I::Pop".into(),
-        OpCode::Bos              => "I::Bos".into(),
-        OpCode::MakeList(n)      => format!("I::ML({})", n),
-        OpCode::ListAccess       => "I::LA".into(),
-        OpCode::MakeMap(n)       => format!("I::MM({})", n),
+        OpCode::PushConstant(n) => format!("I::K({})", n),
+        OpCode::LoadVar(n) => format!("I::LV({}.to_string())", quote(n)),
+        OpCode::StoreVar(n) => format!("I::SV({}.to_string())", quote(n)),
+        OpCode::DefineVar(n) => format!("I::DV({}.to_string())", quote(n)),
+        OpCode::Add => "I::Add".into(),
+        OpCode::Sub => "I::Sub".into(),
+        OpCode::Mul => "I::Mul".into(),
+        OpCode::Div => "I::Div".into(),
+        OpCode::Mod => "I::Mod".into(),
+        OpCode::Greater => "I::Gt".into(),
+        OpCode::GreaterOrEqual => "I::Ge".into(),
+        OpCode::Less => "I::Lt".into(),
+        OpCode::LessOrEqual => "I::Le".into(),
+        OpCode::Equal => "I::Eq".into(),
+        OpCode::NotEqual => "I::Ne".into(),
+        OpCode::And => "I::And".into(),
+        OpCode::Or => "I::Or".into(),
+        OpCode::Not => "I::Not".into(),
+        OpCode::Length => "I::Len".into(),
+        OpCode::Jump(n) => format!("I::J({})", n),
+        OpCode::JumpIfFalse(n) => format!("I::JF({})", n),
+        OpCode::Call(n) => format!("I::Call({})", n),
+        OpCode::Return => "I::Ret".into(),
+        OpCode::Print => "I::Print".into(),
+        OpCode::Pop => "I::Pop".into(),
+        OpCode::Bos => "I::Bos".into(),
+        OpCode::MakeList(n) => format!("I::ML({})", n),
+        OpCode::ListAccess => "I::LA".into(),
+        OpCode::MakeMap(n) => format!("I::MM({})", n),
         OpCode::TryBlockStart(n) => format!("I::TS({})", n),
-        OpCode::TryBlockEnd      => "I::TE".into(),
-        OpCode::Await            => "I::Aw".into(),
-        OpCode::CallFFI { lib_ad, fn_ad, arg_len } =>
-            format!("I::FFI({}.to_string(),{}.to_string(),{})", quote(lib_ad), quote(fn_ad), arg_len),
+        OpCode::TryBlockEnd => "I::TE".into(),
+        OpCode::Await => "I::Aw".into(),
+        OpCode::CallFFI {
+            lib_ad,
+            fn_ad,
+            arg_len,
+        } => format!(
+            "I::FFI({}.to_string(),{}.to_string(),{})",
+            quote(lib_ad),
+            quote(fn_ad),
+            arg_len
+        ),
         // MakeFunction is pre-compiled; at the top level it emits a MkFn referencing the table
-        OpCode::MakeFunction { name, .. } =>
-            format!("I::MkFn({}.to_string())", quote(name)),
+        OpCode::MakeFunction { name, .. } => format!("I::MkFn({}.to_string())", quote(name)),
     }
 }
 
@@ -97,7 +116,7 @@ fn quote(s: &str) -> String {
 /// Format a `Constant` as a Rust literal.
 fn render_const(c: &Constant) -> String {
     match c {
-        Constant::Sayi(n)  => format!("C::N({:?})", n),
+        Constant::Sayi(n) => format!("C::N({:?})", n),
         Constant::Metin(m) => format!("C::S({}.to_string())", quote(m)),
     }
 }
@@ -158,7 +177,8 @@ pub fn generate_standalone(input_path: &str, output_name: &str) -> HumaResult<St
 
     // ── Native Package Discovery ─────────────────────────────────────────────
     let mut native_code = String::new();
-    let mut extra_crates: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    let mut extra_crates: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
 
     if let Ok(mod_dir) = fs::read_dir("huma_modulleri") {
         for entry in mod_dir.flatten() {
@@ -167,7 +187,7 @@ pub fn generate_standalone(input_path: &str, output_name: &str) -> HumaResult<St
                 if source.contains(&format!("yükle \"{}\"", pkg_name))
                     || source.contains(&format!("yükle '{}'", pkg_name))
                 {
-                    let json_path  = entry.path().join("huma.json");
+                    let json_path = entry.path().join("huma.json");
                     let json_path2 = entry.path().join("paket.json");
                     let target_json = if json_path.exists() {
                         Some(json_path)
@@ -179,14 +199,17 @@ pub fn generate_standalone(input_path: &str, output_name: &str) -> HumaResult<St
                     if let Some(j) = target_json {
                         if let Ok(content) = fs::read_to_string(j) {
                             if let Ok(v) = serde_json::from_str::<serde_json::Value>(&content) {
-                                if let Some(code) = v.get("yerleşik_rust").and_then(|c| c.as_str()) {
+                                if let Some(code) = v.get("yerleşik_rust").and_then(|c| c.as_str())
+                                {
                                     native_code.push_str("\n// --- Native Glue from ");
                                     native_code.push_str(&pkg_name);
                                     native_code.push_str(" ---\n");
                                     native_code.push_str(code);
                                     native_code.push('\n');
                                 }
-                                if let Some(deps) = v.get("crate_bagimliliklari").and_then(|d| d.as_object()) {
+                                if let Some(deps) =
+                                    v.get("crate_bagimliliklari").and_then(|d| d.as_object())
+                                {
                                     for (k, ver) in deps {
                                         if let Some(v) = ver.as_str() {
                                             extra_crates.insert(k.clone(), v.to_string());
@@ -216,7 +239,7 @@ enum I {{
     LV(String),    // LoadVar
     SV(String),    // StoreVar
     DV(String),    // DefineVar
-    Add, Sub, Mul, Div, Gt, Lt, Le, Eq, Ne,
+    Add, Sub, Mul, Div, Mod, Gt, Ge, Lt, Le, Eq, Ne, And, Or, Not, Len,
     J(usize),      // Jump
     JF(usize),     // JumpIfFalse
     Call(usize),   // Call(arg_count)
@@ -371,9 +394,20 @@ fn run_frame(
                     else {{ stack.push(V::N(a / b)); }}
                 }}
             }},
+            I::Mod => {{
+                let r = pop!(); let l = pop!();
+                if let (V::N(a), V::N(b)) = (l, r) {{
+                    if b == 0.0 {{ stack.push(V::Err("Sıfıra göre kalan hesaplanamaz".into())); }}
+                    else {{ stack.push(V::N(a % b)); }}
+                }}
+            }},
             I::Gt => {{
                 let r = pop!(); let l = pop!();
                 if let (V::N(a), V::N(b)) = (l, r) {{ stack.push(V::N(if a > b {{ 1.0 }} else {{ 0.0 }})); }}
+            }},
+            I::Ge => {{
+                let r = pop!(); let l = pop!();
+                if let (V::N(a), V::N(b)) = (l, r) {{ stack.push(V::N(if a >= b {{ 1.0 }} else {{ 0.0 }})); }}
             }},
             I::Lt => {{
                 let r = pop!(); let l = pop!();
@@ -402,6 +436,32 @@ fn run_frame(
                     _                    => false,
                 }};
                 stack.push(V::N(if !eq {{ 1.0 }} else {{ 0.0 }}));
+            }},
+            I::And => {{
+                let r = pop!(); let l = pop!();
+                let lt = !matches!(l, V::Nil | V::N(0.0));
+                let rt = !matches!(r, V::Nil | V::N(0.0));
+                stack.push(V::N(if lt && rt {{ 1.0 }} else {{ 0.0 }}));
+            }},
+            I::Or => {{
+                let r = pop!(); let l = pop!();
+                let lt = !matches!(l, V::Nil | V::N(0.0));
+                let rt = !matches!(r, V::Nil | V::N(0.0));
+                stack.push(V::N(if lt || rt {{ 1.0 }} else {{ 0.0 }}));
+            }},
+            I::Not => {{
+                let v = pop!();
+                let truthy = !matches!(v, V::Nil | V::N(0.0));
+                stack.push(V::N(if truthy {{ 0.0 }} else {{ 1.0 }}));
+            }},
+            I::Len => {{
+                let v = pop!();
+                match v {{
+                    V::S(s) => stack.push(V::N(s.chars().count() as f64)),
+                    V::List(items) => stack.push(V::N(items.len() as f64)),
+                    V::Map(items) => stack.push(V::N(items.len() as f64)),
+                    _ => stack.push(V::Err("Bu değerin uzunluğu alınamaz".into())),
+                }}
             }},
 
             I::Print => println!("{{}}", pop!()),
@@ -530,11 +590,11 @@ fn main() {{
     run_frame(&mut frame, &mut globals, 0);
 }}
 "#,
-        ver        = env!("CARGO_PKG_VERSION"),
-        input      = input_path,
-        native     = native_code,
-        fn_table   = fn_table_lit,
-        top_insts  = top_insts,
+        ver = env!("CARGO_PKG_VERSION"),
+        input = input_path,
+        native = native_code,
+        fn_table = fn_table_lit,
+        top_insts = top_insts,
         top_consts = top_consts,
     );
 

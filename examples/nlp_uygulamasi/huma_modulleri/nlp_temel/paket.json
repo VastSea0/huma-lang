@@ -9,8 +9,6 @@
   "betikler": {
     "test": "huma run tests/test_nlp.hb"
   },
-  "crate_bagimliliklari": null,
-  "yerleşik_rust": null,
   "kaynak": "github.com/VastSea0/huma-lang",
   "github": "VastSea0/huma-lang",
   "lisans": "MIT"

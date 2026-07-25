@@ -1,7 +1,0 @@
-[2026-03-16 05:00] BILGI: Sistem baslatildi.
-[2026-03-16 05:01] UYARI: Bellek kullanimi yuksek (%85).
-[2026-03-16 05:05] HATA: Veritabani baglantisi kesildi!
-[2026-03-16 05:06] BILGI: Baglanti yeniden kuruldu.
-[2026-03-16 05:10] HATA: API yanit vermiyor.
-[2026-03-16 05:12] UYARI: Disk alani azaliyor.
-[2026-03-16 05:15] BILGI: Gunluk yedekleme tamamlandi.

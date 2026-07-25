@@ -3,24 +3,36 @@
 //! High-level compilation operations: parse → compile → serialize to bytecode,
 //! and the standalone-binary code-generation path.
 
-pub mod pipeline;
-pub mod codegen;
 pub mod aot;
-
+pub mod codegen;
+pub mod pipeline;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use huma_core::{lexer::Lexer, parser::Parser, compiler::Derleyici, vm::VM};
+    use huma_core::{compiler::Derleyici, lexer::Lexer, parser::Parser, vm::VM};
+    use std::{cell::RefCell, rc::Rc};
 
     fn compile_and_run(kod: &str) {
         let lexer = Lexer::new(kod);
         let mut parser = Parser::new(lexer);
-        let ast = parser.parse_program();
+        let (ast, diagnostics) = parser.parse_program_with_diagnostics();
+        assert!(diagnostics.is_empty());
         let mut derleyici = Derleyici::new();
-        let prog = derleyici.derle(ast);
+        let prog = derleyici
+            .derle_kontrollu(ast)
+            .expect("Kaynak bytecode'a derlenmeli");
         let mut vm = VM::new(prog);
-        vm.run();
+        vm.run_checked().expect("Bytecode hatasız çalışmalı");
+    }
+
+    fn vm_output(kod: &str) -> String {
+        let program = pipeline::compile_source(kod).expect("kaynak bytecode'a derlenmeli");
+        let output = Rc::new(RefCell::new(String::new()));
+        let mut vm = VM::new(program).with_output_buffer(output.clone());
+        vm.run_checked().expect("VM programı hatasız çalışmalı");
+        let result = output.borrow().clone();
+        result
     }
 
     // ─────────────────────────────────────────────
@@ -101,5 +113,36 @@ mod tests {
         let mut derleyici = Derleyici::new();
         let sonuc = derleyici.derle_kontrollu(ast);
         assert!(sonuc.is_ok(), "Kontrollü derleme başarılı olmalı");
+    }
+
+    #[test]
+    fn compiler_vm_ozyinelemeli_fibonacci_dogru() {
+        let kod = r#"
+            fibonacci fonksiyon olsun n alsın {
+                n <= 1 ise { n'i döndür }
+                fibonacci(n - 1) + fibonacci(n - 2)'yi döndür
+            }
+            fibonacci(0)'ı yazdır
+            fibonacci(1)'i yazdır
+            fibonacci(2)'yi yazdır
+            fibonacci(7)'yi yazdır
+        "#;
+        assert_eq!(vm_output(kod), "0\n1\n1\n13\n");
+    }
+
+    #[test]
+    fn pipeline_desteklenmeyen_komutu_reddeder() {
+        let sonuc = pipeline::compile_source(r#""matematik.hb"'yi yükle"#);
+        assert!(
+            sonuc.is_err(),
+            "Bytecode modül yüklemeyi sessizce yutmamalı"
+        );
+    }
+
+    #[test]
+    fn pipeline_desteklenmeyen_liste_atamasini_reddeder() {
+        let error = pipeline::compile_source("dizi = [1] olsun\ndizi[0] = 2 olsun")
+            .expect_err("Liste ataması bytecode alt kümesinde reddedilmeli");
+        assert!(error.to_string().contains("atama hedefini desteklemiyor"));
     }
 }

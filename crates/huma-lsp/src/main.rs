@@ -1,7 +1,7 @@
 use anyhow::Result;
-use huma_core::{HumaError};
 use huma_core::lexer::Lexer;
 use huma_core::parser::Parser;
+use huma_core::HumaError;
 use regex::Regex;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -35,23 +35,39 @@ impl Backend {
 
     fn word_at_position(text: &str, pos: Position) -> Option<String> {
         let line = text.lines().nth(pos.line as usize)?;
-        let col = pos.character as usize;
-        let bytes = line.as_bytes();
-        if col > bytes.len() {
-            return None;
+        let target_utf16 = pos.character as usize;
+        let mut utf16_offset = 0;
+        let mut byte_offset = None;
+        for (index, ch) in line.char_indices() {
+            if utf16_offset == target_utf16 {
+                byte_offset = Some(index);
+                break;
+            }
+            let next_offset = utf16_offset + ch.len_utf16();
+            if target_utf16 < next_offset {
+                return None;
+            }
+            utf16_offset = next_offset;
+        }
+        let byte_offset =
+            byte_offset.or_else(|| (utf16_offset == target_utf16).then_some(line.len()))?;
+
+        let is_word = |ch: char| ch.is_alphanumeric() || ch == '_';
+
+        let mut start = byte_offset;
+        while let Some((index, ch)) = line[..start].char_indices().next_back() {
+            if !is_word(ch) {
+                break;
+            }
+            start = index;
         }
 
-        let is_word = |b: u8| {
-            (b as char).is_alphanumeric() || b == b'_' || b >= 0x80
-        };
-
-        let mut start = col;
-        while start > 0 && is_word(bytes[start - 1]) {
-            start -= 1;
-        }
-        let mut end = col;
-        while end < bytes.len() && is_word(bytes[end]) {
-            end += 1;
+        let mut end = byte_offset;
+        for (relative_index, ch) in line[byte_offset..].char_indices() {
+            if !is_word(ch) {
+                break;
+            }
+            end = byte_offset + relative_index + ch.len_utf8();
         }
         if start == end {
             return None;
@@ -72,8 +88,14 @@ impl Backend {
                     let c = col.saturating_sub(1) as u32;
                     Some(Diagnostic {
                         range: Range {
-                            start: Position { line: l, character: c },
-                            end: Position { line: l, character: c + 1 },
+                            start: Position {
+                                line: l,
+                                character: c,
+                            },
+                            end: Position {
+                                line: l,
+                                character: c + 1,
+                            },
                         },
                         severity: Some(DiagnosticSeverity::ERROR),
                         code: None,
@@ -91,7 +113,9 @@ impl Backend {
     }
 
     fn collect_builtin_function_names() -> Vec<String> {
-        let re = Regex::new(r#"(?m)^\s*([A-Za-z_ÇĞİÖŞÜçğıöşü][\wÇĞİÖŞÜçğıöşü]*)\s+fonksiyon\s+olsun"#).ok();
+        let re =
+            Regex::new(r#"(?m)^\s*([A-Za-z_ÇĞİÖŞÜçğıöşü][\wÇĞİÖŞÜçğıöşü]*)\s+fonksiyon\s+olsun"#)
+                .ok();
         let mut out = Vec::new();
         if let Some(re) = re {
             for (_name, content) in huma_core::builtin_files::get_lib_files() {
@@ -120,7 +144,7 @@ impl Backend {
             "ile"       => "**ile** — Fonksiyon argümanlarını bağlar (with).\n\n```hüma\n10 ile 20'yi topla\n```",
             "çağır"     => "**çağır** — Bir fonksiyonu doğrudan çağırır.\n\n```hüma\nçağır hesapla(5)\n```",
             "bekle"     => "**bekle** — Asenkron işlem sonucunu bekler (await).",
-            "kadar"     => "**kadar** — Aralık döngüsü üst sınırını belirtir.\n\n```hüma\n0'dan 10'a kadar i alsın { ... }\n```",
+            "kadar"     => "**kadar** — Aralık döngüsü üst sınırını belirtir.\n\n```hüma\ni = 0'dan 10'a kadar { ... }\n```",
             "dene"      => "**dene** — Hata yakalama bloğu başlatır (try).",
             "yakala"    => "**yakala** — Dene bloğundaki hatayı yakalar (catch).",
             "sınıf"     => "**sınıf** — Yeni bir sınıf tanımlar.\n\n```hüma\nKişi sınıf olsun { ... }\n```",
@@ -148,14 +172,21 @@ impl LanguageServer for Backend {
         let root = params
             .root_uri
             .and_then(|u| u.to_file_path().ok())
-            .or_else(|| params.workspace_folders.and_then(|mut w| w.pop()).and_then(|f| f.uri.to_file_path().ok()));
+            .or_else(|| {
+                params
+                    .workspace_folders
+                    .and_then(|mut w| w.pop())
+                    .and_then(|f| f.uri.to_file_path().ok())
+            });
         if let Some(r) = root {
             *self.root.write().await = Some(r);
         }
 
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
-                text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
+                text_document_sync: Some(TextDocumentSyncCapability::Kind(
+                    TextDocumentSyncKind::FULL,
+                )),
                 definition_provider: Some(OneOf::Left(true)),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
                 completion_provider: Some(CompletionOptions {
@@ -185,7 +216,10 @@ impl LanguageServer for Backend {
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         let uri = params.text_document.uri.clone();
         let text = params.text_document.text;
-        self.docs.lock().await.insert(uri.clone(), Document { text: text.clone() });
+        self.docs
+            .lock()
+            .await
+            .insert(uri.clone(), Document { text: text.clone() });
 
         let diags = Self::diagnostics_for(&text);
         self.client.publish_diagnostics(uri, diags, None).await;
@@ -195,7 +229,10 @@ impl LanguageServer for Backend {
         let uri = params.text_document.uri.clone();
         if let Some(change) = params.content_changes.into_iter().last() {
             let text = change.text;
-            self.docs.lock().await.insert(uri.clone(), Document { text: text.clone() });
+            self.docs
+                .lock()
+                .await
+                .insert(uri.clone(), Document { text: text.clone() });
             let diags = Self::diagnostics_for(&text);
             self.client.publish_diagnostics(uri, diags, None).await;
         }
@@ -206,8 +243,12 @@ impl LanguageServer for Backend {
         let pos = params.text_document_position_params.position;
 
         let docs = self.docs.lock().await;
-        let Some(doc) = docs.get(&uri) else { return Ok(None); };
-        let Some(word) = Self::word_at_position(&doc.text, pos) else { return Ok(None); };
+        let Some(doc) = docs.get(&uri) else {
+            return Ok(None);
+        };
+        let Some(word) = Self::word_at_position(&doc.text, pos) else {
+            return Ok(None);
+        };
         drop(docs);
 
         // 1) Check built-in keyword docs
@@ -228,18 +269,23 @@ impl LanguageServer for Backend {
             let def_re = Regex::new(&format!(
                 r#"(?m)^\s*{}\s+fonksiyon\s+olsun(?:\s+(\w[\wÇĞİÖŞÜçğıöşü,\s]*)\s+alsın)?"#,
                 regex::escape(&word)
-            )).ok();
+            ))
+            .ok();
             if let Some(def_re) = def_re {
                 for p in files {
                     if let Ok(text) = std::fs::read_to_string(&p) {
-                        for cap in def_re.captures_iter(&text) {
-                            let params_str = cap.get(1)
+                        if let Some(cap) = def_re.captures_iter(&text).next() {
+                            let params_str = cap
+                                .get(1)
                                 .map(|m| m.as_str().to_string())
                                 .unwrap_or_default();
                             let hover_text = if params_str.is_empty() {
                                 format!("**{}** *(fonksiyon)*", word)
                             } else {
-                                format!("**{}** *(fonksiyon)*\n\nParametreler: `{}`", word, params_str)
+                                format!(
+                                    "**{}** *(fonksiyon)*\n\nParametreler: `{}`",
+                                    word, params_str
+                                )
                             };
                             return Ok(Some(Hover {
                                 contents: HoverContents::Markup(MarkupContent {
@@ -257,16 +303,27 @@ impl LanguageServer for Backend {
         Ok(None)
     }
 
-    async fn goto_definition(&self, params: GotoDefinitionParams) -> LspResult<Option<GotoDefinitionResponse>> {
+    async fn goto_definition(
+        &self,
+        params: GotoDefinitionParams,
+    ) -> LspResult<Option<GotoDefinitionResponse>> {
         let uri = params.text_document_position_params.text_document.uri;
         let pos = params.text_document_position_params.position;
 
         let docs = self.docs.lock().await;
-        let Some(doc) = docs.get(&uri) else { return Ok(None); };
-        let Some(word) = Self::word_at_position(&doc.text, pos) else { return Ok(None); };
+        let Some(doc) = docs.get(&uri) else {
+            return Ok(None);
+        };
+        let Some(word) = Self::word_at_position(&doc.text, pos) else {
+            return Ok(None);
+        };
 
         // 1) Search opened documents first
-        let def_re = Regex::new(&format!(r#"(?m)^\s*{}\s+fonksiyon\b"#, regex::escape(&word))).ok();
+        let def_re = Regex::new(&format!(
+            r#"(?m)^\s*{}\s+fonksiyon\b"#,
+            regex::escape(&word)
+        ))
+        .ok();
         if let Some(def_re) = def_re {
             for (u, d) in docs.iter() {
                 for (idx, line) in d.text.lines().enumerate() {
@@ -274,8 +331,14 @@ impl LanguageServer for Backend {
                         let loc = Location {
                             uri: u.clone(),
                             range: Range {
-                                start: Position { line: idx as u32, character: 0 },
-                                end: Position { line: idx as u32, character: line.len() as u32 },
+                                start: Position {
+                                    line: idx as u32,
+                                    character: 0,
+                                },
+                                end: Position {
+                                    line: idx as u32,
+                                    character: line.len() as u32,
+                                },
                             },
                         };
                         return Ok(Some(GotoDefinitionResponse::Scalar(loc)));
@@ -287,9 +350,15 @@ impl LanguageServer for Backend {
 
         // 2) Search workspace files
         let root_guard = self.root.read().await;
-        let Some(root) = root_guard.as_ref() else { return Ok(None); };
+        let Some(root) = root_guard.as_ref() else {
+            return Ok(None);
+        };
         let files = Self::scan_hb_files(root);
-        let def_re = Regex::new(&format!(r#"(?m)^\s*{}\s+fonksiyon\b"#, regex::escape(&word))).ok();
+        let def_re = Regex::new(&format!(
+            r#"(?m)^\s*{}\s+fonksiyon\b"#,
+            regex::escape(&word)
+        ))
+        .ok();
         if let Some(def_re) = def_re {
             for p in files {
                 if let Ok(text) = std::fs::read_to_string(&p) {
@@ -299,8 +368,14 @@ impl LanguageServer for Backend {
                                 let loc = Location {
                                     uri: u,
                                     range: Range {
-                                        start: Position { line: idx as u32, character: 0 },
-                                        end: Position { line: idx as u32, character: line.len() as u32 },
+                                        start: Position {
+                                            line: idx as u32,
+                                            character: 0,
+                                        },
+                                        end: Position {
+                                            line: idx as u32,
+                                            character: line.len() as u32,
+                                        },
                                     },
                                 };
                                 return Ok(Some(GotoDefinitionResponse::Scalar(loc)));
@@ -319,35 +394,35 @@ impl LanguageServer for Backend {
 
         // 1) Keywords with documentation
         let keywords: Vec<(&str, &str)> = vec![
-            ("yazdır",   "Bir değeri ekrana yazar"),
-            ("olsun",    "Değişken tanımlar veya değer atar"),
-            ("alsın",    "Fonksiyon parametrelerini tanımlar"),
-            ("fonksiyon","Yeni bir fonksiyon tanımlar"),
-            ("sınıf",    "Yeni bir sınıf tanımlar"),
-            ("ise",      "Koşul ifadesi (if)"),
-            ("yoksa",    "Koşul karşılanmadığında (else)"),
-            ("olduğu",   "'olduğu sürece' döngüsünün parçası"),
-            ("sürece",   "'olduğu sürece' döngüsünün parçası"),
-            ("döndür",   "Fonksiyondan değer döndürür"),
-            ("ve",       "Mantıksal VE (AND)"),
-            ("veya",     "Mantıksal VEYA (OR)"),
-            ("değil",    "Mantıksal DEĞİL (NOT)"),
-            ("yükle",    "Modül yükler: \"lib.hb\"'yi yükle"),
-            ("liste",    "Boş liste oluşturur"),
-            ("ekle",     "Listeye eleman ekler"),
-            ("çıkar",    "Listeden eleman çıkarır"),
+            ("yazdır", "Bir değeri ekrana yazar"),
+            ("olsun", "Değişken tanımlar veya değer atar"),
+            ("alsın", "Fonksiyon parametrelerini tanımlar"),
+            ("fonksiyon", "Yeni bir fonksiyon tanımlar"),
+            ("sınıf", "Yeni bir sınıf tanımlar"),
+            ("ise", "Koşul ifadesi (if)"),
+            ("yoksa", "Koşul karşılanmadığında (else)"),
+            ("olduğu", "'olduğu sürece' döngüsünün parçası"),
+            ("sürece", "'olduğu sürece' döngüsünün parçası"),
+            ("döndür", "Fonksiyondan değer döndürür"),
+            ("ve", "Mantıksal VE (AND)"),
+            ("veya", "Mantıksal VEYA (OR)"),
+            ("değil", "Mantıksal DEĞİL (NOT)"),
+            ("yükle", "Modül yükler: \"lib.hb\"'yi yükle"),
+            ("liste", "Boş liste oluşturur"),
+            ("ekle", "Listeye eleman ekler"),
+            ("çıkar", "Listeden eleman çıkarır"),
             ("uzunluğu", "Boyutu döndürür"),
-            ("kendisi",  "Sınıf içi öz-referans (self)"),
-            ("doğru",    "Boolean true"),
-            ("yanlış",   "Boolean false"),
-            ("dene",     "Hata yakalama bloğu (try)"),
-            ("yakala",   "Hata yakalar (catch)"),
-            ("var",      "ile var: Boyunca gezinir"),
-            ("kadar",    "Aralık döngüsü üst sınırı"),
-            ("mi",       "Soru eki"),
-            ("ile",      "Fonksiyon argümanını bağlar (with)"),
-            ("bekle",    "Asenkron bekler (await)"),
-            ("çağır",    "Fonksiyon çağırır"),
+            ("kendisi", "Sınıf içi öz-referans (self)"),
+            ("doğru", "Boolean true"),
+            ("yanlış", "Boolean false"),
+            ("dene", "Hata yakalama bloğu (try)"),
+            ("yakala", "Hata yakalar (catch)"),
+            ("var", "ile var: Boyunca gezinir"),
+            ("kadar", "Aralık döngüsü üst sınırı"),
+            ("mi", "Soru eki"),
+            ("ile", "Fonksiyon argümanını bağlar (with)"),
+            ("bekle", "Asenkron bekler (await)"),
+            ("çağır", "Fonksiyon çağırır"),
         ];
 
         for (kw, desc) in keywords {
@@ -392,4 +467,48 @@ async fn main() -> Result<()> {
 
     Server::new(stdin, stdout, socket).serve(service).await;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Backend;
+    use tower_lsp::lsp_types::Position;
+
+    #[test]
+    fn turkce_sozcugu_utf16_konumundan_bulur() {
+        let text = "öğrenci_sayısı'nı yazdır";
+        let word = Backend::word_at_position(
+            text,
+            Position {
+                line: 0,
+                character: 5,
+            },
+        );
+        assert_eq!(word.as_deref(), Some("öğrenci_sayısı"));
+    }
+
+    #[test]
+    fn emoji_sonrasindaki_utf16_konumunu_dogru_cevirir() {
+        let text = "🙂 değer'i yazdır";
+        let word = Backend::word_at_position(
+            text,
+            Position {
+                line: 0,
+                character: 5,
+            },
+        );
+        assert_eq!(word.as_deref(), Some("değer"));
+    }
+
+    #[test]
+    fn ayrac_uzerinde_sozcuk_dondurmez() {
+        let word = Backend::word_at_position(
+            "ad = 1 olsun",
+            Position {
+                line: 0,
+                character: 3,
+            },
+        );
+        assert!(word.is_none());
+    }
 }

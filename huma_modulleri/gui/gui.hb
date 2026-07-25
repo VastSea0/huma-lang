@@ -1,4 +1,4 @@
-// Hüma Native GUI Kütüphanesi — v0.5.0 (Modern Syntax Edition)
+// Hüma Native GUI Kütüphanesi — v0.5.0
 // egui tabanlı yerel arayüz oluşturma araçları
 
 GUI_SÜRÜM = "0.5.0" olsun

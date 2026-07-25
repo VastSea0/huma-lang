@@ -4,16 +4,15 @@
 // Yazar: Egehan KAHRAMAN
 // ═══════════════════════════════════════════════════════════════════
 
-__toplam_test = 0 olsun
-__başarılı_test = 0 olsun
+__test_durumu = {"toplam": 0, "başarılı": 0} olsun
 
 test_et fonksiyon olsun ad, f alsın {
-    __toplam_test = __toplam_test + 1
+    __test_durumu["toplam"] = __test_durumu["toplam"] + 1 olsun
     "[TEST] " + ad + " ..."'yı yazdır
     sonuc = f() olsun
     sonuc ise {
         "  -> BAŞARILI"'yı yazdır
-        __başarılı_test = __başarılı_test + 1
+        __test_durumu["başarılı"] = __test_durumu["başarılı"] + 1 olsun
     } yoksa {
         "  -> !!! HATA !!!"'yı yazdır
     }
@@ -21,9 +20,9 @@ test_et fonksiyon olsun ad, f alsın {
 
 test_raporu fonksiyon olsun {
     "-----------------------------"'yı yazdır
-    "Toplam Test: " + __toplam_test'i yazdır
-    "Başarılı: " + __başarılı_test'i yazdır
-    "Başarısız: " + (__toplam_test - __başarılı_test)'i yazdır
+    "Toplam Test: " + __test_durumu["toplam"]'ı yazdır
+    "Başarılı: " + __test_durumu["başarılı"]'yı yazdır
+    "Başarısız: " + (__test_durumu["toplam"] - __test_durumu["başarılı"])'yı yazdır
     "-----------------------------"'yı yazdır
 }
 

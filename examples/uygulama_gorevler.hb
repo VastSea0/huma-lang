@@ -6,16 +6,16 @@ yükle "liste.hb";
 DOSYA = "gorevler.txt" olsun
 
 gorevleri_oku fonksiyon olsun {
+    dosya_var_mı(DOSYA) = 0 ise { []'yi döndür }
     icerik = dosya_oku(DOSYA) olsun
-    tipi(icerik) = "Boş" ise { []'yi döndür }
     satırlara_ayır(icerik)'i döndür
 }
 
-gorevleri_kaydet fonksiyon olsun liste alsın {
+gorevleri_kaydet fonksiyon olsun gorev_listesi alsın {
     metin = "" olsun
     i = 0 olsun
-    i < uzunluk(liste) olduğu sürece {
-        metin = metin + liste[i] + "\n" olsun
+    i < uzunluk(gorev_listesi) olduğu sürece {
+        metin = metin + gorev_listesi[i] + "\n" olsun
         i = i + 1 olsun
     }
     dosya_yaz(DOSYA, metin)

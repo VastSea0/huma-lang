@@ -1,8 +1,11 @@
 {
   "ad": "yapay_zeka",
-  "versiyon": "0.1.0",
-  "aciklama": "Hüma Yapay Zeka, Derin Öğrenme (Neural Networks) ve BPE Tokenizer Paketi",
+  "surum": "1.0.0",
+  "aciklama": "CPU üzerinde yoğun katman, geri yayılım, Adam güncellemesi ve model serileştirme araçları.",
   "yazar": "Hüma Ekibi",
   "giris": "yapay_zeka.hb",
-  "bagimliliklar": {}
+  "huma_surum": ">=0.6.0",
+  "bagimliliklar": {},
+  "betikler": {},
+  "lisans": "MIT"
 }

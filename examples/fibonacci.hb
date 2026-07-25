@@ -1,5 +1,3 @@
-yükle "matematik.hb";
-
 fibonacci fonksiyon olsun n alsın {
     n <= 1 ise { n'i döndür }
     fibonacci(n - 1) + fibonacci(n - 2)'yi döndür

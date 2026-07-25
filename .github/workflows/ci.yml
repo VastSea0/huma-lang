@@ -18,8 +18,39 @@ jobs:
       - name: Cache cargo artifacts
         uses: swatinem/rust-cache@v2
 
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Reject Rust warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
       - name: Run workspace tests
         run: cargo test --workspace
 
-      - name: Run CLI assertion test suite
-        run: cargo run -p huma-cli -- test tests/test_mimari.hb
+      - name: Run canonical Hüma test suite
+        run: cargo run -p huma-cli -- test tests
+
+      - name: Run Hüma example smoke tests
+        run: cargo run -p huma-cli -- test examples
+
+      - name: Build release CLI
+        run: cargo build --release -p huma-cli
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: www/site/package-lock.json
+
+      - name: Install website dependencies
+        working-directory: www/site
+        run: npm ci
+
+      - name: Lint website
+        working-directory: www/site
+        run: npm run lint
+
+      - name: Build website
+        working-directory: www/site
+        run: npm run build

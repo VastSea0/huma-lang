@@ -42,9 +42,8 @@ pub fn compile_file(input_path: &str, output_path: &str) -> HumaResult<()> {
 /// Load a previously compiled `.hbc` bytecode file.
 pub fn load_bytecode(path: &str) -> HumaResult<Program> {
     let bytes = fs::read(path)?;
-    let program: Program = bincode::deserialize(&bytes).map_err(|e| {
-        HumaError::SerializationError(format!("Bytecode okuma hatası: {}", e))
-    })?;
+    let program: Program = bincode::deserialize(&bytes)
+        .map_err(|e| HumaError::SerializationError(format!("Bytecode okuma hatası: {}", e)))?;
     Ok(program)
 }
 

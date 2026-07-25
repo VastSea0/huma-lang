@@ -24,7 +24,7 @@ ters_cevir fonksiyon olsun d alsın {
     yeni = [] olsun
     i = boy - 1 olsun
     i >= 0 olduğu sürece {
-        yeni = yeni'ye d[i]'yi ekle olsun
+        yeni = listeye_ekle(yeni, d[i]) olsun
         i = i - 1 olsun
     }
     yeni'yi döndür
@@ -34,8 +34,9 @@ ters_cevir fonksiyon olsun d alsın {
 eşle fonksiyon olsun d, f alsın {
     sonuç = [] olsun
     boy = d'nin uzunluğu olsun
-    i = 0'dan boy'a kadar {
-        sonuç = sonuç'a f(d[i])'yi ekle olsun
+    boy = 0 ise { sonuç'u döndür }
+    i = 0'dan (boy - 1)'e kadar {
+        sonuç = listeye_ekle(sonuç, f(d[i])) olsun
     }
     sonuç'u döndür
 }
@@ -43,10 +44,11 @@ eşle fonksiyon olsun d, f alsın {
 filtrele fonksiyon olsun d, f alsın {
     sonuç = [] olsun
     boy = d'nin uzunluğu olsun
-    i = 0'dan boy'a kadar {
+    boy = 0 ise { sonuç'u döndür }
+    i = 0'dan (boy - 1)'e kadar {
         eleman = d[i] olsun
         f(eleman) ise {
-            sonuç = sonuç'a eleman'ı ekle olsun
+            sonuç = listeye_ekle(sonuç, eleman) olsun
         }
     }
     sonuç'u döndür
@@ -55,7 +57,8 @@ filtrele fonksiyon olsun d, f alsın {
 indirge fonksiyon olsun d, f, başlangıç alsın {
     akümülatör = başlangıç olsun
     boy = d'nin uzunluğu olsun
-    i = 0'dan boy'a kadar {
+    boy = 0 ise { akümülatör'ü döndür }
+    i = 0'dan (boy - 1)'e kadar {
         akümülatör = f(akümülatör, d[i]) olsun
     }
     akümülatör'ü döndür
@@ -64,7 +67,7 @@ indirge fonksiyon olsun d, f, başlangıç alsın {
 dilimle fonksiyon olsun d, baş, son alsın {
     sonuç = [] olsun
     i = baş'tan son'a kadar {
-        sonuç = sonuç'a d[i]'yi ekle olsun
+        sonuç = listeye_ekle(sonuç, d[i]) olsun
     }
     sonuç'u döndür
 }

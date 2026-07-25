@@ -1,23 +1,9 @@
-// ══════════════════════════════════════════════════════════════════════════════
-// yapay_zeka/yapay_zeka.hb — Hüma Yapay Zeka Paketi Ana Giriş Dosyası
-// ══════════════════════════════════════════════════════════════════════════════
+// yapay_zeka/yapay_zeka.hb — Kanonik yapay zekâ paketi giriş noktası.
+//
+// Sağlanan yüksek seviyeli API:
+//   model = sinir_agi() olsun
+//   model.ilklendir() olsun
+//   model.katman_ekle(giriş, çıkış, "relu") olsun
+//   model.egit(veri, etiketler, epoch, öğrenme_hızı) olsun
 
-yükle "katman.hb"
-yükle "optimizor.hb"
-
-sınıf YapayZekaMotoru {
-    ilklendir fonksiyon olsun {
-        kendisi.ad = "Hüma Yapay Zeka v0.1" olsun
-    }
-
-    bpe_egit_ve_kodla fonksiyon olsun metin, vocab_boyutu alsın {
-        bpe_eğit(metin, vocab_boyutu)
-        tokenlar = bpe_kodla(metin) olsun
-        tokenlar'ı döndür
-    }
-
-    bpe_metne_cevir fonksiyon olsun token_ids alsın {
-        metin = bpe_çöz(token_ids) olsun
-        metin'i döndür
-    }
-}
+"sinir_agi.hb"'yi yükle

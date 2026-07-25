@@ -1,5 +1,5 @@
 use crate::token::Token;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Ifade {
@@ -115,4 +115,8 @@ pub enum Komut {
         bitis: Ifade,
         govde: Vec<Komut>,
     },
+    /// İçinde bulunulan döngünün sonraki adımına geç.
+    Devam,
+    /// İçinde bulunulan döngüyü sonlandır.
+    Kir,
 }

@@ -2,9 +2,9 @@
   "paketler": {
     "nlp_temel": {
       "surum": "3.1.0",
-      "hash": "68cc8c573345aa758f55df95672c77c77e50b6b6b63cbdadf394f430c74a769f",
+      "hash": "b9b65507d049594d9ebc44b009e3d82db0c980a98cdbbabf86c4e686c1e06fb7",
       "kaynak": "yerel"
     }
   },
-  "guncelleme_zamani": "2026-07-22T16:43:42.000692+03:00"
+  "guncelleme_zamani": "2026-07-25T21:51:28.302974+03:00"
 }

@@ -1,41 +1,43 @@
+use serde::{Deserialize, Serialize};
 use std::fmt;
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum Token {
     // Anahtar Kelimeler
-    Yazdir,         // yazdır
-    Olsun,          // olsun
-    Alsin,          // alsın
-    Fonksiyon,      // fonksiyon
-    Sinif,          // sınıf
-    Ise,            // ise
-    Yoksa,          // yoksa
-    Oldugu,         // olduğu
-    Surece,         // sürece
-    Dondur,         // döndür
-    Ve,             // ve
-    Veya,           // veya
-    Degil,          // değil
-    Yukle,          // yükle
-    ListeAnahtar,   // liste
-    Ekle,           // ekle
-    Cikar,          // çıkar
-    Uzunlugu,       // uzunluğu
-    Kendisi,        // kendisi
-    Dogru,          // doğru
-    Yanlis,         // yanlış
-    Dene,           // dene
-    Yakala,         // yakala
-    HataAnahtar,    // hata
-    Var,            // var
-    Nin,            // 'nin / 'nın (kendisi'nin erişimi)
-    Iyelik,         // 'si / 'sı / 'su / 'sü (özellik iyeliği)
-    Kadar,          // kadar
-    Mi,             // mi / mı / mu / mü
-    Ile,            // ile
-    Bekle,          // bekle (await)
-    Cagir,          // çağır
+    Yazdir,       // yazdır
+    Olsun,        // olsun
+    Alsin,        // alsın
+    Fonksiyon,    // fonksiyon
+    Sinif,        // sınıf
+    Ise,          // ise
+    Yoksa,        // yoksa
+    Oldugu,       // olduğu
+    Surece,       // sürece
+    Dondur,       // döndür
+    Ve,           // ve
+    Veya,         // veya
+    Degil,        // değil
+    Yukle,        // yükle
+    ListeAnahtar, // liste
+    Ekle,         // ekle
+    Cikar,        // çıkar
+    Uzunlugu,     // uzunluğu
+    Kendisi,      // kendisi
+    Dogru,        // doğru
+    Yanlis,       // yanlış
+    Dene,         // dene
+    Yakala,       // yakala
+    HataAnahtar,  // hata
+    Var,          // var
+    Nin,          // 'nin / 'nın (kendisi'nin erişimi)
+    Iyelik,       // 'si / 'sı / 'su / 'sü (özellik iyeliği)
+    Kadar,        // kadar
+    Mi,           // mi / mı / mu / mü
+    Ile,          // ile
+    Bekle,        // bekle (await)
+    Cagir,        // çağır
+    Devam,        // devam (continue)
+    Kir,          // kır (break)
 
     // Tanımlayıcılar ve Literaller
     Tanimlayici(String),
@@ -106,6 +108,8 @@ impl fmt::Display for Token {
             Token::Ile => "ile",
             Token::Bekle => "bekle",
             Token::Cagir => "çağır",
+            Token::Devam => "devam",
+            Token::Kir => "kır",
             Token::Tanimlayici(s) => s,
             Token::Sayi(n) => return write!(f, "{}", n),
             Token::Metin(s) => return write!(f, "\"{}\"", s),

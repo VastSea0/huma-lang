@@ -5,7 +5,7 @@ renkli_yaz("   MERHABA HÜMA DÜNYASI!    ", KALIN + YESIL)
 renkli_yaz("------------------------------", TURKUAZ)
 
 ""'yi yazdır
-"Hüma, modern ve Türkçe bir dildir."'i yazdır
+"Hüma, deneysel ve Türkçe odaklı bir dildir."'i yazdır
 "Performanslı Rust altyapısı ile gücünü hisseder."'i yazdır
 ""'yi yazdır
 
