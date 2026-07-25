@@ -8,6 +8,7 @@ pub struct Parser {
     current_token: Token,
     peek_token: Token,
     current_pos: (usize, usize),
+    peek_pos: (usize, usize),
     errors: Vec<HumaError>,
 }
 
@@ -43,22 +44,25 @@ impl Parser {
     }
 
     pub fn new(mut lexer: Lexer) -> Self {
-        let current_pos = lexer.get_pos();
         let current_token = lexer.next_token();
+        let current_pos = lexer.get_token_pos();
         let peek_token = lexer.next_token();
+        let peek_pos = lexer.get_token_pos();
         Self {
             lexer,
             current_token,
             peek_token,
             current_pos,
+            peek_pos,
             errors: Vec::new(),
         }
     }
 
     fn next_token(&mut self) {
-        self.current_pos = self.lexer.get_pos();
         self.current_token = self.peek_token.clone();
+        self.current_pos = self.peek_pos;
         self.peek_token = self.lexer.next_token();
+        self.peek_pos = self.lexer.get_token_pos();
     }
 
     fn error(&mut self, msg: &str) {
@@ -89,7 +93,7 @@ impl Parser {
         let mut komutlar = Vec::new();
         while self.current_token != Token::Son {
             let start_pos = self.current_pos;
-            if let Some(komut) = self.parse_komut() {
+            if let Some(komut) = self.parse_konumlu_komut() {
                 komutlar.push(komut);
             }
             // Güvenlik: parse_komut bir şey tüketmediyse zorla ilerlet
@@ -137,10 +141,28 @@ impl Parser {
                 match self.current_token.clone() {
                     Token::Metin(yol) => {
                         self.next_token();
+                        let takma_ad = if self.current_token == Token::Olarak {
+                            self.next_token();
+                            match self.current_token.clone() {
+                                Token::Tanimlayici(ad) => {
+                                    self.next_token();
+                                    Some(ad)
+                                }
+                                gelen => {
+                                    self.error(&format!(
+                                        "'olarak' sonrasında modül adı bekleniyordu ama {} geldi",
+                                        gelen
+                                    ));
+                                    return None;
+                                }
+                            }
+                        } else {
+                            None
+                        };
                         if self.current_token == Token::NoktaliVirgul {
                             self.next_token();
                         }
-                        Some(Komut::YukleKomutu(yol))
+                        Some(Komut::YukleKomutu { yol, takma_ad })
                     }
                     gelen => {
                         self.error(&format!(
@@ -178,32 +200,28 @@ impl Parser {
 
             // Identifier ile başlayan komutlar — özel kalıpları kontrol et
             Token::Tanimlayici(_) => {
+                let ad = match &self.current_token {
+                    Token::Tanimlayici(name) => name.clone(),
+                    _ => {
+                        self.errors.push(HumaError::SyntaxError {
+                            line: self.current_pos.0,
+                            col: self.current_pos.1,
+                            message: "İç ayrıştırıcı hatası: tanımlayıcı bekleniyordu".to_string(),
+                        });
+                        return None;
+                    }
+                };
                 // Peek ile hızlı kontrol: fonksiyon/sınıf/liste tanımı
                 match self.peek_token {
                     Token::Fonksiyon => {
-                        let ad = if let Token::Tanimlayici(ref s) = self.current_token {
-                            s.clone()
-                        } else {
-                            unreachable!()
-                        };
                         self.next_token(); // identifier yut
                         return self.parse_fonksiyon_tanimi(ad);
                     }
                     Token::Sinif => {
-                        let ad = if let Token::Tanimlayici(ref s) = self.current_token {
-                            s.clone()
-                        } else {
-                            unreachable!()
-                        };
                         self.next_token(); // identifier yut
                         return self.parse_sinif_tanimi(ad);
                     }
                     Token::ListeAnahtar => {
-                        let ad = if let Token::Tanimlayici(ref s) = self.current_token {
-                            s.clone()
-                        } else {
-                            unreachable!()
-                        };
                         self.next_token(); // identifier yut
                         self.next_token(); // 'liste' yut
                         self.consume(Token::Olsun);
@@ -227,6 +245,15 @@ impl Parser {
         }
     }
 
+    fn parse_konumlu_komut(&mut self) -> Option<Komut> {
+        let (satir, sutun) = self.current_pos;
+        self.parse_komut().map(|komut| Komut::Konumlu {
+            komut: Box::new(komut),
+            satir,
+            sutun,
+        })
+    }
+
     /// Genel ifade tabanlı komut: ifade parse et, ardından postfix kontroller
     fn parse_genel_ifade_komutu(&mut self) -> Option<Komut> {
         let ifade = self.parse_ifade();
@@ -242,6 +269,70 @@ impl Parser {
         } else {
             ifade
         };
+
+        // Doğal liste ekleme: `liste'ye değer'i ekle`.
+        // Yönelme token'ı olmadığı zaman iki ardışık satırdan ayırt edilemezdi.
+        if self.current_token == Token::Yonelme {
+            self.next_token();
+            if Self::ifade_baslatabilir(&self.current_token) {
+                let saved_lexer = self.lexer.clone();
+                let saved_curr = self.current_token.clone();
+                let saved_peek = self.peek_token.clone();
+                let saved_pos = self.current_pos;
+                let saved_peek_pos = self.peek_pos;
+                let saved_errors_len = self.errors.len();
+                let value = self.parse_ifade();
+                if self.current_token == Token::Ekle {
+                    self.next_token();
+                    if self.current_token == Token::NoktaliVirgul {
+                        self.next_token();
+                    }
+                    return Some(Komut::ListeEkle {
+                        liste: ifade,
+                        deger: value,
+                    });
+                }
+                self.lexer = saved_lexer;
+                self.current_token = saved_curr;
+                self.peek_token = saved_peek;
+                self.current_pos = saved_pos;
+                self.peek_pos = saved_peek_pos;
+                self.errors.truncate(saved_errors_len);
+            }
+        }
+
+        // Doğal liste çıkarma: `liste'den indeks'i çıkar`.
+        // Ayrılma token'ı aralık döngüsünde de kullanılır; `çıkar` gelmezse
+        // tüketilmiş ek dekoratif kalır ve aşağıdaki aralık ayrıştırması
+        // bitiş ifadesini aynı konumdan okumaya devam eder.
+        if self.current_token == Token::Ayrilma {
+            self.next_token();
+            if Self::ifade_baslatabilir(&self.current_token) {
+                let saved_lexer = self.lexer.clone();
+                let saved_curr = self.current_token.clone();
+                let saved_peek = self.peek_token.clone();
+                let saved_pos = self.current_pos;
+                let saved_peek_pos = self.peek_pos;
+                let saved_errors_len = self.errors.len();
+                let index = self.parse_ifade();
+                if self.current_token == Token::Cikar {
+                    self.next_token();
+                    if self.current_token == Token::NoktaliVirgul {
+                        self.next_token();
+                    }
+                    return Some(Komut::ListeCikar {
+                        liste: ifade,
+                        indeks: index,
+                    });
+                }
+                self.lexer = saved_lexer;
+                self.current_token = saved_curr;
+                self.peek_token = saved_peek;
+                self.current_pos = saved_pos;
+                self.peek_pos = saved_peek_pos;
+                self.errors.truncate(saved_errors_len);
+            }
+        }
 
         // olsun → ifadeyi assignment olarak yeniden yorumla
         // x = 5 olsun → DegiskenTanimla { ad: x, deger: 5 }
@@ -313,8 +404,27 @@ impl Parser {
                 self.next_token();
             }
             if let Ifade::Metin(yol) = ifade {
-                return Some(Komut::YukleKomutu(yol));
+                return Some(Komut::YukleKomutu {
+                    yol,
+                    takma_ad: None,
+                });
             }
+            return None;
+        }
+
+        // Kanonik açık modül dışa aktarımı: `değer'i dışa aktar`
+        if self.current_token == Token::Disa {
+            self.next_token();
+            if !self.consume(Token::Aktar) {
+                return None;
+            }
+            if self.current_token == Token::NoktaliVirgul {
+                self.next_token();
+            }
+            if let Ifade::Degisken(ad) = ifade {
+                return Some(Komut::DisaAktar(ad));
+            }
+            self.error("yalnızca adlandırılmış bir değer dışa aktarılabilir");
             return None;
         }
 
@@ -344,9 +454,13 @@ impl Parser {
                     let saved_curr = self.current_token.clone();
                     let saved_peek = self.peek_token.clone();
                     let saved_pos = self.current_pos;
+                    let saved_peek_pos = self.peek_pos;
                     let saved_errors_len = self.errors.len();
 
                     let bitis_cand = self.parse_veya();
+                    if self.current_token == Token::Yonelme {
+                        self.next_token();
+                    }
                     if self.current_token == Token::Kadar || self.current_token == Token::AcikSuskun
                     {
                         let ad = ad.clone();
@@ -370,6 +484,7 @@ impl Parser {
                         self.current_token = saved_curr;
                         self.peek_token = saved_peek;
                         self.current_pos = saved_pos;
+                        self.peek_pos = saved_peek_pos;
                         self.errors.truncate(saved_errors_len);
                     }
                 }
@@ -512,9 +627,16 @@ impl Parser {
         let mut hata_degisken = None;
         if self.current_token == Token::Yakala {
             self.next_token();
-            if let Token::Tanimlayici(ref s) = self.current_token {
-                hata_degisken = Some(s.clone());
-                self.next_token();
+            match &self.current_token {
+                Token::Tanimlayici(s) => {
+                    hata_degisken = Some(s.clone());
+                    self.next_token();
+                }
+                Token::HataAnahtar => {
+                    hata_degisken = Some("hata".to_string());
+                    self.next_token();
+                }
+                _ => {}
             }
         } else {
             // Geriye dönük uyumluluk: hata var ise
@@ -536,7 +658,7 @@ impl Parser {
         let mut komutlar = Vec::new();
         while self.current_token != Token::KapaliSuskun && self.current_token != Token::Son {
             let start_pos = self.current_pos;
-            if let Some(komut) = self.parse_komut() {
+            if let Some(komut) = self.parse_konumlu_komut() {
                 komutlar.push(komut);
             }
             // Güvenlik: parse_komut bir şey tüketmediyse zorla ilerlet
@@ -556,6 +678,26 @@ impl Parser {
 
     pub fn parse_ifade(&mut self) -> Ifade {
         self.parse_veya()
+    }
+
+    fn ifade_baslatabilir(token: &Token) -> bool {
+        matches!(
+            token,
+            Token::Bekle
+                | Token::Degil
+                | Token::Eksi
+                | Token::Sayi(_)
+                | Token::Metin(_)
+                | Token::Tanimlayici(_)
+                | Token::Dogru
+                | Token::Yanlis
+                | Token::Kendisi
+                | Token::AcikParantez
+                | Token::AcikKose
+                | Token::AcikSuskun
+                | Token::Fonksiyon
+                | Token::HataAnahtar
+        )
     }
 
     fn parse_veya(&mut self) -> Ifade {
@@ -681,10 +823,6 @@ impl Parser {
     fn keyword_degisken_olarak(&mut self) -> Option<Ifade> {
         let ad = match &self.current_token {
             Token::HataAnahtar => "hata".to_string(),
-            Token::Var => "var".to_string(),
-            Token::Ekle => "ekle".to_string(),
-            Token::Cikar => "çıkar".to_string(),
-            Token::Mi => "mi".to_string(),
             _ => return None,
         };
         self.next_token();
@@ -762,6 +900,7 @@ impl Parser {
                     if matches!(node, Ifade::Sayi(_)) {
                         break;
                     }
+                    let call_pos = self.current_pos;
                     self.next_token();
                     let mut args = Vec::new();
                     if self.current_token != Token::KapaliParantez {
@@ -778,7 +917,7 @@ impl Parser {
                     node = Ifade::Cagri {
                         fonksiyon: Box::new(node),
                         argumanlar: args,
-                        pos: self.current_pos,
+                        pos: call_pos,
                     };
                 }
                 Token::AcikKose => {
@@ -810,6 +949,7 @@ impl Parser {
                         node = Ifade::Uzunluk(Box::new(node));
                     } else if self.current_token == Token::AcikParantez {
                         // Metot çağrısı: nesne'nin (arg1, arg2) metot'u
+                        let call_pos = self.current_pos;
                         self.next_token();
                         let mut args = Vec::new();
                         if self.current_token != Token::KapaliParantez {
@@ -840,7 +980,7 @@ impl Parser {
                                     ozellik: oz,
                                 }),
                                 argumanlar: args,
-                                pos: self.current_pos,
+                                pos: call_pos,
                             };
                         } else {
                             break;
@@ -864,11 +1004,15 @@ impl Parser {
                     node = Ifade::Uzunluk(Box::new(node));
                 }
                 Token::Ile => {
+                    let call_pos = self.current_pos;
                     self.next_token();
                     let mut args = vec![node.clone()];
                     loop {
-                        args.push(self.parse_ifade());
-                        if self.current_token == Token::Ile {
+                        // Doğal çağrıda üst düzey `ve`, mantıksal işlem değil
+                        // argüman ayıracıdır. Mantıksal bir argüman parantezle
+                        // açıkça yazılabilir: `x ile (a ve b)'yi f`.
+                        args.push(self.parse_esitlik());
+                        if matches!(self.current_token, Token::Ve | Token::Ile) {
                             self.next_token();
                         } else {
                             break;
@@ -884,7 +1028,7 @@ impl Parser {
                         node = Ifade::Cagri {
                             fonksiyon: Box::new(Ifade::Degisken(ad)),
                             argumanlar: args,
-                            pos: self.current_pos,
+                            pos: call_pos,
                         };
                     } else {
                         break;
@@ -959,5 +1103,141 @@ impl Parser {
             parametreler: params,
             govde,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Parser;
+    use crate::ast::{Ifade, Komut};
+    use crate::lexer::Lexer;
+    use crate::token::Token;
+
+    #[test]
+    fn komut_ve_cagri_konumlari_token_baslangiclarini_gosterir() {
+        let mut parser = Parser::new(Lexer::new("\n  f()"));
+        let (program, diagnostics) = parser.parse_program_with_diagnostics();
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        assert_eq!(program.len(), 1);
+
+        let Komut::Konumlu {
+            komut,
+            satir,
+            sutun,
+        } = &program[0]
+        else {
+            panic!("Komut kaynak konumu taşımalıdır");
+        };
+        assert_eq!((*satir, *sutun), (2, 3));
+        let Komut::IfadeKomutu(Ifade::Cagri { pos, .. }) = komut.as_ref() else {
+            panic!("İfade çağrı olmalıdır");
+        };
+        assert_eq!(*pos, (2, 4));
+    }
+
+    #[test]
+    fn yakala_hata_kanonik_hata_degiskenini_baglar() {
+        let mut parser = Parser::new(Lexer::new("dene { 1 / 0 } yakala hata { hata'yı yazdır }"));
+        let (program, diagnostics) = parser.parse_program_with_diagnostics();
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        let Komut::Konumlu { komut, .. } = &program[0] else {
+            panic!("Komut kaynak konumu taşımalıdır");
+        };
+        let Komut::DeneKomutu { hata_degisken, .. } = komut.as_ref() else {
+            panic!("Komut dene/yakala olmalıdır");
+        };
+        assert_eq!(hata_degisken.as_deref(), Some("hata"));
+    }
+
+    #[test]
+    fn ayrilmis_sozcukleri_genel_degisken_adi_olarak_kabul_etmez() {
+        for word in ["var", "ekle", "çıkar", "mi"] {
+            let source = format!("{word} = 1 olsun");
+            let mut parser = Parser::new(Lexer::new(&source));
+            let (_, diagnostics) = parser.parse_program_with_diagnostics();
+            assert!(
+                !diagnostics.is_empty(),
+                "{word} ayrılmış sözcük olarak kalmalıdır"
+            );
+        }
+    }
+
+    #[test]
+    fn rastgele_bayt_kaynaklari_ayristiriciyi_cokertmez() {
+        // Bu test gerçek libFuzzer hedefinin hızlı ve her platformda çalışan
+        // regresyon karşılığıdır. UTF-8 olmayan girdi kayıplı dönüştürülür;
+        // ayrıştırıcının sonucu hata olabilir ama panik veya sonsuz döngü olamaz.
+        let mut state = 0x6a09_e667_f3bc_c909_u64;
+        for case_index in 0..4_096_usize {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let length = (state as usize) % 257;
+            let mut bytes = Vec::with_capacity(length);
+            for byte_index in 0..length {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                bytes.push((state as u8).wrapping_add((case_index ^ byte_index) as u8));
+            }
+            let source = String::from_utf8_lossy(&bytes);
+            let mut parser = Parser::new(Lexer::new(&source));
+            let _ = parser.parse_program_with_diagnostics();
+        }
+    }
+
+    #[test]
+    fn dogal_cagri_ve_sozcugunu_arguman_ayiraci_yapar() {
+        let mut parser = Parser::new(Lexer::new(
+            "1 ile 2 ve 3'ü topla3\nx ile (doğru ve yanlış)'ı denetle",
+        ));
+        let (program, diagnostics) = parser.parse_program_with_diagnostics();
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+
+        let Komut::Konumlu { komut, .. } = &program[0] else {
+            panic!("İlk komut konumlu olmalı");
+        };
+        let Komut::IfadeKomutu(Ifade::Cagri { argumanlar, .. }) = komut.as_ref() else {
+            panic!("İlk komut çağrı olmalı");
+        };
+        assert_eq!(argumanlar.len(), 3);
+
+        let Komut::Konumlu { komut, .. } = &program[1] else {
+            panic!("İkinci komut konumlu olmalı");
+        };
+        let Komut::IfadeKomutu(Ifade::Cagri { argumanlar, .. }) = komut.as_ref() else {
+            panic!("İkinci komut çağrı olmalı");
+        };
+        assert_eq!(argumanlar.len(), 2);
+        assert!(matches!(
+            argumanlar[1],
+            Ifade::IkiliIslem {
+                operator: Token::Ve,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn yonelme_eki_dogal_liste_eklemeyi_ayristirir() {
+        let mut parser = Parser::new(Lexer::new("sayılar'a [1, 2]'yi ekle"));
+        let (program, diagnostics) = parser.parse_program_with_diagnostics();
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        let Komut::Konumlu { komut, .. } = &program[0] else {
+            panic!("Komut konumlu olmalı");
+        };
+        assert!(matches!(komut.as_ref(), Komut::ListeEkle { .. }));
+    }
+
+    #[test]
+    fn ayrilma_eki_dogal_liste_cikarmayi_ayristirir() {
+        let mut parser = Parser::new(Lexer::new("öğeler'den 0'ı çıkar"));
+        let (program, diagnostics) = parser.parse_program_with_diagnostics();
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        assert!(matches!(
+            program.first(),
+            Some(Komut::Konumlu { komut, .. })
+                if matches!(komut.as_ref(), Komut::ListeCikar { .. })
+        ));
     }
 }

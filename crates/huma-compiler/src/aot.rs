@@ -7,6 +7,8 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
 
 use cranelift_codegen::ir::{condcodes::FloatCC, types, AbiParam, InstBuilder};
 use cranelift_codegen::settings::{self, Configurable};
@@ -19,6 +21,16 @@ use huma_core::error::{HumaError, HumaResult};
 use huma_core::lexer::Lexer;
 use huma_core::parser::Parser;
 use huma_core::token::Token;
+use wait_timeout::ChildExt;
+
+static AOT_BACKUP_SEQUENCE: AtomicU64 = AtomicU64::new(1);
+
+fn bare_command(command: &Komut) -> &Komut {
+    match command {
+        Komut::Konumlu { komut, .. } => bare_command(komut),
+        other => other,
+    }
+}
 
 // ── Runtime C kaynak kodu ─────────────────────────────────────────────────────
 const RUNTIME_C_SRC: &str = r#"
@@ -35,6 +47,97 @@ void huma_rt_print_f64(double v) {
 }
 "#;
 
+fn command_status_with_timeout(mut command: Command, operation: &str) -> HumaResult<()> {
+    let mut child = command
+        .spawn()
+        .map_err(|error| HumaError::CompileError(format!("{operation} başlatılamadı: {error}")))?;
+    let status = match child.wait_timeout(Duration::from_secs(120)) {
+        Ok(Some(status)) => status,
+        Ok(None) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(HumaError::CompileError(format!(
+                "{operation} 120 saniyede tamamlanmadı"
+            )));
+        }
+        Err(error) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(HumaError::CompileError(format!(
+                "{operation} beklenemedi: {error}"
+            )));
+        }
+    };
+    if status.success() {
+        Ok(())
+    } else {
+        Err(HumaError::CompileError(format!(
+            "{operation} başarısız oldu (çıkış: {})",
+            status
+                .code()
+                .map_or_else(|| "sinyal".to_string(), |code| code.to_string())
+        )))
+    }
+}
+
+fn activate_binary(staged: &Path, output: &Path) -> HumaResult<()> {
+    if std::fs::rename(staged, output).is_ok() {
+        return Ok(());
+    }
+    if !output.exists() {
+        return Err(HumaError::CompileError(format!(
+            "AOT çıktısı etkinleştirilemedi: {}",
+            output.display()
+        )));
+    }
+    if output.is_dir() {
+        return Err(HumaError::CompileError(format!(
+            "AOT çıktı hedefi bir dizin: {}",
+            output.display()
+        )));
+    }
+    let parent = output.parent().unwrap_or_else(|| Path::new("."));
+    let file_name = output
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| HumaError::CompileError("AOT çıktı adı geçerli UTF-8 değil".to_string()))?;
+    let backup = (0..1_024)
+        .find_map(|_| {
+            let sequence = AOT_BACKUP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+            let candidate = parent.join(format!(
+                ".{file_name}.aot-backup-{}-{sequence}",
+                std::process::id()
+            ));
+            (!candidate.exists()).then_some(candidate)
+        })
+        .ok_or_else(|| {
+            HumaError::CompileError(format!(
+                "AOT çıktısı için benzersiz yedek yolu üretilemedi: {}",
+                output.display()
+            ))
+        })?;
+    std::fs::rename(output, &backup)?;
+    if let Err(error) = std::fs::rename(staged, output) {
+        let restore = std::fs::rename(&backup, output);
+        return match restore {
+            Ok(()) => Err(error.into()),
+            Err(restore_error) => Err(HumaError::CompileError(format!(
+                "AOT çıktısı etkinleştirilemedi ({error}) ve eski çıktı geri yüklenemedi \
+                 ({restore_error}); yedek: {}",
+                backup.display()
+            ))),
+        };
+    }
+    if let Err(error) = std::fs::remove_file(&backup) {
+        eprintln!(
+            "Uyarı: eski AOT yedeği temizlenemedi ({}): {}",
+            backup.display(),
+            error
+        );
+    }
+    Ok(())
+}
+
 // ── Genel seçenekler ─────────────────────────────────────────────────────────
 
 /// AOT derleme seçenekleri.
@@ -49,6 +152,12 @@ pub struct AotOptions<'a> {
 
 /// `source` Hüma kaynak kodunu native binary'ye derle.
 pub fn compile_to_binary(source: &str, opts: &AotOptions<'_>) -> HumaResult<()> {
+    if source.len() > crate::pipeline::MAX_SOURCE_BYTES {
+        return Err(HumaError::CompileError(format!(
+            "Kaynak {} bayt sınırını aşıyor",
+            crate::pipeline::MAX_SOURCE_BYTES
+        )));
+    }
     // ── 1. Ayrıştırma ────────────────────────────────────────────────────────
     let lexer = Lexer::new(source);
     let mut parser = Parser::new(lexer);
@@ -60,12 +169,17 @@ pub fn compile_to_binary(source: &str, opts: &AotOptions<'_>) -> HumaResult<()> 
 
     // ── 2. Cranelift kurulumu ────────────────────────────────────────────────
     let mut flag_builder = settings::builder();
-    match opts.opt_level {
-        0 => flag_builder.set("opt_level", "none").unwrap(),
-        1 => flag_builder.set("opt_level", "speed").unwrap(),
-        _ => flag_builder.set("opt_level", "speed_and_size").unwrap(),
-    }
-    flag_builder.set("is_pic", "true").unwrap();
+    let opt_level = match opts.opt_level {
+        0 => "none",
+        1 => "speed",
+        _ => "speed_and_size",
+    };
+    flag_builder.set("opt_level", opt_level).map_err(|error| {
+        HumaError::CompileError(format!("AOT optimizasyon ayarı hatası: {error}"))
+    })?;
+    flag_builder
+        .set("is_pic", "true")
+        .map_err(|error| HumaError::CompileError(format!("AOT PIC ayarı hatası: {error}")))?;
 
     let flags = settings::Flags::new(flag_builder);
     let isa = cranelift_codegen::isa::lookup(target_lexicon::Triple::host())
@@ -94,7 +208,7 @@ pub fn compile_to_binary(source: &str, opts: &AotOptions<'_>) -> HumaResult<()> 
     let mut toplevel: Vec<Komut> = Vec::new();
 
     for komut in &ast {
-        match komut {
+        match bare_command(komut) {
             Komut::FonksiyonTanimla {
                 ad, parametreler, ..
             } => {
@@ -127,7 +241,7 @@ pub fn compile_to_binary(source: &str, opts: &AotOptions<'_>) -> HumaResult<()> 
             ad,
             parametreler,
             govde,
-        } = komut
+        } = bare_command(komut)
         {
             let (fid, _) = fn_registry[ad];
             emit_user_function(
@@ -211,52 +325,38 @@ pub fn compile_to_binary(source: &str, opts: &AotOptions<'_>) -> HumaResult<()> 
         .emit()
         .map_err(|e| HumaError::CompileError(format!("Nesne dosyası üretim hatası: {e}")))?;
 
-    let stem = opts
-        .output_bin
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("huma_prog");
     let parent = opts.output_bin.parent().unwrap_or(Path::new("."));
-
-    let obj_path = parent.join(format!("{stem}.o"));
-    let rt_c_path = parent.join("huma_rt_tmp.c");
-    let rt_o_path = parent.join("huma_rt_tmp.o");
+    std::fs::create_dir_all(parent)?;
+    let temporary = tempfile::Builder::new()
+        .prefix(".huma-aot-")
+        .tempdir_in(parent)
+        .map_err(HumaError::IoError)?;
+    let obj_path = temporary.path().join("program.o");
+    let rt_c_path = temporary.path().join("runtime.c");
+    let rt_o_path = temporary.path().join("runtime.o");
+    let staged_output = temporary.path().join("program");
 
     std::fs::write(&obj_path, &obj_bytes)?;
-
-    // ── 9. Runtime derleme ───────────────────────────────────────────────────
     std::fs::write(&rt_c_path, RUNTIME_C_SRC)?;
 
-    let status = Command::new("cc")
+    // ── 9. Runtime derleme ───────────────────────────────────────────────────
+    let mut runtime_compile = Command::new("cc");
+    runtime_compile
         .args(["-O2", "-c", "-o"])
         .arg(&rt_o_path)
-        .arg(&rt_c_path)
-        .status()
-        .map_err(|e| HumaError::CompileError(format!("cc (runtime) çalıştırılamadı: {e}")))?;
-    if !status.success() {
-        return Err(HumaError::CompileError(
-            "Runtime C derlemesi başarısız".into(),
-        ));
-    }
+        .arg(&rt_c_path);
+    command_status_with_timeout(runtime_compile, "Runtime C derlemesi")?;
 
     // ── 10. Link ────────────────────────────────────────────────────────────
-    let status = Command::new("cc")
+    let mut linker = Command::new("cc");
+    linker
         .arg(&obj_path)
         .arg(&rt_o_path)
         .arg("-o")
-        .arg(opts.output_bin)
-        .arg("-lm")
-        .status()
-        .map_err(|e| HumaError::CompileError(format!("Bağlayıcı çalıştırılamadı: {e}")))?;
-    if !status.success() {
-        return Err(HumaError::CompileError("Bağlayıcı (linker) hatası".into()));
-    }
-
-    let _ = std::fs::remove_file(&obj_path);
-    let _ = std::fs::remove_file(&rt_c_path);
-    let _ = std::fs::remove_file(&rt_o_path);
-
-    Ok(())
+        .arg(&staged_output)
+        .arg("-lm");
+    command_status_with_timeout(linker, "AOT bağlayıcısı")?;
+    activate_binary(&staged_output, opts.output_bin)
 }
 
 /// AOT backend currently targets a deliberately small, numeric subset.
@@ -267,7 +367,7 @@ pub fn compile_to_binary(source: &str, opts: &AotOptions<'_>) -> HumaResult<()> 
 fn validate_aot_subset(ast: &[Komut]) -> HumaResult<()> {
     let function_names: HashSet<String> = ast
         .iter()
-        .filter_map(|command| match command {
+        .filter_map(|command| match bare_command(command) {
             Komut::FonksiyonTanimla { ad, .. } => Some(ad.clone()),
             _ => None,
         })
@@ -278,7 +378,7 @@ fn validate_aot_subset(ast: &[Komut]) -> HumaResult<()> {
             ad,
             parametreler,
             govde,
-        } = command
+        } = bare_command(command)
         {
             let mut scope: HashSet<String> = parametreler.iter().cloned().collect();
             validate_aot_commands(govde, &mut scope, &function_names).map_err(|message| {
@@ -297,7 +397,7 @@ fn validate_aot_commands(
     function_names: &HashSet<String>,
 ) -> Result<(), String> {
     for command in commands {
-        match command {
+        match bare_command(command) {
             Komut::DegiskenTanimla { ad, deger } => {
                 validate_aot_expression(deger, scope, function_names)?;
                 scope.insert(ad.clone());
@@ -534,6 +634,7 @@ impl<'a, 'b> Emitter<'a, 'b> {
     }
 
     fn emit_stmt(&mut self, komut: &Komut, module: &mut ObjectModule) {
+        let komut = bare_command(komut);
         match komut {
             Komut::DegiskenTanimla { ad, deger } | Komut::Atama { ad, deger } => {
                 if let Some(val) = self.emit_expr(deger, module) {

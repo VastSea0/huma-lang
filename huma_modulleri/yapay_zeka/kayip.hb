@@ -30,7 +30,7 @@ mse_gradyan fonksiyon olsun tahmin, gercek alsın {
 
 // Sigmoid + Binary Cross-Entropy gradyanı (birleştirilmiş, numerik kararlı)
 ikce_gradyan fonksiyon olsun tahmin, gercek alsın {
-    tahmin - gercek'yi döndür
+    tahmin - gercek'i döndür
 }
 
 // Batch MSE — liste üzerinde ortalama

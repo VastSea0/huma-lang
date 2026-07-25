@@ -30,13 +30,13 @@ ortalama fonksiyon olsun d alsın {
 en_büyük fonksiyon olsun d alsın {
     boy = d'nin uzunluğu olsun
     boy = 0 ise { 0'ı döndür }
-    eb = d[0] olsun
+    en_buyuk_deger = d[0] olsun
     i = 1 olsun
     i < boy olduğu sürece {
-        d[i] > eb ise { eb = d[i] olsun }
+        d[i] > en_buyuk_deger ise { en_buyuk_deger = d[i] olsun }
         i = i + 1 olsun
     }
-    eb'yi döndür
+    en_buyuk_deger'i döndür
 }
 
 en_küçük fonksiyon olsun d alsın {

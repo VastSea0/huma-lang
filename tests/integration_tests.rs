@@ -12,6 +12,8 @@ use std::rc::Rc;
 // Yardımcı fonksiyon — kodu çalıştırıp çıktısını döndürür
 // ─────────────────────────────────────────────
 fn eval(kod: &str) -> String {
+    let _capability_guard = huma::capability::install(huma::capability::CapabilitySet::allow_all())
+        .expect("Test yetenekleri kurulmalı");
     let buffer = Rc::new(RefCell::new(String::new()));
     let mut yorumlayici = Yorumlayici::new().with_output_buffer(Rc::clone(&buffer));
 
@@ -39,7 +41,7 @@ fn eval(kod: &str) -> String {
 fn test_degisken_atama_ve_okuma() {
     let kod = r#"
         sayi = 42 olsun
-        sayi'yı yazdır
+        sayi'yi yazdır
     "#;
     assert_eq!(eval(kod).trim(), "42");
 }

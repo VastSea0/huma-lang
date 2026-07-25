@@ -22,21 +22,21 @@ Yanıt sınıf olsun {
 
 Sunucu sınıf olsun {
     port = 8080 olsun
-    _get_rotalari = metinden_nesneye("{}") olsun
-    _post_rotalari = metinden_nesneye("{}") olsun
+    _get_rotaları = metinden_nesneye("{}") olsun
+    _post_rotaları = metinden_nesneye("{}") olsun
 
     kur fonksiyon olsun p alsın {
         kendisi'nin port'u = p olsun
-        kendisi'nin _get_rotalari'sı = metinden_nesneye("{}") olsun
-        kendisi'nin _post_rotalari'sı = metinden_nesneye("{}") olsun
+        kendisi'nin _get_rotaları'sı = metinden_nesneye("{}") olsun
+        kendisi'nin _post_rotaları'sı = metinden_nesneye("{}") olsun
     }
 
     getir fonksiyon olsun yol, islem alsın {
-        değer_ata(kendisi'nin _get_rotalari'sı, yol, islem)
+        değer_ata(kendisi'nin _get_rotaları'sı, yol, islem)
     }
 
     gönder fonksiyon olsun yol, islem alsın {
-        değer_ata(kendisi'nin _post_rotalari'sı, yol, islem)
+        değer_ata(kendisi'nin _post_rotaları'sı, yol, islem)
     }
 
     baslat fonksiyon olsun {
@@ -52,25 +52,25 @@ Sunucu sınıf olsun {
             istek = bekle dahili_sunucu_bekle(sid)
             
             istek != boş ise {
-                url = (istek'in url'si)
+                url = (istek'in url'u)
                 metot = (istek'in metot'u)
                 
-                yanit = Yanıt()
-                yanit'ın istek_id'i = (istek'in id'i) olsun
+                yanıt = Yanıt()
+                yanıt'ın istek_id'i = (istek'in id'i) olsun
                 
                 metot == "GET" ise {
-                    içeriyor(kendisi'nin _get_rotalari'sı, url) ise {
-                        islem = değer_al(kendisi'nin _get_rotalari'sı, url)
-                        islem(istek, yanit)
+                    içeriyor(kendisi'nin _get_rotaları'sı, url) ise {
+                        islem = değer_al(kendisi'nin _get_rotaları'sı, url)
+                        islem(istek, yanıt)
                     } yoksa {
                         dahili_sunucu_yanitla((istek'in id'i), "404 Sayfa Bulunamadı", 404, "text/plain")
                     }
                 }
                 
                 metot == "POST" ise {
-                    içeriyor(kendisi'nin _post_rotalari'sı, url) ise {
-                        islem = değer_al(kendisi'nin _post_rotalari'sı, url)
-                        islem(istek, yanit)
+                    içeriyor(kendisi'nin _post_rotaları'sı, url) ise {
+                        islem = değer_al(kendisi'nin _post_rotaları'sı, url)
+                        islem(istek, yanıt)
                     } yoksa {
                         dahili_sunucu_yanitla((istek'in id'i), "404 Sayfa Bulunamadı", 404, "text/plain")
                     }

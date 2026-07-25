@@ -1,83 +1,89 @@
-use crate::bytecode::{Constant, OpCode, Program};
-use crate::error::{HumaError, HumaResult};
-use crate::value::Deger;
+use crate::bytecode::{validate_program, Constant, OpCode, Program};
+use crate::error::{HumaError, HumaResult, RuntimeDiagnostic, SourceSpan, StackFrame};
+use crate::token::Token;
+use crate::value::{BuiltinRuntime, Deger};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use tokio::runtime::{Builder, Runtime};
-use tokio::task::JoinHandle;
-use tokio::task::LocalSet;
+
+struct CallFrame {
+    function_index: Option<usize>,
+    function_name: Option<String>,
+    function_location: Option<SourceSpan>,
+    current_location: Option<SourceSpan>,
+    ip: usize,
+    locals: HashMap<String, Deger>,
+    stack_base: usize,
+    error_stack: Vec<(usize, usize)>,
+}
+
+struct SyncCallBoundary {
+    frame_depth: usize,
+    error: Option<RuntimeDiagnostic>,
+}
 
 pub struct VM {
     stack: Vec<Deger>,
     globals: HashMap<String, Deger>,
     program: Program,
+    function_index: Option<usize>,
+    function_name: Option<String>,
+    function_location: Option<SourceSpan>,
+    current_location: Option<SourceSpan>,
     ip: usize,
-    error_stack: Vec<usize>,
-    yaprak: YaprakExecutor,
+    locals: HashMap<String, Deger>,
+    stack_base: usize,
+    error_stack: Vec<(usize, usize)>,
+    frames: Vec<CallFrame>,
+    sync_call_boundaries: Vec<SyncCallBoundary>,
     pub call_depth: usize,
-    runtime_error: Option<String>,
+    runtime_error: Option<RuntimeDiagnostic>,
     output_buffer: Option<Rc<RefCell<String>>>,
-}
-
-#[allow(dead_code)]
-struct YaprakExecutor {
-    rt: Runtime,
-    local: LocalSet,
-    next_id: u64,
-    tasks: HashMap<u64, JoinHandle<Deger>>,
-}
-
-#[allow(dead_code)]
-impl YaprakExecutor {
-    fn new() -> Self {
-        Self {
-            rt: Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .expect("tokio runtime init failed"),
-            local: LocalSet::new(),
-            next_id: 1,
-            tasks: HashMap::new(),
-        }
-    }
-
-    fn insert(&mut self, task: JoinHandle<Deger>) -> u64 {
-        let id = self.next_id;
-        self.next_id += 1;
-        self.tasks.insert(id, task);
-        id
-    }
-
-    fn await_task(&mut self, id: u64) -> Deger {
-        match self.tasks.remove(&id) {
-            Some(handle) => match self.rt.block_on(self.local.run_until(handle)) {
-                Ok(v) => v,
-                Err(e) => Deger::Hata(format!("Görev hatası: {}", e)),
-            },
-            None => Deger::Hata(format!("Bilinmeyen görev: {}", id)),
-        }
-    }
+    limits: crate::limits::ExecutionLimits,
+    executed_steps: u64,
+    output_bytes: usize,
 }
 
 impl VM {
     pub fn new(program: Program) -> Self {
+        let validation_error = validate_program(&program)
+            .err()
+            .map(|error| RuntimeDiagnostic {
+                message: error.to_string(),
+                location: None,
+                stack: Vec::new(),
+            });
         Self {
             stack: Vec::new(),
             globals: crate::interpreter::varsayilan_global_degiskenler(),
             program,
+            function_index: None,
+            function_name: None,
+            function_location: None,
+            current_location: None,
             ip: 0,
+            locals: HashMap::new(),
+            stack_base: 0,
             error_stack: Vec::new(),
-            yaprak: YaprakExecutor::new(),
+            frames: Vec::new(),
+            sync_call_boundaries: Vec::new(),
             call_depth: 0,
-            runtime_error: None,
+            runtime_error: validation_error,
             output_buffer: None,
+            limits: crate::limits::ExecutionLimits::default(),
+            executed_steps: 0,
+            output_bytes: 0,
         }
     }
 
     pub fn with_output_buffer(mut self, buffer: Rc<RefCell<String>>) -> Self {
         self.output_buffer = Some(buffer);
         self
+    }
+
+    pub fn with_limits(mut self, limits: crate::limits::ExecutionLimits) -> Result<Self, String> {
+        self.limits = limits.validate()?;
+        Ok(self)
     }
 
     pub fn run_checked(&mut self) -> HumaResult<()> {
@@ -89,390 +95,853 @@ impl VM {
     }
 
     pub fn run(&mut self) {
-        while self.ip < self.program.instructions.len() {
-            let op = &self.program.instructions[self.ip];
-            self.ip += 1;
-            match op {
-                OpCode::PushConstant(idx) => {
-                    let c = &self.program.constants[*idx];
-                    match c {
-                        Constant::Sayi(n) => self.stack.push(Deger::Sayi(*n)),
-                        Constant::Metin(s) => self.stack.push(Deger::Metin(s.clone())),
-                    }
-                }
-                OpCode::LoadVar(ad) => match self.globals.get(ad).cloned() {
-                    Some(val) => self.stack.push(val),
-                    None => self.hata_firlat(format!("Tanımsız değişken: {}", ad)),
-                },
-                OpCode::StoreVar(ad) => {
-                    let val = self.stack.pop().unwrap_or(Deger::Bos);
-                    if self.globals.contains_key(ad) {
-                        self.globals.insert(ad.clone(), val);
-                    } else {
-                        self.hata_firlat(format!(
-                            "Tanımlanmamış değişkene atama yapılamaz: {}",
-                            ad
-                        ));
-                    }
-                }
-                OpCode::DefineVar(ad) => {
-                    let val = self.stack.pop().unwrap_or(Deger::Bos);
-                    self.globals.insert(ad.clone(), val);
-                }
-                OpCode::Add => {
-                    let r = self.stack.pop().unwrap_or(Deger::Bos);
-                    let l = self.stack.pop().unwrap_or(Deger::Bos);
-                    match (l, r) {
-                        (Deger::Sayi(a), Deger::Sayi(b)) => self.stack.push(Deger::Sayi(a + b)),
-                        (Deger::Metin(a), Deger::Metin(b)) => self.stack.push(Deger::Metin(a + &b)),
-                        (Deger::Metin(a), b) => {
-                            self.stack.push(Deger::Metin(format!("{}{}", a, b)))
-                        }
-                        (a, Deger::Metin(b)) => {
-                            self.stack.push(Deger::Metin(format!("{}{}", a, b)))
-                        }
-                        (a, b) => self.hata_firlat(format!(
-                            "Toplama işlemi bu değerlerde desteklenmez: {} ve {}",
-                            a, b
-                        )),
-                    }
-                }
-                OpCode::Sub => {
-                    let r = self.stack.pop().unwrap_or(Deger::Bos);
-                    let l = self.stack.pop().unwrap_or(Deger::Bos);
-                    if let (Deger::Sayi(a), Deger::Sayi(b)) = (l, r) {
-                        self.stack.push(Deger::Sayi(a - b));
-                    } else {
-                        self.hata_firlat(
-                            "Çıkarma işlemi yalnızca sayılarda desteklenir".to_string(),
-                        );
-                    }
-                }
-                OpCode::Mul => {
-                    let r = self.stack.pop().unwrap_or(Deger::Bos);
-                    let l = self.stack.pop().unwrap_or(Deger::Bos);
-                    if let (Deger::Sayi(a), Deger::Sayi(b)) = (l, r) {
-                        self.stack.push(Deger::Sayi(a * b));
-                    } else {
-                        self.hata_firlat(
-                            "Çarpma işlemi yalnızca sayılarda desteklenir".to_string(),
-                        );
-                    }
-                }
-                OpCode::Div => {
-                    let r = self.stack.pop().unwrap_or(Deger::Bos);
-                    let l = self.stack.pop().unwrap_or(Deger::Bos);
-                    if let (Deger::Sayi(a), Deger::Sayi(b)) = (l, r) {
-                        if b == 0.0 {
-                            self.hata_firlat("Sıfıra bölme hatası".to_string());
-                        } else {
-                            self.stack.push(Deger::Sayi(a / b));
-                        }
-                    } else {
-                        self.hata_firlat("Bölme işlemi yalnızca sayılarda desteklenir".to_string());
-                    }
-                }
-                OpCode::Mod => {
-                    let r = self.stack.pop().unwrap_or(Deger::Bos);
-                    let l = self.stack.pop().unwrap_or(Deger::Bos);
-                    match (l, r) {
-                        (Deger::Sayi(_), Deger::Sayi(0.0)) => {
-                            self.hata_firlat("Sıfıra göre kalan hesaplanamaz".to_string());
-                        }
-                        (Deger::Sayi(a), Deger::Sayi(b)) => self.stack.push(Deger::Sayi(a % b)),
-                        _ => self
-                            .hata_firlat("Kalan işlemi yalnızca sayılarda desteklenir".to_string()),
-                    }
-                }
-                OpCode::Greater => {
-                    let r = self.stack.pop().unwrap_or(Deger::Bos);
-                    let l = self.stack.pop().unwrap_or(Deger::Bos);
-                    match (l, r) {
-                        (Deger::Sayi(a), Deger::Sayi(b)) => {
-                            self.stack.push(Deger::Sayi(if a > b { 1.0 } else { 0.0 }))
-                        }
-                        _ => self.hata_firlat(
-                            "Büyüktür karşılaştırması sadece sayılarda desteklenir".to_string(),
-                        ),
-                    }
-                }
-                OpCode::Less => {
-                    let r = self.stack.pop().unwrap_or(Deger::Bos);
-                    let l = self.stack.pop().unwrap_or(Deger::Bos);
-                    match (l, r) {
-                        (Deger::Sayi(a), Deger::Sayi(b)) => {
-                            self.stack.push(Deger::Sayi(if a < b { 1.0 } else { 0.0 }))
-                        }
-                        _ => self.hata_firlat(
-                            "Küçüktür karşılaştırması sadece sayılarda desteklenir".to_string(),
-                        ),
-                    }
-                }
-                OpCode::LessOrEqual => {
-                    let r = self.stack.pop().unwrap_or(Deger::Bos);
-                    let l = self.stack.pop().unwrap_or(Deger::Bos);
-                    match (l, r) {
-                        (Deger::Sayi(a), Deger::Sayi(b)) => {
-                            self.stack.push(Deger::Sayi(if a <= b { 1.0 } else { 0.0 }))
-                        }
-                        _ => self.hata_firlat(
-                            "Küçük eşittir karşılaştırması sadece sayılarda desteklenir"
-                                .to_string(),
-                        ),
-                    }
-                }
-                OpCode::GreaterOrEqual => {
-                    let r = self.stack.pop().unwrap_or(Deger::Bos);
-                    let l = self.stack.pop().unwrap_or(Deger::Bos);
-                    match (l, r) {
-                        (Deger::Sayi(a), Deger::Sayi(b)) => {
-                            self.stack.push(Deger::Sayi(if a >= b { 1.0 } else { 0.0 }))
-                        }
-                        _ => self.hata_firlat(
-                            "Büyük eşittir karşılaştırması sadece sayılarda desteklenir"
-                                .to_string(),
-                        ),
-                    }
-                }
-                OpCode::Equal => {
-                    let r = self.stack.pop().unwrap_or(Deger::Bos);
-                    let l = self.stack.pop().unwrap_or(Deger::Bos);
-                    self.stack.push(Deger::Sayi(if l == r { 1.0 } else { 0.0 }));
-                }
-                OpCode::NotEqual => {
-                    let r = self.stack.pop().unwrap_or(Deger::Bos);
-                    let l = self.stack.pop().unwrap_or(Deger::Bos);
-                    self.stack.push(Deger::Sayi(if l != r { 1.0 } else { 0.0 }));
-                }
-                OpCode::And => {
-                    let r = self.stack.pop().unwrap_or(Deger::Bos);
-                    let l = self.stack.pop().unwrap_or(Deger::Bos);
-                    let result = self.is_truthy(l) && self.is_truthy(r);
-                    self.stack.push(Deger::Sayi(if result { 1.0 } else { 0.0 }));
-                }
-                OpCode::Or => {
-                    let r = self.stack.pop().unwrap_or(Deger::Bos);
-                    let l = self.stack.pop().unwrap_or(Deger::Bos);
-                    let result = self.is_truthy(l) || self.is_truthy(r);
-                    self.stack.push(Deger::Sayi(if result { 1.0 } else { 0.0 }));
-                }
-                OpCode::Not => {
-                    let value = self.stack.pop().unwrap_or(Deger::Bos);
-                    let result = !self.is_truthy(value);
-                    self.stack.push(Deger::Sayi(if result { 1.0 } else { 0.0 }));
-                }
-                OpCode::Length => {
-                    let value = self.stack.pop().unwrap_or(Deger::Bos);
-                    match value {
-                        Deger::Metin(s) => self.stack.push(Deger::Sayi(s.chars().count() as f64)),
-                        Deger::Liste(items) => {
-                            self.stack.push(Deger::Sayi(items.borrow().len() as f64))
-                        }
-                        Deger::Sozluk(items) => {
-                            self.stack.push(Deger::Sayi(items.borrow().len() as f64))
-                        }
-                        other => self.hata_firlat(format!("{} değerinin uzunluğu alınamaz", other)),
-                    }
-                }
-                OpCode::Call(arg_len) => {
-                    if self.call_depth >= 50 {
-                        self.hata_firlat("Azami özyineleme derinliği aşıldı".to_string());
-                    } else {
-                        let callable = self.stack.pop().unwrap_or(Deger::Bos);
-                        let mut args = Vec::with_capacity(*arg_len);
-                        for _ in 0..*arg_len {
-                            args.push(self.stack.pop().unwrap_or(Deger::Bos));
-                        }
-                        args.reverse();
+        if self.runtime_error.is_some() {
+            return;
+        }
+        self.executed_steps = 0;
+        self.output_bytes = 0;
+        while self.tek_adim() {}
+    }
 
-                        match callable {
-                            Deger::DahiliFonksiyon(f) => {
-                                self.stack.push(f(args));
-                            }
-                            Deger::Fonksiyon {
-                                parametreler,
-                                govde,
-                            } => {
-                                // Fonksiyon gövdeleri AST olarak saklanır. Aynı AST semantiğini
-                                // kullanan yorumlayıcı, yerel kapsamları ve özyinelemeyi yönetir.
-                                // Bu sayede çağrı parametreleri global değişkenleri kirletmez.
-                                let mut interp = crate::interpreter::Yorumlayici::new();
-                                interp.global_degiskenler = self.globals.clone();
-                                interp.call_depth = self.call_depth;
-                                if let Some(buffer) = &self.output_buffer {
-                                    interp = interp.with_output_buffer(buffer.clone());
-                                }
-                                let ret = interp.fonksiyon_cagrisi(
-                                    Deger::Fonksiyon {
-                                        parametreler,
-                                        govde,
-                                    },
-                                    args,
-                                );
-                                self.globals = interp.global_degiskenler;
-                                match ret {
-                                    Deger::Hata(message) => self.hata_firlat(message),
-                                    value => self.stack.push(value),
-                                }
-                            }
-                            other => {
-                                self.hata_firlat(format!("Çağrılamayan değer: {}", other));
-                            }
-                        }
+    fn tek_adim(&mut self) -> bool {
+        if self.runtime_error.is_some()
+            || self
+                .sync_call_boundaries
+                .last()
+                .is_some_and(|boundary| boundary.error.is_some())
+        {
+            return false;
+        }
+        let Some(opcode) = self.current_instructions().get(self.ip).cloned() else {
+            if self.function_index.is_some() {
+                self.fonksiyondan_don(Deger::Bos);
+                return true;
+            }
+            return false;
+        };
+        self.current_location = self.current_spans().get(self.ip).copied().flatten();
+        self.executed_steps = self.executed_steps.saturating_add(1);
+        if self.executed_steps > self.limits.max_steps {
+            self.hata_firlat(format!(
+                "Çalıştırma adım sınırı aşıldı: {}",
+                self.limits.max_steps
+            ));
+            return false;
+        }
+        self.ip += 1;
+        self.execute(opcode);
+        self.runtime_error.is_none()
+            && self
+                .sync_call_boundaries
+                .last()
+                .is_none_or(|boundary| boundary.error.is_none())
+    }
+
+    fn current_instructions(&self) -> &[OpCode] {
+        match self.function_index {
+            Some(index) => self
+                .program
+                .functions
+                .get(index)
+                .map_or(&[], |function| function.instructions.as_slice()),
+            None => &self.program.instructions,
+        }
+    }
+
+    fn current_spans(&self) -> &[Option<SourceSpan>] {
+        match self.function_index {
+            Some(index) => self
+                .program
+                .functions
+                .get(index)
+                .map_or(&[], |function| function.instruction_spans.as_slice()),
+            None => &self.program.instruction_spans,
+        }
+    }
+
+    fn execute(&mut self, opcode: OpCode) {
+        match opcode {
+            OpCode::PushConstant(index) => match self.program.constants.get(index) {
+                Some(Constant::Sayi(number)) => self.stack.push(Deger::Sayi(*number)),
+                Some(Constant::Metin(text)) => self.stack.push(Deger::Metin(text.clone())),
+                None => self.hata_firlat(format!("Geçersiz sabit indeksi: {index}")),
+            },
+            OpCode::LoadVar(name) => match self
+                .locals
+                .get(name.as_ref())
+                .or_else(|| self.globals.get(name.as_ref()))
+                .cloned()
+            {
+                Some(value) => self.stack.push(value),
+                None => self.hata_firlat(format!("Tanımsız değişken: {name}")),
+            },
+            OpCode::StoreVar(name) => {
+                let Some(value) = self.pop_value("değişken ataması") else {
+                    return;
+                };
+                if let Some(current) = self.locals.get_mut(name.as_ref()) {
+                    *current = value;
+                } else if let Some(current) = self.globals.get_mut(name.as_ref()) {
+                    *current = value;
+                } else {
+                    self.hata_firlat(format!("Tanımlanmamış değişkene atama yapılamaz: {name}"));
+                }
+            }
+            OpCode::DefineVar(name) => {
+                let Some(value) = self.pop_value("değişken tanımı") else {
+                    return;
+                };
+                self.degisken_tanimla(name.to_string(), value);
+            }
+            OpCode::Add => self.ikili_islem_calistir(Token::Arti),
+            OpCode::Sub => self.ikili_islem_calistir(Token::Eksi),
+            OpCode::Mul => self.ikili_islem_calistir(Token::Carpi),
+            OpCode::Div => self.ikili_islem_calistir(Token::Bolnu),
+            OpCode::Mod => self.ikili_islem_calistir(Token::Mod),
+            OpCode::Greater => self.ikili_islem_calistir(Token::Buyuktur),
+            OpCode::Less => self.ikili_islem_calistir(Token::Kucuktur),
+            OpCode::LessOrEqual => self.ikili_islem_calistir(Token::KucukEsit),
+            OpCode::GreaterOrEqual => self.ikili_islem_calistir(Token::BuyukEsit),
+            OpCode::Equal => self.ikili_islem_calistir(Token::EsitEsittir),
+            OpCode::NotEqual => self.ikili_islem_calistir(Token::EsitDegil),
+            OpCode::And | OpCode::Or => {
+                let Some(right) = self.pop_value("mantıksal işlem") else {
+                    return;
+                };
+                let Some(left) = self.pop_value("mantıksal işlem") else {
+                    return;
+                };
+                let left = match crate::semantics::dogru_mu(&left) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        self.hata_firlat(error);
+                        return;
                     }
-                }
-                OpCode::Print => {
-                    let val = self.stack.pop().unwrap_or(Deger::Bos);
-                    self.satir_yazdir(&val.to_string());
-                }
-                OpCode::Jump(addr) => {
-                    self.ip = *addr;
-                }
-                OpCode::JumpIfFalse(addr) => {
-                    let val = self.stack.pop().unwrap_or(Deger::Bos);
-                    if !self.is_truthy(val) {
-                        self.ip = *addr;
+                };
+                let right = match crate::semantics::dogru_mu(&right) {
+                    Ok(value) => value,
+                    Err(error) => {
+                        self.hata_firlat(error);
+                        return;
                     }
+                };
+                let value = if matches!(opcode, OpCode::And) {
+                    left && right
+                } else {
+                    left || right
+                };
+                self.stack.push(Deger::Sayi(if value { 1.0 } else { 0.0 }));
+            }
+            OpCode::Not => {
+                let Some(value) = self.pop_value("mantıksal değil") else {
+                    return;
+                };
+                match crate::semantics::dogru_mu(&value) {
+                    Ok(value) => self.stack.push(Deger::Sayi(if value { 0.0 } else { 1.0 })),
+                    Err(error) => self.hata_firlat(error),
                 }
-                OpCode::Pop => {
-                    self.stack.pop();
+            }
+            OpCode::Length => {
+                let Some(value) = self.pop_value("uzunluk") else {
+                    return;
+                };
+                match self.uzunluk(value) {
+                    Ok(length) => self.stack.push(Deger::Sayi(length as f64)),
+                    Err(error) => self.hata_firlat(error),
                 }
-                OpCode::Return => break,
-                OpCode::Bos => self.stack.push(Deger::Bos),
-                OpCode::MakeList(len) => {
-                    let mut list = Vec::with_capacity(*len);
-                    for _ in 0..*len {
-                        list.push(self.stack.pop().unwrap_or(Deger::Bos));
+            }
+            OpCode::Call(argument_count) => self.cagri_calistir(argument_count),
+            OpCode::Print => {
+                let Some(value) = self.pop_value("yazdır") else {
+                    return;
+                };
+                let text = match value.to_string_limited(self.limits.max_output_bytes) {
+                    Ok(text) => text,
+                    Err(error) => {
+                        self.hata_firlat(error);
+                        return;
                     }
-                    list.reverse();
-                    self.stack
-                        .push(Deger::Liste(std::rc::Rc::new(std::cell::RefCell::new(
-                            list,
-                        ))));
+                };
+                if let Err(error) = self.satir_yazdir(&text) {
+                    self.hata_firlat(error);
                 }
-                OpCode::ListAccess => {
-                    let index = self.stack.pop().unwrap_or(Deger::Bos);
-                    let list = self.stack.pop().unwrap_or(Deger::Bos);
-                    match (list, index) {
-                        (Deger::Liste(items), Deger::Sayi(i)) => {
-                            let idx = i as isize;
-                            if idx < 0 || (idx as usize) >= items.borrow().len() {
-                                self.hata_firlat(
-                                    "Liste erişiminde indeks sınır dışında".to_string(),
-                                );
-                            } else {
-                                self.stack.push(items.borrow()[idx as usize].clone());
-                            }
-                        }
-                        (Deger::Sozluk(map), Deger::Metin(k)) => {
-                            if let Some(v) = map.borrow().get(&k) {
-                                self.stack.push(v.clone());
-                            } else {
-                                self.stack.push(Deger::Bos);
-                            }
-                        }
-                        (Deger::Nesne { alanlar, .. }, Deger::Metin(k)) => {
-                            if let Some(v) = alanlar.borrow().get(&k) {
-                                self.stack.push(v.clone());
-                            } else {
-                                self.stack.push(Deger::Bos);
-                            }
-                        }
-                        _ => self.hata_firlat(
-                            "Erişim için liste/sözlük ve geçerli indeks/anahtar gerekir"
-                                .to_string(),
-                        ),
+            }
+            OpCode::Jump(address) => self.ip = address,
+            OpCode::JumpIfFalse(address) => {
+                let Some(value) = self.pop_value("koşullu atlama") else {
+                    return;
+                };
+                match crate::semantics::dogru_mu(&value) {
+                    Ok(false) => self.ip = address,
+                    Ok(true) => {}
+                    Err(error) => self.hata_firlat(error),
+                }
+            }
+            OpCode::Pop => {
+                if self.stack.pop().is_none() {
+                    self.hata_firlat("Pop komutu boş yığınla çalıştırılamaz".to_string());
+                }
+            }
+            OpCode::Return => {
+                let Some(value) = self.pop_value("döndür") else {
+                    return;
+                };
+                self.fonksiyondan_don(value);
+            }
+            OpCode::Bos => self.stack.push(Deger::Bos),
+            OpCode::MakeList(length) => {
+                if length > self.limits.max_collection_items {
+                    self.hata_firlat(format!(
+                        "Liste eleman sınırı aşıldı: {} > {}",
+                        length, self.limits.max_collection_items
+                    ));
+                    return;
+                }
+                let Some(values) = self.pop_values(length, "liste oluşturma") else {
+                    return;
+                };
+                self.stack.push(Deger::Liste(Rc::new(RefCell::new(values))));
+            }
+            OpCode::ListAccess => {
+                let Some(index) = self.pop_value("koleksiyon erişimi") else {
+                    return;
+                };
+                let Some(container) = self.pop_value("koleksiyon erişimi") else {
+                    return;
+                };
+                match self.koleksiyon_erisimi(container, index) {
+                    Ok(value) => self.stack.push(value),
+                    Err(error) => self.hata_firlat(error),
+                }
+            }
+            OpCode::MakeMap(length) => {
+                if length > self.limits.max_collection_items {
+                    self.hata_firlat(format!(
+                        "Sözlük eleman sınırı aşıldı: {} > {}",
+                        length, self.limits.max_collection_items
+                    ));
+                    return;
+                }
+                let pair_value_count = match length.checked_mul(2) {
+                    Some(value) => value,
+                    None => {
+                        self.hata_firlat("Sözlük eleman sayısı taştı".to_string());
+                        return;
                     }
-                }
-                OpCode::MakeMap(len) => {
-                    let mut map = HashMap::new();
-                    for _ in 0..*len {
-                        let val = self.stack.pop().unwrap_or(Deger::Bos);
-                        let key = self.stack.pop().unwrap_or(Deger::Bos);
-                        if let Deger::Metin(k) = key {
-                            map.insert(k, val);
-                        }
-                    }
-                    self.stack
-                        .push(Deger::Sozluk(std::rc::Rc::new(std::cell::RefCell::new(
-                            map,
-                        ))));
-                }
-                OpCode::TryBlockStart(addr) => {
-                    self.error_stack.push(*addr);
-                }
-                OpCode::TryBlockEnd => {
-                    self.error_stack.pop();
-                }
-                OpCode::Await => {
-                    let val = self.stack.pop().unwrap_or(Deger::Bos);
-                    match val {
-                        Deger::GorevId(id) => {
-                            let out = self.yaprak.await_task(id);
-                            self.stack.push(out);
+                };
+                let Some(values) = self.pop_values(pair_value_count, "sözlük oluşturma") else {
+                    return;
+                };
+                let mut map = HashMap::with_capacity(length);
+                for pair in values.chunks_exact(2) {
+                    match &pair[0] {
+                        Deger::Metin(key) => {
+                            map.insert(key.clone(), pair[1].clone());
                         }
                         other => {
-                            self.hata_firlat(format!("bekle: await edilemez değer: {}", other));
+                            self.hata_firlat(format!(
+                                "Sözlük anahtarı metin olmalıdır; {other} geldi"
+                            ));
+                            return;
                         }
                     }
                 }
-                OpCode::CallFFI {
-                    lib_ad,
-                    fn_ad,
-                    arg_len,
-                } => {
-                    let mut args = Vec::with_capacity(*arg_len);
-                    for _ in 0..*arg_len {
-                        args.push(self.stack.pop().unwrap_or(Deger::Bos));
-                    }
-                    args.reverse();
-                    if let Ok(mgr) = crate::ffi::FFI_YONETICI.lock() {
-                        match mgr.cagir_esnek(lib_ad, fn_ad, args) {
-                            Ok(res) => self.stack.push(res),
-                            Err(e) => self.hata_firlat(e),
-                        }
+                self.stack.push(Deger::Sozluk(Rc::new(RefCell::new(map))));
+            }
+            OpCode::TryBlockStart(address) => {
+                self.error_stack.push((address, self.stack.len()));
+            }
+            OpCode::TryBlockEnd => {
+                if self.error_stack.pop().is_none() {
+                    self.hata_firlat("Eşleşmeyen TryBlockEnd komutu".to_string());
+                }
+            }
+            OpCode::Await => {
+                let Some(value) = self.pop_value("bekle") else {
+                    return;
+                };
+                match value {
+                    Deger::GorevId(id) => match crate::interpreter::gorev_bekle(id) {
+                        Deger::Hata(error) => self.hata_firlat(error),
+                        result => self.stack.push(result),
+                    },
+                    other => {
+                        self.hata_firlat(format!("bekle: await edilemez değer: {other}"));
                     }
                 }
-                OpCode::MakeFunction { name, params, body } => {
-                    self.globals.insert(
-                        name.clone(),
-                        Deger::Fonksiyon {
-                            parametreler: params.clone(),
-                            govde: body.clone(),
-                        },
+            }
+            OpCode::CallFFI {
+                lib_ad,
+                fn_ad,
+                signature,
+                arg_len,
+            } => {
+                if let Err(error) =
+                    crate::capability::require(crate::capability::Capability::Ffi, "FFI çağrısı")
+                {
+                    self.hata_firlat(error);
+                    return;
+                }
+                let Some(args) = self.pop_values(arg_len, "FFI çağrısı") else {
+                    return;
+                };
+                let result = match crate::ffi::FFI_YONETICI.lock() {
+                    Ok(manager) => manager.cagir_imzali(&lib_ad, &fn_ad, &signature, args),
+                    Err(_) => Err("FFI yöneticisi kilidi bozuldu".to_string()),
+                };
+                match result {
+                    Ok(Deger::Hata(error)) | Err(error) => self.hata_firlat(error),
+                    Ok(value) => self.stack.push(value),
+                }
+            }
+            OpCode::DefineFunction {
+                name,
+                function_index,
+            } => {
+                let function = Deger::BytecodeFonksiyon {
+                    ad: Some(name.to_string()),
+                    function_index,
+                    yakalanan_degiskenler: self.locals.clone(),
+                };
+                self.degisken_tanimla(name.to_string(), function);
+            }
+            OpCode::MakeClosure(function_index) => {
+                self.stack.push(Deger::BytecodeFonksiyon {
+                    ad: None,
+                    function_index,
+                    yakalanan_degiskenler: self.locals.clone(),
+                });
+            }
+        }
+    }
+
+    fn cagri_calistir(&mut self, argument_count: usize) {
+        let Some(callable) = self.pop_value("fonksiyon çağrısı") else {
+            return;
+        };
+        let Some(args) = self.pop_values(argument_count, "fonksiyon çağrısı") else {
+            return;
+        };
+        match callable {
+            Deger::DahiliFonksiyon(function) => {
+                let result =
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| function(args)));
+                match result {
+                    Ok(Deger::Hata(error)) => self.hata_firlat(error),
+                    Ok(value) => self.stack.push(value),
+                    Err(payload) => self.hata_firlat(format!(
+                        "Yerleşik fonksiyon paniği güvenli biçimde yakalandı: {}",
+                        crate::error::panik_mesaji(payload)
+                    )),
+                }
+            }
+            Deger::BaglamliDahiliFonksiyon(function) => {
+                let result =
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| function(self, args)));
+                match result {
+                    Ok(Deger::Hata(error)) => self.hata_firlat(error),
+                    Ok(value) => self.stack.push(value),
+                    Err(payload) => self.hata_firlat(format!(
+                        "Bağlamlı yerleşik fonksiyon paniği güvenli biçimde yakalandı: {}",
+                        crate::error::panik_mesaji(payload)
+                    )),
+                }
+            }
+            Deger::BytecodeFonksiyon {
+                ad,
+                function_index,
+                yakalanan_degiskenler,
+            } => {
+                let function_name = ad
+                    .clone()
+                    .unwrap_or_else(|| format!("<anonim:{function_index}>"));
+                if let Err(error) =
+                    self.bytecode_cagrisi_baslat(ad, function_index, yakalanan_degiskenler, args)
+                {
+                    self.hata_firlat_cerceveli(
+                        error,
+                        Some(StackFrame {
+                            function: function_name,
+                            location: self.current_location,
+                        }),
                     );
+                }
+            }
+            Deger::Fonksiyon { .. } => self.hata_firlat(
+                "AST fonksiyonu VM içinde yürütülemez; kaynak yeniden derlenmeli".to_string(),
+            ),
+            other => self.hata_firlat(format!("Çağrılamayan değer: {other}")),
+        }
+    }
+
+    fn bytecode_cagrisi_baslat(
+        &mut self,
+        ad: Option<String>,
+        function_index: usize,
+        yakalanan_degiskenler: HashMap<String, Deger>,
+        args: Vec<Deger>,
+    ) -> Result<(), String> {
+        if self.call_depth >= self.limits.max_call_depth {
+            return Err("Azami özyineleme derinliği aşıldı".to_string());
+        }
+        let prototype = self
+            .program
+            .functions
+            .get(function_index)
+            .ok_or_else(|| format!("Geçersiz fonksiyon indeksi: {function_index}"))?;
+        if args.len() != prototype.params.len() {
+            return Err(format!(
+                "Fonksiyon {} argüman bekliyor; {} argüman geldi",
+                prototype.params.len(),
+                args.len()
+            ));
+        }
+        let params = prototype.params.clone();
+        let callable_copy = Deger::BytecodeFonksiyon {
+            ad: ad.clone(),
+            function_index,
+            yakalanan_degiskenler: yakalanan_degiskenler.clone(),
+        };
+        let mut locals = yakalanan_degiskenler;
+        if let Some(name) = &ad {
+            locals.insert(name.clone(), callable_copy);
+        }
+        for (parameter, value) in params.into_iter().zip(args) {
+            locals.insert(parameter, value);
+        }
+
+        let frame = CallFrame {
+            function_index: self.function_index,
+            function_name: self.function_name.take(),
+            function_location: self.function_location.take(),
+            current_location: self.current_location,
+            ip: self.ip,
+            locals: std::mem::take(&mut self.locals),
+            stack_base: self.stack_base,
+            error_stack: std::mem::take(&mut self.error_stack),
+        };
+        self.frames.push(frame);
+        self.function_index = Some(function_index);
+        self.function_name = ad;
+        self.function_location = self.current_location;
+        self.current_location = None;
+        self.ip = 0;
+        self.locals = locals;
+        self.stack_base = self.stack.len();
+        self.call_depth += 1;
+        Ok(())
+    }
+
+    fn bytecode_degerini_eszamanli_cagir(
+        &mut self,
+        ad: Option<String>,
+        function_index: usize,
+        yakalanan_degiskenler: HashMap<String, Deger>,
+        args: Vec<Deger>,
+    ) -> Deger {
+        let frame_depth = self.frames.len();
+        let stack_height = self.stack.len();
+        self.sync_call_boundaries.push(SyncCallBoundary {
+            frame_depth,
+            error: None,
+        });
+        if let Err(error) =
+            self.bytecode_cagrisi_baslat(ad, function_index, yakalanan_degiskenler, args)
+        {
+            self.sync_call_boundaries.pop();
+            return Deger::Hata(error);
+        }
+
+        while self.frames.len() > frame_depth {
+            if !self.tek_adim() {
+                break;
+            }
+        }
+        let Some(boundary) = self.sync_call_boundaries.pop() else {
+            self.stack.truncate(stack_height);
+            return Deger::Hata(
+                "İç hata: eşzamanlı VM geri çağrı sınırı beklenmedik biçimde kayboldu".to_string(),
+            );
+        };
+        if let Some(error) = boundary.error {
+            self.stack.truncate(stack_height);
+            return Deger::Hata(error.to_string());
+        }
+        if self.runtime_error.is_some() {
+            self.stack.truncate(stack_height);
+            return Deger::Hata(
+                "Eşzamanlı VM geri çağrısı üst düzey çalışma zamanı hatasıyla sonlandı".to_string(),
+            );
+        }
+        if self.frames.len() != frame_depth {
+            self.stack.truncate(stack_height);
+            return Deger::Hata(
+                "İç hata: eşzamanlı VM geri çağrısı çağrı çerçevesini geri yüklemedi".to_string(),
+            );
+        }
+        let Some(expected_stack_height) = stack_height.checked_add(1) else {
+            self.stack.truncate(stack_height);
+            return Deger::Hata(
+                "İç hata: eşzamanlı VM geri çağrı yığın yüksekliği taştı".to_string(),
+            );
+        };
+        if self.stack.len() != expected_stack_height {
+            self.stack.truncate(stack_height);
+            return Deger::Hata(
+                "İç hata: eşzamanlı VM geri çağrısı tam olarak bir sonuç üretmedi".to_string(),
+            );
+        }
+        match self.stack.pop() {
+            Some(value) => value,
+            None => Deger::Hata("İç hata: eşzamanlı VM geri çağrı sonucu kayboldu".to_string()),
+        }
+    }
+
+    fn fonksiyondan_don(&mut self, value: Deger) {
+        let Some(frame) = self.frames.pop() else {
+            self.function_index = None;
+            self.function_name = None;
+            self.function_location = None;
+            self.current_location = None;
+            self.ip = self.program.instructions.len();
+            self.stack.clear();
+            self.stack.push(value);
+            return;
+        };
+        self.stack.truncate(self.stack_base);
+        self.function_index = frame.function_index;
+        self.function_name = frame.function_name;
+        self.function_location = frame.function_location;
+        self.current_location = frame.current_location;
+        self.ip = frame.ip;
+        self.locals = frame.locals;
+        self.stack_base = frame.stack_base;
+        self.error_stack = frame.error_stack;
+        self.call_depth = self.call_depth.saturating_sub(1);
+        self.stack.push(value);
+    }
+
+    fn hata_firlat(&mut self, message: String) {
+        self.hata_firlat_cerceveli(message, None);
+    }
+
+    fn hata_firlat_cerceveli(&mut self, message: String, initial_frame: Option<StackFrame>) {
+        let error_location = self.current_location;
+        let mut trace = initial_frame.into_iter().collect::<Vec<_>>();
+        loop {
+            if let Some((handler_address, stack_height)) = self.error_stack.pop() {
+                self.stack.truncate(stack_height);
+                self.ip = handler_address;
+                let diagnostic = RuntimeDiagnostic {
+                    message,
+                    location: error_location,
+                    stack: trace,
+                };
+                self.stack.push(Deger::Hata(diagnostic.to_string()));
+                return;
+            }
+
+            if let Some(name) = self.function_name.take() {
+                trace.push(StackFrame {
+                    function: name,
+                    location: self.function_location,
+                });
+            } else if let Some(index) = self.function_index {
+                trace.push(StackFrame {
+                    function: format!("<anonim:{index}>"),
+                    location: self.function_location,
+                });
+            }
+
+            let Some(frame) = self.frames.pop() else {
+                self.runtime_error = Some(RuntimeDiagnostic {
+                    message,
+                    location: error_location,
+                    stack: trace,
+                });
+                self.function_index = None;
+                self.function_location = None;
+                self.current_location = None;
+                self.ip = self.program.instructions.len();
+                self.stack.clear();
+                self.locals.clear();
+                self.error_stack.clear();
+                self.call_depth = 0;
+                return;
+            };
+            self.stack.truncate(self.stack_base);
+            self.function_index = frame.function_index;
+            self.function_name = frame.function_name;
+            self.function_location = frame.function_location;
+            self.current_location = frame.current_location;
+            self.ip = frame.ip;
+            self.locals = frame.locals;
+            self.stack_base = frame.stack_base;
+            self.error_stack = frame.error_stack;
+            self.call_depth = self.call_depth.saturating_sub(1);
+            if let Some(boundary) = self.sync_call_boundaries.last_mut() {
+                if self.frames.len() == boundary.frame_depth {
+                    boundary.error = Some(RuntimeDiagnostic {
+                        message,
+                        location: error_location,
+                        stack: trace,
+                    });
+                    return;
                 }
             }
         }
     }
 
-    fn hata_firlat(&mut self, msg: String) {
-        if let Some(handler_addr) = self.error_stack.pop() {
-            self.ip = handler_addr;
-            self.stack.push(Deger::Hata(msg));
+    fn degisken_tanimla(&mut self, name: String, value: Deger) {
+        if self.function_index.is_some() {
+            self.locals.insert(name, value);
         } else {
-            self.runtime_error = Some(msg);
-            self.ip = self.program.instructions.len();
+            self.globals.insert(name, value);
         }
     }
 
-    fn satir_yazdir(&self, content: &str) {
-        if let Some(buffer) = &self.output_buffer {
-            let mut buffer = buffer.borrow_mut();
-            buffer.push_str(content);
-            buffer.push('\n');
-        } else {
-            println!("{}", content);
+    fn pop_value(&mut self, operation: &str) -> Option<Deger> {
+        match self.stack.pop() {
+            Some(value) => Some(value),
+            None => {
+                self.hata_firlat(format!("{operation}: çalışma yığını boş"));
+                None
+            }
         }
     }
 
-    fn is_truthy(&self, d: Deger) -> bool {
-        match d {
-            Deger::Sayi(n) => n != 0.0,
-            Deger::Metin(s) => !s.is_empty(),
-            Deger::Liste(l) => !l.borrow().is_empty(),
-            Deger::Bos => false,
-            _ => true,
+    fn pop_values(&mut self, count: usize, operation: &str) -> Option<Vec<Deger>> {
+        if self.stack.len() < count {
+            self.hata_firlat(format!(
+                "{operation}: {count} değer gerekiyor, yığında {} değer var",
+                self.stack.len()
+            ));
+            return None;
         }
+        let start = self.stack.len() - count;
+        Some(self.stack.drain(start..).collect())
+    }
+
+    fn ikili_islem_calistir(&mut self, operator: Token) {
+        let Some(right) = self.pop_value("ikili işlem") else {
+            return;
+        };
+        let Some(left) = self.pop_value("ikili işlem") else {
+            return;
+        };
+        match crate::semantics::ikili_islem(&operator, left, right) {
+            Ok(result) => self.stack.push(result),
+            Err(error) => self.hata_firlat(error),
+        }
+    }
+
+    fn uzunluk(&self, value: Deger) -> Result<usize, String> {
+        match value {
+            Deger::Metin(text) => Ok(text.chars().count()),
+            Deger::Bayt(bytes) => Ok(bytes.len()),
+            Deger::Liste(items) => items
+                .try_borrow()
+                .map(|borrowed| borrowed.len())
+                .map_err(|_| "Liste uzunluğu alınırken liste kullanımda".to_string()),
+            Deger::Sozluk(items) => items
+                .try_borrow()
+                .map(|borrowed| borrowed.len())
+                .map_err(|_| "Sözlük uzunluğu alınırken sözlük kullanımda".to_string()),
+            Deger::Vektor(items) => items
+                .try_borrow()
+                .map(|borrowed| borrowed.len())
+                .map_err(|_| "Vektör uzunluğu alınırken vektör kullanımda".to_string()),
+            other => Err(format!("{other} değerinin uzunluğu alınamaz")),
+        }
+    }
+
+    fn sayisal_indeks(value: f64, length: usize) -> Result<usize, String> {
+        if !value.is_finite() || value < 0.0 || value.fract() != 0.0 {
+            return Err("Koleksiyon indeksi negatif olmayan sonlu tamsayı olmalı".to_string());
+        }
+        if value >= length as f64 {
+            return Err(format!(
+                "Koleksiyon indeksi sınır dışında: {value} (uzunluk {length})"
+            ));
+        }
+        Ok(value as usize)
+    }
+
+    fn koleksiyon_erisimi(&self, container: Deger, index: Deger) -> Result<Deger, String> {
+        match (container, index) {
+            (Deger::Liste(items), Deger::Sayi(number)) => {
+                let borrowed = items
+                    .try_borrow()
+                    .map_err(|_| "Liste erişimi sırasında liste kullanımda".to_string())?;
+                let index = Self::sayisal_indeks(number, borrowed.len())?;
+                Ok(borrowed[index].clone())
+            }
+            (Deger::Metin(text), Deger::Sayi(number)) => {
+                let length = text.chars().count();
+                let index = Self::sayisal_indeks(number, length)?;
+                text.chars()
+                    .nth(index)
+                    .map(|character| Deger::Metin(character.to_string()))
+                    .ok_or_else(|| "Metin indeksi çözülemedi".to_string())
+            }
+            (Deger::Sozluk(map), Deger::Metin(key)) => map
+                .try_borrow()
+                .map_err(|_| "Sözlük erişimi sırasında sözlük kullanımda".to_string())
+                .map(|borrowed| borrowed.get(&key).cloned().unwrap_or(Deger::Bos)),
+            (Deger::Nesne { alanlar, .. }, Deger::Metin(key)) => alanlar
+                .try_borrow()
+                .map_err(|_| "Nesne erişimi sırasında nesne kullanımda".to_string())
+                .map(|borrowed| borrowed.get(&key).cloned().unwrap_or(Deger::Bos)),
+            (container, index) => Err(format!(
+                "{container} değerine {index} indeksiyle erişilemez"
+            )),
+        }
+    }
+
+    fn satir_yazdir(&mut self, content: &str) -> Result<(), String> {
+        let byte_count = content
+            .len()
+            .checked_add(1)
+            .ok_or_else(|| "Çıktı boyutu hesaplanırken taştı".to_string())?;
+        let next_output = self
+            .output_bytes
+            .checked_add(byte_count)
+            .filter(|next| *next <= self.limits.max_output_bytes)
+            .ok_or_else(|| {
+                format!(
+                    "Çıktı sınırı aşıldı: en fazla {} bayt",
+                    self.limits.max_output_bytes
+                )
+            })?;
+        if let Some(buffer) = self.output_buffer.clone() {
+            let mut borrowed = buffer
+                .try_borrow_mut()
+                .map_err(|_| "Çıktı tamponu kullanımda".to_string())?;
+            borrowed.push_str(content);
+            borrowed.push('\n');
+        } else {
+            println!("{content}");
+        }
+        self.output_bytes = next_output;
+        Ok(())
+    }
+}
+
+impl BuiltinRuntime for VM {
+    fn call_value(&mut self, function: Deger, args: Vec<Deger>) -> Deger {
+        match function {
+            Deger::DahiliFonksiyon(function) => {
+                match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| function(args))) {
+                    Ok(value) => value,
+                    Err(payload) => Deger::Hata(format!(
+                        "Yerleşik fonksiyon paniği güvenli biçimde yakalandı: {}",
+                        crate::error::panik_mesaji(payload)
+                    )),
+                }
+            }
+            Deger::BaglamliDahiliFonksiyon(function) => {
+                match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    function(self, args)
+                })) {
+                    Ok(value) => value,
+                    Err(payload) => Deger::Hata(format!(
+                        "Bağlamlı yerleşik fonksiyon paniği güvenli biçimde yakalandı: {}",
+                        crate::error::panik_mesaji(payload)
+                    )),
+                }
+            }
+            Deger::BytecodeFonksiyon {
+                ad,
+                function_index,
+                yakalanan_degiskenler,
+            } => self.bytecode_degerini_eszamanli_cagir(
+                ad,
+                function_index,
+                yakalanan_degiskenler,
+                args,
+            ),
+            Deger::Fonksiyon { .. } => {
+                Deger::Hata("AST fonksiyonu VM içinde yürütülemez".to_string())
+            }
+            other => Deger::Hata(format!("Çağrılamayan değer: {other}")),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::VM;
+    use crate::bytecode::{Constant, FunctionPrototype, OpCode, Program};
+    use crate::value::{BuiltinRuntime, Deger};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    fn geri_cagir(runtime: &mut dyn BuiltinRuntime, args: Vec<Deger>) -> Deger {
+        let [callback] = args.as_slice() else {
+            return Deger::Hata("test geri çağrısı bir fonksiyon bekliyor".to_string());
+        };
+        runtime.call_value(callback.clone(), Vec::new())
+    }
+
+    fn callback_program(function_instructions: Vec<OpCode>) -> Program {
+        Program {
+            constants: vec![Constant::Sayi(7.0)],
+            functions: vec![FunctionPrototype {
+                params: Vec::new(),
+                instruction_spans: vec![None; function_instructions.len()],
+                instructions: function_instructions,
+            }],
+            instructions: vec![
+                OpCode::DefineFunction {
+                    name: "sonuc".into(),
+                    function_index: 0,
+                },
+                OpCode::LoadVar("sonuc".into()),
+                OpCode::LoadVar("geri_cagir".into()),
+                OpCode::Call(1),
+                OpCode::Print,
+            ],
+            instruction_spans: vec![None; 5],
+        }
+    }
+
+    #[test]
+    fn baglamli_yerlesik_bytecode_callbackini_eszamanli_calistirir() {
+        let output = Rc::new(RefCell::new(String::new()));
+        let mut vm = VM::new(callback_program(vec![
+            OpCode::PushConstant(0),
+            OpCode::Return,
+        ]))
+        .with_output_buffer(output.clone());
+        vm.globals.insert(
+            "geri_cagir".to_string(),
+            Deger::BaglamliDahiliFonksiyon(geri_cagir),
+        );
+
+        vm.run_checked()
+            .expect("Bağlamlı bytecode geri çağrısı çalışmalı");
+        assert_eq!(output.borrow().as_str(), "7\n");
+        assert_eq!(vm.call_depth, 0);
+        assert!(vm.frames.is_empty());
+    }
+
+    #[test]
+    fn baglamli_bytecode_callback_hatasi_cagri_cercevesini_bozmaz() {
+        let mut vm = VM::new(callback_program(vec![
+            OpCode::LoadVar("tanimsiz".into()),
+            OpCode::Return,
+        ]));
+        vm.globals.insert(
+            "geri_cagir".to_string(),
+            Deger::BaglamliDahiliFonksiyon(geri_cagir),
+        );
+
+        let error = vm
+            .run_checked()
+            .expect_err("Callback çalışma zamanı hatası vermeli");
+        assert!(error.to_string().contains("Tanımsız değişken"));
+        assert_eq!(vm.call_depth, 0);
+        assert!(vm.frames.is_empty());
+        assert!(vm.sync_call_boundaries.is_empty());
     }
 }

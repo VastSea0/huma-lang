@@ -1,6 +1,10 @@
 # Hüma Programming Language
 
-Hüma is an experimental programming language implemented in Rust and built around Turkish keywords. Version 0.6.0 establishes its first stable core boundary: interpreter correctness, structured errors, consistent syntax, and working CPU-based AI/NLP examples.
+Hüma is an experimental general-purpose programming language implemented in
+Rust and built around Turkish keywords. Version 0.6.0 establishes its first
+verified core boundary: interpreter/VM correctness, structured errors, a
+defined Turkish surface grammar, least-privilege external access, and a base
+for libraries in different domains.
 
 [Türkçe README](README.md)
 
@@ -9,14 +13,20 @@ Hüma is an experimental programming language implemented in Rust and built arou
 | Component | Status | Verified scope |
 |---|---|---|
 | Interpreter | Canonical execution path | Functions, recursion, classes, lists/maps, modules, loops, `dene/yakala`, bundled libraries |
-| Bytecode VM | Stable subset | Numbers, strings, lists, control flow, loops, and functions; unsupported AST is rejected |
+| Bytecode VM | Verified subset | Independent frames/closures, functions, collections, and control flow; unsupported AST is rejected |
 | Cranelift AOT | Experimental numeric subset | Numeric expressions and supported control flow; strings, modules, and classes fail explicitly |
 | LSP | Basic tooling | Parser diagnostics, completion, hover, and go-to-definition |
 | AI/NLP | Working CPU prototype | Dense layers, backpropagation, Adam, gradient clipping, TF-IDF, and embeddings |
 
-Here, “stable” means that supported behavior is regression-tested and errors are not silently converted into plausible output. Hüma does not yet provide a proven static type system, a complete native backend, a GPU runtime, or production-scale performance guarantees.
+Here, “verified” means that covered behavior is regression-tested and errors
+are not silently converted into plausible output. Hüma does not yet provide a
+static type system, a complete native backend, an operating-system sandbox, or
+production-scale performance guarantees.
 
 ## Build and verify
+
+The Rust workspace requires stable Rust 1.92 or newer. The website acceptance
+gate uses Node.js 22.
 
 ```bash
 git clone https://github.com/VastSea0/huma-lang.git
@@ -26,10 +36,11 @@ cargo build --release
 
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+cargo test --workspace --all-targets
+cargo audit
 cargo run -p huma-cli -- test tests
 cargo run -p huma-cli -- test examples
-cd www/site && npm ci && npm run lint && npm run build
+cd www/site && npm ci && npm audit && npm run lint && npm run build
 ```
 
 ## Example
@@ -54,7 +65,19 @@ The interpreter is the default full-language backend. VM and AOT compilation rej
 
 ## Turkish-inspired grammar
 
-Hüma uses Turkish control words and accepts a defined set of case-suffix forms after an apostrophe. Unknown suffixes are syntax errors. This is a deterministic programming-language grammar inspired by Turkish; it is not a general natural-language parser or a complete Turkish morphology engine. See the Turkish [Language Specification](docs/DIL_TANIMI.md) for the normative rules.
+Hüma uses Turkish control words and accepts a defined set of case-suffix forms
+after an apostrophe. Unknown suffixes are syntax errors. For names whose
+pronunciation can be derived from spelling, the lexer also checks vowel harmony,
+buffer consonants, and voiceless-consonant assimilation. See the Turkish
+[Language Specification](docs/DIL_TANIMI.md) and canonical
+[EBNF](docs/DIL_GRAMERI.ebnf).
+
+## Security boundary
+
+External capabilities are denied by default and granted individually, for
+example `--izin dosya-okuma` or `--izin ağ-istemci`. File writing, network
+servers, processes, FFI, databases, and GUI access are separate capabilities.
+`--tüm-izinler` is only for trusted code and is not an operating-system sandbox.
 
 ## AI example
 
@@ -69,8 +92,11 @@ The current runtime targets learning experiments and small CPU workloads. It doe
 ## Documentation
 
 - [Language Specification](docs/DIL_TANIMI.md)
+- [Canonical EBNF](docs/DIL_GRAMERI.ebnf)
 - [Bytecode Container Specification](docs/BYTECODE_BICIMI.md)
 - [Libraries](KUTUPHANELER.md)
+- [Package Security](docs/PAKET_GUVENLIGI.md)
+- [Performance and Memory Measurement](docs/PERFORMANS.md)
 - [Status and Roadmap](docs/DURUM_VE_YOL_HARITASI.md)
 - [Changelog](CHANGELOG.md)
 

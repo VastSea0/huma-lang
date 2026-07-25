@@ -1,13 +1,16 @@
 use crate::interpreter::Yorumlayici;
-use crate::value::Deger;
+use crate::value::{BuiltinRuntime, Deger};
 use eframe::egui;
 use std::cell::RefCell;
+use std::collections::HashMap;
 
 thread_local! {
     static CURRENT_UI: RefCell<Option<*mut egui::Ui>> = const { RefCell::new(None) };
     static GUI_REQUEST: RefCell<Option<GuiRequest>> = const { RefCell::new(None) };
-    static CURRENT_INTERP: RefCell<Option<*mut Yorumlayici>> = const { RefCell::new(None) };
 }
+
+const MAX_WINDOW_SIZE: f64 = 16_384.0;
+const MAX_TEXT_BYTES: usize = 1024 * 1024;
 
 struct GuiRequest {
     baslik: String,
@@ -16,696 +19,861 @@ struct GuiRequest {
     cizim_fks: Deger,
 }
 
+struct UiContextGuard {
+    previous: Option<*mut egui::Ui>,
+}
+
+impl UiContextGuard {
+    fn enter(current: *mut egui::Ui) -> Result<Self, String> {
+        CURRENT_UI.with(|cell| {
+            let mut slot = cell
+                .try_borrow_mut()
+                .map_err(|_| "GUI bağlamı kullanımda".to_string())?;
+            let previous = slot.replace(current);
+            Ok(Self { previous })
+        })
+    }
+}
+
+impl Drop for UiContextGuard {
+    fn drop(&mut self) {
+        CURRENT_UI.with(|cell| {
+            if let Ok(mut slot) = cell.try_borrow_mut() {
+                *slot = self.previous;
+            }
+        });
+    }
+}
+
+fn with_ui<T>(operation: &str, action: impl FnOnce(&mut egui::Ui) -> T) -> Result<T, String> {
+    let pointer = CURRENT_UI.with(|cell| {
+        cell.try_borrow()
+            .map_err(|_| format!("{operation}: GUI bağlamı kullanımda"))
+            .and_then(|slot| {
+                (*slot).ok_or_else(|| {
+                    format!("{operation}: yalnızca pencere çizim fonksiyonu içinde kullanılabilir")
+                })
+            })
+    })?;
+    // İşaretçi yalnızca `UiContextGuard` ömrü boyunca, aynı iş parçacığında
+    // kurulur. Geri çağrıdan önce iç UI için yeni bir guard oluşturulur.
+    Ok(unsafe { action(&mut *pointer) })
+}
+
+fn is_callable(value: &Deger) -> bool {
+    matches!(
+        value,
+        Deger::Fonksiyon { .. }
+            | Deger::BytecodeFonksiyon { .. }
+            | Deger::DahiliFonksiyon(_)
+            | Deger::BaglamliDahiliFonksiyon(_)
+    )
+}
+
+fn callback<'a>(value: &'a Deger, operation: &str) -> Result<&'a Deger, String> {
+    if is_callable(value) {
+        Ok(value)
+    } else {
+        Err(format!("{operation}: geri çağrı fonksiyon olmalıdır"))
+    }
+}
+
+fn finite_f32(value: f64, operation: &str, positive: bool) -> Result<f32, String> {
+    let valid_sign = if positive { value > 0.0 } else { value >= 0.0 };
+    if !value.is_finite() || !valid_sign || value > MAX_WINDOW_SIZE {
+        let qualifier = if positive {
+            "pozitif"
+        } else {
+            "negatif olmayan"
+        };
+        return Err(format!(
+            "{operation}: değer {qualifier}, sonlu ve en fazla {MAX_WINDOW_SIZE} olmalıdır"
+        ));
+    }
+    Ok(value as f32)
+}
+
+fn color_component(value: f64, operation: &str) -> Result<u8, String> {
+    if !value.is_finite() || value.fract() != 0.0 || !(0.0..=255.0).contains(&value) {
+        return Err(format!(
+            "{operation}: renk bileşenleri 0..255 aralığında tamsayı olmalıdır"
+        ));
+    }
+    Ok(value as u8)
+}
+
+fn binary_flag(value: f64, operation: &str) -> Result<bool, String> {
+    match value {
+        0.0 => Ok(false),
+        1.0 => Ok(true),
+        _ => Err(format!("{operation}: durum bayrağı 0 veya 1 olmalıdır")),
+    }
+}
+
+fn checked_text(text: &str, operation: &str) -> Result<(), String> {
+    if text.len() > MAX_TEXT_BYTES {
+        Err(format!(
+            "{operation}: metin {MAX_TEXT_BYTES} bayt sınırını aşıyor"
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn nested_call(
+    runtime: &mut dyn BuiltinRuntime,
+    function: &Deger,
+    ui: &mut egui::Ui,
+    operation: &str,
+) -> Deger {
+    let _guard = match UiContextGuard::enter(ui as *mut egui::Ui) {
+        Ok(guard) => guard,
+        Err(error) => return Deger::Hata(format!("{operation}: {error}")),
+    };
+    runtime.call_value(function.clone(), Vec::new())
+}
+
 pub struct HumaGuiApp {
     cizim_fks: Deger,
     interp: Yorumlayici,
 }
 
 impl HumaGuiApp {
-    pub fn new(_baslik: String, cizim_fks: Deger, interp: Yorumlayici) -> Self {
-        // GUI fonksiyonlarını tekrar eklememize gerek yok, zaten varlar.
+    pub fn new(cizim_fks: Deger, interp: Yorumlayici) -> Self {
         Self { cizim_fks, interp }
     }
 }
 
 impl eframe::App for HumaGuiApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            let ui_ptr = ui as *mut egui::Ui;
-            CURRENT_UI.with(|c| *c.borrow_mut() = Some(ui_ptr));
-
-            let interp_ptr = &mut self.interp as *mut Yorumlayici;
-            CURRENT_INTERP.with(|i| *i.borrow_mut() = Some(interp_ptr));
-
-            // Hüma çizim fonksiyonunu çağır
-            self.interp
-                .fonksiyon_cagrisi(self.cizim_fks.clone(), vec![]);
-
-            CURRENT_INTERP.with(|i| *i.borrow_mut() = None);
-            CURRENT_UI.with(|c| *c.borrow_mut() = None);
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show(ui, |ui| {
+            let _guard = match UiContextGuard::enter(ui as *mut egui::Ui) {
+                Ok(guard) => guard,
+                Err(error) => {
+                    ui.colored_label(egui::Color32::RED, error);
+                    return;
+                }
+            };
+            if let Deger::Hata(error) = self
+                .interp
+                .fonksiyon_cagrisi(self.cizim_fks.clone(), Vec::new())
+            {
+                ui.colored_label(egui::Color32::RED, error);
+            }
         });
     }
 }
 
-pub fn kayit_et(globals: &mut std::collections::HashMap<String, Deger>) {
+pub fn kayit_et(globals: &mut HashMap<String, Deger>) {
+    if crate::capability::require(crate::capability::Capability::Gui, "GUI yerleşikleri").is_err()
+    {
+        return;
+    }
+
     globals.insert(
         "pencere_başlat".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() < 4 {
-                return Deger::Bos;
+            let [Deger::Metin(title), Deger::Sayi(width), Deger::Sayi(height), draw] =
+                args.as_slice()
+            else {
+                return if args.len() == 4 {
+                    Deger::Hata(
+                        "pencere_başlat: başlık, genişlik, yükseklik ve çizim fonksiyonu gerekir"
+                            .to_string(),
+                    )
+                } else {
+                    Deger::Hata(format!(
+                        "pencere_başlat: tam olarak 4 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            if let Err(error) = checked_text(title, "pencere_başlat") {
+                return Deger::Hata(error);
             }
-            let baslik = args[0].to_string();
-            let genislik = if let Deger::Sayi(n) = args[1] {
-                n as f32
-            } else {
-                800.0
+            let width = match finite_f32(*width, "pencere_başlat genişlik", true) {
+                Ok(value) => value,
+                Err(error) => return Deger::Hata(error),
             };
-            let yukseklik = if let Deger::Sayi(n) = args[2] {
-                n as f32
-            } else {
-                600.0
+            let height = match finite_f32(*height, "pencere_başlat yükseklik", true) {
+                Ok(value) => value,
+                Err(error) => return Deger::Hata(error),
             };
-            let cizim_fks = args[3].clone();
-
-            GUI_REQUEST.with(|r| {
-                *r.borrow_mut() = Some(GuiRequest {
-                    baslik,
-                    genislik,
-                    yukseklik,
-                    cizim_fks,
+            if let Err(error) = callback(draw, "pencere_başlat") {
+                return Deger::Hata(error);
+            }
+            GUI_REQUEST.with(|request| {
+                let mut request = match request.try_borrow_mut() {
+                    Ok(request) => request,
+                    Err(_) => {
+                        return Deger::Hata("pencere_başlat: GUI isteği kullanımda".to_string())
+                    }
+                };
+                if request.is_some() {
+                    return Deger::Hata(
+                        "pencere_başlat: aynı çalıştırmada yalnızca bir pencere başlatılabilir"
+                            .to_string(),
+                    );
+                }
+                *request = Some(GuiRequest {
+                    baslik: title.clone(),
+                    genislik: width,
+                    yukseklik: height,
+                    cizim_fks: draw.clone(),
                 });
-            });
-
-            Deger::Bos
+                Deger::Sayi(1.0)
+            })
         }),
     );
 
     globals.insert(
         "buton".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(metin) = args.first() {
-                let res = CURRENT_UI.with(|c| {
-                    if let Some(ui_ptr) = *c.borrow() {
-                        let ui = unsafe { &mut *ui_ptr };
-
-                        let mut rich = egui::RichText::new(metin.to_string());
-                        let mut w_h: Option<(f32, f32)> = None;
-
-                        // Argüman analiz sistemi:
-                        // buton(metin) -> [0]
-                        // buton(metin, r, g, b) -> [0..4]
-                        // buton(metin, w, h) -> [0..3]
-                        // buton(metin, r, g, b, w, h) -> [0..6]
-
-                        if args.len() == 3 {
-                            // Sadece boyut
-                            if let (Deger::Sayi(w), Deger::Sayi(h)) = (&args[1], &args[2]) {
-                                w_h = Some((*w as f32, *h as f32));
-                            }
-                        } else if args.len() >= 4 {
-                            // Renk var
-                            if let (Deger::Sayi(r), Deger::Sayi(g), Deger::Sayi(b)) =
-                                (&args[1], &args[2], &args[3])
-                            {
-                                rich = rich
-                                    .color(egui::Color32::from_rgb(*r as u8, *g as u8, *b as u8));
-                            }
-                            if args.len() >= 6 {
-                                // Renk + Boyut
-                                if let (Deger::Sayi(w), Deger::Sayi(h)) = (&args[4], &args[5]) {
-                                    w_h = Some((*w as f32, *h as f32));
-                                }
-                            }
-                        }
-
-                        let btn = egui::Button::new(rich);
-                        let response = if let Some((w, h)) = w_h {
-                            ui.add_sized([w, h], btn)
-                        } else {
-                            ui.add(btn)
-                        };
-
-                        if response.clicked() {
-                            return 1.0;
-                        }
-                    }
-                    0.0
-                });
-                return Deger::Sayi(res);
+            let (text, color, size) = match args.as_slice() {
+                [Deger::Metin(text)] => (text, None, None),
+                [Deger::Metin(text), Deger::Sayi(width), Deger::Sayi(height)] => {
+                    let width = match finite_f32(*width, "buton genişlik", true) {
+                        Ok(value) => value,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                    let height = match finite_f32(*height, "buton yükseklik", true) {
+                        Ok(value) => value,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                    (text, None, Some([width, height]))
+                }
+                [Deger::Metin(text), Deger::Sayi(red), Deger::Sayi(green), Deger::Sayi(blue)] => {
+                    let red = match color_component(*red, "buton") {
+                        Ok(value) => value,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                    let green = match color_component(*green, "buton") {
+                        Ok(value) => value,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                    let blue = match color_component(*blue, "buton") {
+                        Ok(value) => value,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                    (text, Some(egui::Color32::from_rgb(red, green, blue)), None)
+                }
+                [Deger::Metin(text), Deger::Sayi(red), Deger::Sayi(green), Deger::Sayi(blue), Deger::Sayi(width), Deger::Sayi(height)] => {
+                    let red = match color_component(*red, "buton") {
+                        Ok(value) => value,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                    let green = match color_component(*green, "buton") {
+                        Ok(value) => value,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                    let blue = match color_component(*blue, "buton") {
+                        Ok(value) => value,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                    let width = match finite_f32(*width, "buton genişlik", true) {
+                        Ok(value) => value,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                    let height = match finite_f32(*height, "buton yükseklik", true) {
+                        Ok(value) => value,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                    (
+                        text,
+                        Some(egui::Color32::from_rgb(red, green, blue)),
+                        Some([width, height]),
+                    )
+                }
+                _ => {
+                    return Deger::Hata(
+                        "buton: desteklenen imzalar (metin), (metin,w,h), (metin,r,g,b) ve (metin,r,g,b,w,h)"
+                            .to_string(),
+                    )
+                }
+            };
+            if let Err(error) = checked_text(text, "buton") {
+                return Deger::Hata(error);
             }
-            Deger::Sayi(0.0)
+            match with_ui("buton", |ui| {
+                let mut rich = egui::RichText::new(text);
+                if let Some(color) = color {
+                    rich = rich.color(color);
+                }
+                let button = egui::Button::new(rich);
+                let response = match size {
+                    Some(size) => ui.add_sized(size, button),
+                    None => ui.add(button),
+                };
+                response.clicked()
+            }) {
+                Ok(clicked) => Deger::Sayi(if clicked { 1.0 } else { 0.0 }),
+                Err(error) => Deger::Hata(error),
+            }
         }),
     );
 
     globals.insert(
         "tema_ayarla".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Metin(tema)) = args.first() {
-                CURRENT_UI.with(|c| {
-                    if let Some(ui_ptr) = *c.borrow() {
-                        let ui = unsafe { &mut *ui_ptr };
-                        if tema == "koyu" {
-                            ui.ctx().set_visuals(egui::Visuals::dark());
-                        } else if tema == "açık" {
-                            ui.ctx().set_visuals(egui::Visuals::light());
-                        }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(theme)] if theme == "koyu" || theme == "açık" => {
+                match with_ui("tema_ayarla", |ui| {
+                    if theme == "koyu" {
+                        ui.ctx().set_visuals(egui::Visuals::dark());
+                    } else {
+                        ui.ctx().set_visuals(egui::Visuals::light());
                     }
-                });
+                }) {
+                    Ok(()) => Deger::Sayi(1.0),
+                    Err(error) => Deger::Hata(error),
+                }
             }
-            Deger::Bos
+            [Deger::Metin(_)] => {
+                Deger::Hata("tema_ayarla: tema 'koyu' veya 'açık' olmalıdır".to_string())
+            }
+            [_] => Deger::Hata("tema_ayarla: tema metin olmalıdır".to_string()),
+            _ => Deger::Hata(format!(
+                "tema_ayarla: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "girdi_alanı".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Metin(mut text)) = args.first().cloned() {
-                CURRENT_UI.with(|c| {
-                    if let Some(ui_ptr) = *c.borrow() {
-                        let ui = unsafe { &mut *ui_ptr };
-                        let edit = egui::TextEdit::singleline(&mut text);
-
-                        if args.len() >= 2 {
-                            if let Deger::Sayi(w) = args[1] {
-                                ui.add_sized([w as f32, 20.0], edit);
-                            } else {
-                                ui.add(edit);
-                            }
-                        } else {
-                            ui.add(edit);
-                        };
-                    }
-                });
-                return Deger::Metin(text);
+            let (mut text, width) = match args.as_slice() {
+                [Deger::Metin(text)] => (text.clone(), None),
+                [Deger::Metin(text), Deger::Sayi(width)] => {
+                    let width = match finite_f32(*width, "girdi_alanı genişlik", true) {
+                        Ok(value) => value,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                    (text.clone(), Some(width))
+                }
+                _ => {
+                    return Deger::Hata(
+                        "girdi_alanı: metin ve isteğe bağlı pozitif genişlik gerekir".to_string(),
+                    )
+                }
+            };
+            if let Err(error) = checked_text(&text, "girdi_alanı") {
+                return Deger::Hata(error);
             }
-            Deger::Bos
+            match with_ui("girdi_alanı", |ui| {
+                let edit = egui::TextEdit::singleline(&mut text);
+                match width {
+                    Some(width) => {
+                        ui.add_sized([width, 20.0], edit);
+                    }
+                    None => {
+                        ui.add(edit);
+                    }
+                }
+            }) {
+                Ok(()) if text.len() <= MAX_TEXT_BYTES => Deger::Metin(text),
+                Ok(()) => Deger::Hata("girdi_alanı: metin sınırı aşıldı".to_string()),
+                Err(error) => Deger::Hata(error),
+            }
         }),
     );
 
     globals.insert(
         "büyük_girdi_alanı".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Metin(mut text)) = args.first().cloned() {
-                CURRENT_UI.with(|c| {
-                    if let Some(ui_ptr) = *c.borrow() {
-                        let ui = unsafe { &mut *ui_ptr };
-                        ui.add(egui::TextEdit::multiline(&mut text));
-                    }
-                });
-                return Deger::Metin(text);
+            let [Deger::Metin(text)] = args.as_slice() else {
+                return Deger::Hata(
+                    "büyük_girdi_alanı: tam olarak 1 metin argümanı gerekir".to_string(),
+                );
+            };
+            if let Err(error) = checked_text(text, "büyük_girdi_alanı") {
+                return Deger::Hata(error);
             }
-            Deger::Bos
+            let mut text = text.clone();
+            match with_ui("büyük_girdi_alanı", |ui| {
+                ui.add(egui::TextEdit::multiline(&mut text));
+            }) {
+                Ok(()) if text.len() <= MAX_TEXT_BYTES => Deger::Metin(text),
+                Ok(()) => Deger::Hata("büyük_girdi_alanı: metin sınırı aşıldı".to_string()),
+                Err(error) => Deger::Hata(error),
+            }
         }),
     );
 
     globals.insert(
         "kaydırıcı".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 3 {
-                if let (Deger::Sayi(mut val), Deger::Sayi(min), Deger::Sayi(max)) =
-                    (&args[0], &args[1], &args[2])
-                {
-                    CURRENT_UI.with(|c| {
-                        if let Some(ui_ptr) = *c.borrow() {
-                            let ui = unsafe { &mut *ui_ptr };
-                            ui.add(egui::Slider::new(&mut val, *min..=*max));
-                        }
-                    });
-                    return Deger::Sayi(val);
-                }
+            let [Deger::Sayi(value), Deger::Sayi(minimum), Deger::Sayi(maximum)] = args.as_slice()
+            else {
+                return Deger::Hata("kaydırıcı: değer, alt sınır ve üst sınır gerekir".to_string());
+            };
+            if !value.is_finite()
+                || !minimum.is_finite()
+                || !maximum.is_finite()
+                || minimum > maximum
+                || value < minimum
+                || value > maximum
+            {
+                return Deger::Hata(
+                    "kaydırıcı: sonlu değer alt ve üst sınır arasında olmalıdır".to_string(),
+                );
             }
-            args.first().cloned().unwrap_or(Deger::Sayi(0.0))
+            let mut value = *value;
+            match with_ui("kaydırıcı", |ui| {
+                ui.add(egui::Slider::new(&mut value, *minimum..=*maximum));
+            }) {
+                Ok(()) => Deger::Sayi(value),
+                Err(error) => Deger::Hata(error),
+            }
         }),
     );
 
     globals.insert(
         "onay_kutusu".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Sayi(durum), Deger::Metin(metin)) = (&args[0], &args[1]) {
-                    let mut is_checked = *durum != 0.0;
-                    CURRENT_UI.with(|c| {
-                        if let Some(ui_ptr) = *c.borrow() {
-                            let ui = unsafe { &mut *ui_ptr };
-                            ui.checkbox(&mut is_checked, metin);
-                        }
-                    });
-                    return Deger::Sayi(if is_checked { 1.0 } else { 0.0 });
-                }
+            let [Deger::Sayi(state), Deger::Metin(text)] = args.as_slice() else {
+                return Deger::Hata("onay_kutusu: 0/1 durum ve metin gerekir".to_string());
+            };
+            let mut checked = match binary_flag(*state, "onay_kutusu") {
+                Ok(value) => value,
+                Err(error) => return Deger::Hata(error),
+            };
+            if let Err(error) = checked_text(text, "onay_kutusu") {
+                return Deger::Hata(error);
             }
-            args.first().cloned().unwrap_or(Deger::Sayi(0.0))
+            match with_ui("onay_kutusu", |ui| {
+                ui.checkbox(&mut checked, text);
+            }) {
+                Ok(()) => Deger::Sayi(if checked { 1.0 } else { 0.0 }),
+                Err(error) => Deger::Hata(error),
+            }
         }),
     );
 
-    globals.insert(
-        "yan_yana".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(fks) = args.first() {
-                CURRENT_UI.with(|c| {
-                    let ui_ptr_opt = *c.borrow();
-                    if let Some(ui_ptr) = ui_ptr_opt {
-                        let outer_ui = unsafe { &mut *ui_ptr };
-                        outer_ui.horizontal(|ui| {
-                            let inner_ui_ptr = ui as *mut egui::Ui;
-                            *c.borrow_mut() = Some(inner_ui_ptr);
-
-                            CURRENT_INTERP.with(|i| {
-                                let interp_ptr_opt = *i.borrow();
-                                if let Some(interp_ptr) = interp_ptr_opt {
-                                    let interp = unsafe { &mut *interp_ptr };
-                                    interp.fonksiyon_cagrisi(fks.clone(), vec![]);
-                                }
-                            });
-                        });
-                        // Restore outer ui
-                        *c.borrow_mut() = Some(ui_ptr);
-                    }
-                });
-            }
-            Deger::Bos
-        }),
-    );
+    register_callback_layout(globals, "yan_yana", callback_layout_horizontal);
+    register_callback_layout(globals, "alt_alta", callback_layout_vertical);
+    register_callback_layout(globals, "menü_çubuğu", callback_layout_menu_bar);
 
     globals.insert(
         "ayraç".to_string(),
-        Deger::DahiliFonksiyon(|_args| {
-            CURRENT_UI.with(|c| {
-                if let Some(ui_ptr) = *c.borrow() {
-                    let ui = unsafe { &mut *ui_ptr };
-                    ui.separator();
-                }
-            });
-            Deger::Bos
+        Deger::DahiliFonksiyon(|args| {
+            if !args.is_empty() {
+                return Deger::Hata(format!(
+                    "ayraç: argüman beklenmiyordu; {} geldi",
+                    args.len()
+                ));
+            }
+            match with_ui("ayraç", |ui| ui.separator()) {
+                Ok(_) => Deger::Bos,
+                Err(error) => Deger::Hata(error),
+            }
         }),
     );
 
     globals.insert(
         "boşluk".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(miktar)) = args.first() {
-                CURRENT_UI.with(|c| {
-                    if let Some(ui_ptr) = *c.borrow() {
-                        let ui = unsafe { &mut *ui_ptr };
-                        ui.add_space(*miktar as f32);
-                    }
-                });
+            let [Deger::Sayi(amount)] = args.as_slice() else {
+                return Deger::Hata("boşluk: tam olarak 1 sayı argümanı gerekir".to_string());
+            };
+            let amount = match finite_f32(*amount, "boşluk", false) {
+                Ok(value) => value,
+                Err(error) => return Deger::Hata(error),
+            };
+            match with_ui("boşluk", |ui| ui.add_space(amount)) {
+                Ok(()) => Deger::Bos,
+                Err(error) => Deger::Hata(error),
             }
-            Deger::Bos
         }),
     );
-
-    // Gelişmiş GUI Bileşenleri (Sürüm 0.2.0)
 
     globals.insert(
         "sekme".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Sayi(secili_mi), Deger::Metin(metin)) = (&args[0], &args[1]) {
-                    let is_selected = *secili_mi != 0.0;
-                    let mut clicked = false;
-                    CURRENT_UI.with(|c| {
-                        if let Some(ui_ptr) = *c.borrow() {
-                            let ui = unsafe { &mut *ui_ptr };
-                            if ui.selectable_label(is_selected, metin).clicked() {
-                                clicked = true;
-                            }
-                        }
-                    });
-                    return Deger::Sayi(if clicked { 1.0 } else { 0.0 });
-                }
+            let [Deger::Sayi(selected), Deger::Metin(text)] = args.as_slice() else {
+                return Deger::Hata("sekme: 0/1 seçim durumu ve metin gerekir".to_string());
+            };
+            let selected = match binary_flag(*selected, "sekme") {
+                Ok(value) => value,
+                Err(error) => return Deger::Hata(error),
+            };
+            match with_ui("sekme", |ui| ui.selectable_label(selected, text).clicked()) {
+                Ok(clicked) => Deger::Sayi(if clicked { 1.0 } else { 0.0 }),
+                Err(error) => Deger::Hata(error),
             }
-            Deger::Sayi(0.0)
         }),
     );
 
     globals.insert(
         "yüzen_pencere".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 3 {
-                if let (Deger::Metin(baslik), Deger::Sayi(acik_mi), fks) =
-                    (&args[0], &args[1], &args[2])
-                {
-                    let mut is_open = *acik_mi != 0.0;
-                    CURRENT_UI.with(|c| {
-                        let ui_ptr_opt = *c.borrow();
-                        if let Some(ui_ptr) = ui_ptr_opt {
-                            let outer_ui = unsafe { &mut *ui_ptr };
-                            let ctx = outer_ui.ctx().clone();
-
-                            egui::Window::new(baslik)
-                                .open(&mut is_open)
-                                .show(&ctx, |ui| {
-                                    let inner_ui_ptr = ui as *mut egui::Ui;
-                                    *c.borrow_mut() = Some(inner_ui_ptr);
-
-                                    CURRENT_INTERP.with(|i| {
-                                        let interp_ptr_opt = *i.borrow();
-                                        if let Some(interp_ptr) = interp_ptr_opt {
-                                            let interp = unsafe { &mut *interp_ptr };
-                                            interp.fonksiyon_cagrisi(fks.clone(), vec![]);
-                                        }
-                                    });
-                                });
-                            // Restore outer
-                            *c.borrow_mut() = Some(ui_ptr);
-                        }
+        Deger::BaglamliDahiliFonksiyon(|runtime, args| {
+            let [Deger::Metin(title), Deger::Sayi(open), draw] = args.as_slice() else {
+                return Deger::Hata(
+                    "yüzen_pencere: başlık, 0/1 açık durumu ve geri çağrı gerekir".to_string(),
+                );
+            };
+            let mut open = match binary_flag(*open, "yüzen_pencere") {
+                Ok(value) => value,
+                Err(error) => return Deger::Hata(error),
+            };
+            if let Err(error) = callback(draw, "yüzen_pencere") {
+                return Deger::Hata(error);
+            }
+            let mut result = Deger::Bos;
+            let shown = with_ui("yüzen_pencere", |ui| {
+                let context = ui.ctx().clone();
+                egui::Window::new(title)
+                    .open(&mut open)
+                    .show(&context, |inner| {
+                        result = nested_call(runtime, draw, inner, "yüzen_pencere");
                     });
-                    return Deger::Sayi(if is_open { 1.0 } else { 0.0 });
-                }
+            });
+            match shown {
+                Err(error) => Deger::Hata(error),
+                Ok(()) if matches!(result, Deger::Hata(_)) => result,
+                Ok(()) => Deger::Sayi(if open { 1.0 } else { 0.0 }),
             }
-            Deger::Sayi(1.0)
         }),
     );
 
-    globals.insert(
-        "menü_çubuğu".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(fks) = args.first() {
-                CURRENT_UI.with(|c| {
-                    let ui_ptr_opt = *c.borrow();
-                    if let Some(ui_ptr) = ui_ptr_opt {
-                        let outer_ui = unsafe { &mut *ui_ptr };
-                        egui::menu::bar(outer_ui, |ui| {
-                            let inner_ui_ptr = ui as *mut egui::Ui;
-                            *c.borrow_mut() = Some(inner_ui_ptr);
-
-                            CURRENT_INTERP.with(|i| {
-                                let interp_ptr_opt = *i.borrow();
-                                if let Some(interp_ptr) = interp_ptr_opt {
-                                    let interp = unsafe { &mut *interp_ptr };
-                                    interp.fonksiyon_cagrisi(fks.clone(), vec![]);
-                                }
-                            });
-                        });
-                        *c.borrow_mut() = Some(ui_ptr);
-                    }
-                });
-            }
-            Deger::Bos
-        }),
-    );
-
-    globals.insert(
-        "açılır_menü".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Metin(baslik), fks) = (&args[0], &args[1]) {
-                    CURRENT_UI.with(|c| {
-                        let ui_ptr_opt = *c.borrow();
-                        if let Some(ui_ptr) = ui_ptr_opt {
-                            let outer_ui = unsafe { &mut *ui_ptr };
-                            outer_ui.menu_button(baslik, |ui| {
-                                let inner_ui_ptr = ui as *mut egui::Ui;
-                                *c.borrow_mut() = Some(inner_ui_ptr);
-
-                                CURRENT_INTERP.with(|i| {
-                                    let interp_ptr_opt = *i.borrow();
-                                    if let Some(interp_ptr) = interp_ptr_opt {
-                                        let interp = unsafe { &mut *interp_ptr };
-                                        interp.fonksiyon_cagrisi(fks.clone(), vec![]);
-                                    }
-                                });
-                            });
-                            *c.borrow_mut() = Some(ui_ptr);
-                        }
-                    });
-                }
-            }
-            Deger::Bos
-        }),
-    );
-
-    globals.insert(
-        "grup_kutusu".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Metin(baslik), fks) = (&args[0], &args[1]) {
-                    CURRENT_UI.with(|c| {
-                        let ui_ptr_opt = *c.borrow();
-                        if let Some(ui_ptr) = ui_ptr_opt {
-                            let outer_ui = unsafe { &mut *ui_ptr };
-                            outer_ui.group(|ui| {
-                                ui.label(baslik.clone());
-                                ui.separator();
-                                let inner_ui_ptr = ui as *mut egui::Ui;
-                                *c.borrow_mut() = Some(inner_ui_ptr);
-
-                                CURRENT_INTERP.with(|i| {
-                                    let interp_ptr_opt = *i.borrow();
-                                    if let Some(interp_ptr) = interp_ptr_opt {
-                                        let interp = unsafe { &mut *interp_ptr };
-                                        interp.fonksiyon_cagrisi(fks.clone(), vec![]);
-                                    }
-                                });
-                            });
-                            *c.borrow_mut() = Some(ui_ptr);
-                        }
-                    });
-                }
-            }
-            Deger::Bos
-        }),
-    );
-
-    globals.insert(
-        "alt_alta".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(fks) = args.first() {
-                CURRENT_UI.with(|c| {
-                    let ui_ptr_opt = *c.borrow();
-                    if let Some(ui_ptr) = ui_ptr_opt {
-                        let outer_ui = unsafe { &mut *ui_ptr };
-                        outer_ui.vertical(|ui| {
-                            let inner_ui_ptr = ui as *mut egui::Ui;
-                            *c.borrow_mut() = Some(inner_ui_ptr);
-
-                            CURRENT_INTERP.with(|i| {
-                                let interp_ptr_opt = *i.borrow();
-                                if let Some(interp_ptr) = interp_ptr_opt {
-                                    let interp = unsafe { &mut *interp_ptr };
-                                    interp.fonksiyon_cagrisi(fks.clone(), vec![]);
-                                }
-                            });
-                        });
-                        *c.borrow_mut() = Some(ui_ptr);
-                    }
-                });
-            }
-            Deger::Bos
-        }),
-    );
-
-    globals.insert(
-        "grid_oluştur".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Metin(id), fks) = (&args[0], &args[1]) {
-                    CURRENT_UI.with(|c| {
-                        let ui_ptr_opt = *c.borrow();
-                        if let Some(ui_ptr) = ui_ptr_opt {
-                            let outer_ui = unsafe { &mut *ui_ptr };
-                            egui::Grid::new(id).striped(true).show(outer_ui, |ui| {
-                                let inner_ui_ptr = ui as *mut egui::Ui;
-                                *c.borrow_mut() = Some(inner_ui_ptr);
-
-                                CURRENT_INTERP.with(|i| {
-                                    let interp_ptr_opt = *i.borrow();
-                                    if let Some(interp_ptr) = interp_ptr_opt {
-                                        let interp = unsafe { &mut *interp_ptr };
-                                        interp.fonksiyon_cagrisi(fks.clone(), vec![]);
-                                    }
-                                });
-                            });
-                            *c.borrow_mut() = Some(ui_ptr);
-                        }
-                    });
-                }
-            }
-            Deger::Bos
-        }),
-    );
+    register_named_callback_layout(globals, "açılır_menü", named_layout_menu);
+    register_named_callback_layout(globals, "grup_kutusu", named_layout_group);
+    register_named_callback_layout(globals, "grid_oluştur", named_layout_grid);
+    register_named_callback_layout(globals, "kaydırılabilir_alan", named_layout_scroll);
 
     globals.insert(
         "satır_bitir".to_string(),
-        Deger::DahiliFonksiyon(|_args| {
-            CURRENT_UI.with(|c| {
-                if let Some(ui_ptr) = *c.borrow() {
-                    let ui = unsafe { &mut *ui_ptr };
-                    ui.end_row();
-                }
-            });
-            Deger::Bos
-        }),
-    );
-
-    globals.insert(
-        "kaydırılabilir_alan".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Metin(id), fks) = (&args[0], &args[1]) {
-                    CURRENT_UI.with(|c| {
-                        let ui_ptr_opt = *c.borrow();
-                        if let Some(ui_ptr) = ui_ptr_opt {
-                            let outer_ui = unsafe { &mut *ui_ptr };
-                            egui::ScrollArea::vertical()
-                                .id_source(id)
-                                .auto_shrink([false, false])
-                                .show(outer_ui, |ui| {
-                                    let inner_ui_ptr = ui as *mut egui::Ui;
-                                    *c.borrow_mut() = Some(inner_ui_ptr);
-
-                                    CURRENT_INTERP.with(|i| {
-                                        let interp_ptr_opt = *i.borrow();
-                                        if let Some(interp_ptr) = interp_ptr_opt {
-                                            let interp = unsafe { &mut *interp_ptr };
-                                            interp.fonksiyon_cagrisi(fks.clone(), vec![]);
-                                        }
-                                    });
-                                });
-                            *c.borrow_mut() = Some(ui_ptr);
-                        }
-                    });
-                }
+            if !args.is_empty() {
+                return Deger::Hata(format!(
+                    "satır_bitir: argüman beklenmiyordu; {} geldi",
+                    args.len()
+                ));
             }
-            Deger::Bos
+            match with_ui("satır_bitir", |ui| ui.end_row()) {
+                Ok(()) => Deger::Bos,
+                Err(error) => Deger::Hata(error),
+            }
         }),
     );
 
     globals.insert(
         "alan_ayır".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 3 {
-                if let (Deger::Sayi(w), Deger::Sayi(h), fks) = (&args[0], &args[1], &args[2]) {
-                    CURRENT_UI.with(|c| {
-                        let ui_ptr_opt = *c.borrow();
-                        if let Some(ui_ptr) = ui_ptr_opt {
-                            let outer_ui = unsafe { &mut *ui_ptr };
-                            outer_ui.allocate_ui(egui::Vec2::new(*w as f32, *h as f32), |ui| {
-                                let inner_ui_ptr = ui as *mut egui::Ui;
-                                *c.borrow_mut() = Some(inner_ui_ptr);
-
-                                CURRENT_INTERP.with(|i| {
-                                    let interp_ptr_opt = *i.borrow();
-                                    if let Some(interp_ptr) = interp_ptr_opt {
-                                        let interp = unsafe { &mut *interp_ptr };
-                                        interp.fonksiyon_cagrisi(fks.clone(), vec![]);
-                                    }
-                                });
-                            });
-                            *c.borrow_mut() = Some(ui_ptr);
-                        }
-                    });
-                }
+        Deger::BaglamliDahiliFonksiyon(|runtime, args| {
+            let [Deger::Sayi(width), Deger::Sayi(height), draw] = args.as_slice() else {
+                return Deger::Hata(
+                    "alan_ayır: genişlik, yükseklik ve geri çağrı gerekir".to_string(),
+                );
+            };
+            let width = match finite_f32(*width, "alan_ayır genişlik", true) {
+                Ok(value) => value,
+                Err(error) => return Deger::Hata(error),
+            };
+            let height = match finite_f32(*height, "alan_ayır yükseklik", true) {
+                Ok(value) => value,
+                Err(error) => return Deger::Hata(error),
+            };
+            if let Err(error) = callback(draw, "alan_ayır") {
+                return Deger::Hata(error);
             }
-            Deger::Bos
+            let mut result = Deger::Bos;
+            match with_ui("alan_ayır", |ui| {
+                ui.allocate_ui(egui::Vec2::new(width, height), |inner| {
+                    result = nested_call(runtime, draw, inner, "alan_ayır");
+                });
+            }) {
+                Err(error) => Deger::Hata(error),
+                Ok(()) => result,
+            }
         }),
     );
 
     globals.insert(
         "boyutlu_buton".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 3 {
-                if let (Deger::Metin(metin), Deger::Sayi(w), Deger::Sayi(h)) =
-                    (&args[0], &args[1], &args[2])
-                {
-                    let mut clicked = false;
-                    CURRENT_UI.with(|c| {
-                        if let Some(ui_ptr) = *c.borrow() {
-                            let ui = unsafe { &mut *ui_ptr };
-                            if ui
-                                .add_sized([*w as f32, *h as f32], egui::Button::new(metin))
-                                .clicked()
-                            {
-                                clicked = true;
-                            }
-                        }
-                    });
-                    return Deger::Sayi(if clicked { 1.0 } else { 0.0 });
-                }
-            }
-            Deger::Sayi(0.0)
+            let [Deger::Metin(text), Deger::Sayi(width), Deger::Sayi(height)] = args.as_slice()
+            else {
+                return Deger::Hata(
+                    "boyutlu_buton: metin, genişlik ve yükseklik gerekir".to_string(),
+                );
+            };
+            sized_button(text, *width, *height, None, "boyutlu_buton")
         }),
     );
 
     globals.insert(
         "boyutlu_renkli_buton".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 6 {
-                if let (
-                    Deger::Metin(metin),
-                    Deger::Sayi(w),
-                    Deger::Sayi(h),
-                    Deger::Sayi(r),
-                    Deger::Sayi(g),
-                    Deger::Sayi(b),
-                ) = (&args[0], &args[1], &args[2], &args[3], &args[4], &args[5])
-                {
-                    let mut clicked = false;
-                    CURRENT_UI.with(|c| {
-                        if let Some(ui_ptr) = *c.borrow() {
-                            let ui = unsafe { &mut *ui_ptr };
-                            let btn = egui::Button::new(
-                                egui::RichText::new(metin.clone())
-                                    .color(egui::Color32::from_rgb(*r as u8, *g as u8, *b as u8)),
-                            );
-                            if ui.add_sized([*w as f32, *h as f32], btn).clicked() {
-                                clicked = true;
-                            }
-                        }
-                    });
-                    return Deger::Sayi(if clicked { 1.0 } else { 0.0 });
-                }
-            }
-            Deger::Sayi(0.0)
+            let [Deger::Metin(text), Deger::Sayi(width), Deger::Sayi(height), Deger::Sayi(red), Deger::Sayi(green), Deger::Sayi(blue)] =
+                args.as_slice()
+            else {
+                return Deger::Hata(
+                    "boyutlu_renkli_buton: metin, genişlik, yükseklik ve RGB gerekir".to_string(),
+                );
+            };
+            let red = match color_component(*red, "boyutlu_renkli_buton") {
+                Ok(value) => value,
+                Err(error) => return Deger::Hata(error),
+            };
+            let green = match color_component(*green, "boyutlu_renkli_buton") {
+                Ok(value) => value,
+                Err(error) => return Deger::Hata(error),
+            };
+            let blue = match color_component(*blue, "boyutlu_renkli_buton") {
+                Ok(value) => value,
+                Err(error) => return Deger::Hata(error),
+            };
+            sized_button(
+                text,
+                *width,
+                *height,
+                Some(egui::Color32::from_rgb(red, green, blue)),
+                "boyutlu_renkli_buton",
+            )
         }),
     );
 
     globals.insert(
         "etiket".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(metin) = args.first() {
-                CURRENT_UI.with(|c| {
-                    if let Some(ui_ptr) = *c.borrow() {
-                        let ui = unsafe { &mut *ui_ptr };
-
-                        let mut rich = egui::RichText::new(metin.to_string());
-                        let mut is_heading = false;
-
-                        // etiket(metin)
-                        // etiket(metin, r, g, b)
-                        // etiket(metin, stil_str) -> "kalın", "eğik", "başlık"
-
-                        if args.len() >= 2 {
-                            if let Deger::Metin(stil) = &args[1] {
-                                match stil.as_str() {
-                                    "kalın" => rich = rich.strong(),
-                                    "eğik" => rich = rich.italics(),
-                                    "başlık" => is_heading = true,
-                                    _ => {}
-                                }
-                            } else if args.len() >= 4 {
-                                // Renk
-                                if let (Deger::Sayi(r), Deger::Sayi(g), Deger::Sayi(b)) =
-                                    (&args[1], &args[2], &args[3])
-                                {
-                                    rich = rich.color(egui::Color32::from_rgb(
-                                        *r as u8, *g as u8, *b as u8,
-                                    ));
-                                }
-                            }
-                        }
-
-                        if is_heading {
-                            ui.heading(rich);
-                        } else {
-                            ui.label(rich);
-                        }
-                    }
-                });
+            let (text, style, color) = match args.as_slice() {
+                [Deger::Metin(text)] => (text, None, None),
+                [Deger::Metin(text), Deger::Metin(style)]
+                    if matches!(style.as_str(), "kalın" | "eğik" | "başlık") =>
+                {
+                    (text, Some(style.as_str()), None)
+                }
+                [Deger::Metin(_), Deger::Metin(_)] => {
+                    return Deger::Hata(
+                        "etiket: stil 'kalın', 'eğik' veya 'başlık' olmalıdır".to_string(),
+                    )
+                }
+                [Deger::Metin(text), Deger::Sayi(red), Deger::Sayi(green), Deger::Sayi(blue)] => {
+                    let red = match color_component(*red, "etiket") {
+                        Ok(value) => value,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                    let green = match color_component(*green, "etiket") {
+                        Ok(value) => value,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                    let blue = match color_component(*blue, "etiket") {
+                        Ok(value) => value,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                    (text, None, Some(egui::Color32::from_rgb(red, green, blue)))
+                }
+                _ => {
+                    return Deger::Hata(
+                        "etiket: desteklenen imzalar (metin), (metin,stil) ve (metin,r,g,b)"
+                            .to_string(),
+                    )
+                }
+            };
+            if let Err(error) = checked_text(text, "etiket") {
+                return Deger::Hata(error);
             }
-            Deger::Bos
+            match with_ui("etiket", |ui| {
+                let mut rich = egui::RichText::new(text);
+                if let Some(color) = color {
+                    rich = rich.color(color);
+                }
+                match style {
+                    Some("kalın") => {
+                        ui.label(rich.strong());
+                    }
+                    Some("eğik") => {
+                        ui.label(rich.italics());
+                    }
+                    Some("başlık") => {
+                        ui.heading(rich);
+                    }
+                    _ => {
+                        ui.label(rich);
+                    }
+                }
+            }) {
+                Ok(()) => Deger::Bos,
+                Err(error) => Deger::Hata(error),
+            }
         }),
     );
 }
 
-pub fn gui_istegi_var_mi() -> bool {
-    GUI_REQUEST.with(|r| r.borrow().is_some())
+fn register_callback_layout(
+    globals: &mut HashMap<String, Deger>,
+    name: &'static str,
+    function: fn(&mut dyn BuiltinRuntime, Vec<Deger>) -> Deger,
+) {
+    globals.insert(name.to_string(), Deger::BaglamliDahiliFonksiyon(function));
 }
 
-pub fn gui_calistir(interp: Yorumlayici) {
-    let req = GUI_REQUEST.with(|r| r.borrow_mut().take());
-
-    if let Some(req) = req {
-        let options = eframe::NativeOptions {
-            viewport: egui::ViewportBuilder::default()
-                .with_inner_size([req.genislik, req.yukseklik]),
-            ..Default::default()
-        };
-        let baslik_copy = req.baslik.clone();
-        let _ = eframe::run_native(
-            &baslik_copy,
-            options,
-            Box::new(|_cc| Box::new(HumaGuiApp::new(req.baslik, req.cizim_fks, interp))),
-        );
+fn execute_callback_layout(
+    runtime: &mut dyn BuiltinRuntime,
+    args: Vec<Deger>,
+    name: &str,
+    layout: impl FnOnce(&mut egui::Ui, &mut dyn FnMut(&mut egui::Ui)),
+) -> Deger {
+    let [draw] = args.as_slice() else {
+        return Deger::Hata(format!("{name}: tam olarak 1 geri çağrı gerekir"));
+    };
+    if let Err(error) = callback(draw, name) {
+        return Deger::Hata(error);
     }
+    let mut result = Deger::Bos;
+    match with_ui(name, |ui| {
+        let mut invoke = |inner: &mut egui::Ui| {
+            result = nested_call(runtime, draw, inner, name);
+        };
+        layout(ui, &mut invoke);
+    }) {
+        Err(error) => Deger::Hata(error),
+        Ok(()) => result,
+    }
+}
+
+fn callback_layout_horizontal(runtime: &mut dyn BuiltinRuntime, args: Vec<Deger>) -> Deger {
+    execute_callback_layout(runtime, args, "yan_yana", |ui, draw| {
+        ui.horizontal(draw);
+    })
+}
+
+fn callback_layout_vertical(runtime: &mut dyn BuiltinRuntime, args: Vec<Deger>) -> Deger {
+    execute_callback_layout(runtime, args, "alt_alta", |ui, draw| {
+        ui.vertical(draw);
+    })
+}
+
+fn callback_layout_menu_bar(runtime: &mut dyn BuiltinRuntime, args: Vec<Deger>) -> Deger {
+    execute_callback_layout(runtime, args, "menü_çubuğu", |ui, draw| {
+        egui::MenuBar::new().ui(ui, draw);
+    })
+}
+
+fn register_named_callback_layout(
+    globals: &mut HashMap<String, Deger>,
+    name: &'static str,
+    function: fn(&mut dyn BuiltinRuntime, Vec<Deger>) -> Deger,
+) {
+    globals.insert(name.to_string(), Deger::BaglamliDahiliFonksiyon(function));
+}
+
+fn execute_named_layout(
+    runtime: &mut dyn BuiltinRuntime,
+    args: Vec<Deger>,
+    name: &str,
+    layout: impl FnOnce(&mut egui::Ui, &str, &mut dyn FnMut(&mut egui::Ui)),
+) -> Deger {
+    let [Deger::Metin(identifier), draw] = args.as_slice() else {
+        return Deger::Hata(format!("{name}: metin adı ve geri çağrı gerekir"));
+    };
+    if let Err(error) = checked_text(identifier, name) {
+        return Deger::Hata(error);
+    }
+    if let Err(error) = callback(draw, name) {
+        return Deger::Hata(error);
+    }
+    let mut result = Deger::Bos;
+    match with_ui(name, |ui| {
+        let mut invoke = |inner: &mut egui::Ui| {
+            result = nested_call(runtime, draw, inner, name);
+        };
+        layout(ui, identifier, &mut invoke);
+    }) {
+        Err(error) => Deger::Hata(error),
+        Ok(()) => result,
+    }
+}
+
+fn named_layout_menu(runtime: &mut dyn BuiltinRuntime, args: Vec<Deger>) -> Deger {
+    execute_named_layout(runtime, args, "açılır_menü", |ui, name, draw| {
+        ui.menu_button(name, draw);
+    })
+}
+
+fn named_layout_group(runtime: &mut dyn BuiltinRuntime, args: Vec<Deger>) -> Deger {
+    execute_named_layout(runtime, args, "grup_kutusu", |ui, name, draw| {
+        ui.group(|inner| {
+            inner.label(name);
+            inner.separator();
+            draw(inner);
+        });
+    })
+}
+
+fn named_layout_grid(runtime: &mut dyn BuiltinRuntime, args: Vec<Deger>) -> Deger {
+    execute_named_layout(runtime, args, "grid_oluştur", |ui, name, draw| {
+        egui::Grid::new(name).striped(true).show(ui, draw);
+    })
+}
+
+fn named_layout_scroll(runtime: &mut dyn BuiltinRuntime, args: Vec<Deger>) -> Deger {
+    execute_named_layout(runtime, args, "kaydırılabilir_alan", |ui, name, draw| {
+        egui::ScrollArea::vertical()
+            .id_salt(name)
+            .auto_shrink([false, false])
+            .show(ui, draw);
+    })
+}
+
+fn sized_button(
+    text: &str,
+    width: f64,
+    height: f64,
+    color: Option<egui::Color32>,
+    operation: &str,
+) -> Deger {
+    if let Err(error) = checked_text(text, operation) {
+        return Deger::Hata(error);
+    }
+    let width = match finite_f32(width, &format!("{operation} genişlik"), true) {
+        Ok(value) => value,
+        Err(error) => return Deger::Hata(error),
+    };
+    let height = match finite_f32(height, &format!("{operation} yükseklik"), true) {
+        Ok(value) => value,
+        Err(error) => return Deger::Hata(error),
+    };
+    match with_ui(operation, |ui| {
+        let mut rich = egui::RichText::new(text);
+        if let Some(color) = color {
+            rich = rich.color(color);
+        }
+        ui.add_sized([width, height], egui::Button::new(rich))
+            .clicked()
+    }) {
+        Ok(clicked) => Deger::Sayi(if clicked { 1.0 } else { 0.0 }),
+        Err(error) => Deger::Hata(error),
+    }
+}
+
+pub fn gui_istegi_var_mi() -> Result<bool, String> {
+    GUI_REQUEST.with(|request| {
+        request
+            .try_borrow()
+            .map(|request| request.is_some())
+            .map_err(|_| "GUI isteği durumu kullanımda".to_string())
+    })
+}
+
+pub fn gui_calistir(interp: Yorumlayici) -> Result<(), String> {
+    let request = GUI_REQUEST.with(|request| {
+        request
+            .try_borrow_mut()
+            .map_err(|_| "GUI isteği kullanımda".to_string())
+            .map(|mut request| request.take())
+    })?;
+    let request = request.ok_or_else(|| "Başlatılacak GUI isteği yok".to_string())?;
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size([request.genislik, request.yukseklik]),
+        ..Default::default()
+    };
+    let title = request.baslik;
+    let draw = request.cizim_fks;
+    eframe::run_native(
+        &title.clone(),
+        options,
+        Box::new(|_creation_context| Ok(Box::new(HumaGuiApp::new(draw, interp)))),
+    )
+    .map_err(|error| format!("GUI çalıştırılamadı: {error}"))
 }

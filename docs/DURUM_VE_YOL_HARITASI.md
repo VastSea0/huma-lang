@@ -1,62 +1,90 @@
 # Hüma Durum ve Yol Haritası
 
-## 0.6.0 kabul sınırı
+## 0.6.0 doğrulanmış çekirdek sınırı
 
-Tamamlanan ve otomatik testle korunan işler:
+Otomatik test ve kod kabul kapılarıyla korunan zemin:
 
-- Yorumlayıcıda yapısal sözdizimi/çalışma zamanı hataları
-- Özyineleme ve yerel kapsam doğruluğu
-- Liste/sözlük erişimi ve atama sınır kontrolleri
-- Kısa devreli mantık, `devam`, `kır`, `dene/yakala`
-- Bytecode alt kümesinde kontrollü derleme ve yorumlayıcıyla Fibonacci eşliği
-- Sürümlü, boyut sınırlı ve bütünlük özeti doğrulanan `.hbc` kapsayıcısı
-- AOT’de desteklenmeyen sözdiziminin açıkça reddedilmesi
-- İzlenen Hüma kaynaklarının tamamı için ayrıştırma testi
-- Hüma ve Rust test süitleri, biçim ve sıfır-uyarı Clippy kapısı
-- CPU üzerinde gerçek yoğun katman eğitimi, geri yayılım ve Adam güncellemesi
+- Kaynak konumlu lexer, ayrıştırıcı tanıları, çalışma zamanı stack trace’leri
+  ve yakalanabilir yapısal hatalar
+- NFC tanımlayıcılar, katı metin kaçışları, tanımlı Türkçe ek kümesi; yazımdan
+  çıkarılabilen köklerde ünlü uyumu, kaynaştırma ve ünsüz benzeşmesi
+- Paylaşılan normatif doğruluk, sonlu `f64`, aritmetik, karşılaştırma, eşitlik
+  ve döngü güvenli koleksiyon semantiği
+- Tam fonksiyon argüman sayısı, sözcüksel closure, özyineleme sınırı ve
+  yorumlayıcı/VM hata eşliği
+- AST’ye geri dönmeyen bytecode fonksiyonları, bağımsız VM frame/closure
+  yığınları ve kontrol akışı/yığın doğrulaması
+- Sürümlü, boyut sınırlı, SHA-256 bütünlük denetimli `.hbc` v4 kapsayıcısı
+- Kanonik modül kimliği, döngü algılama, başarısız yüklemede geri alma, açık
+  dışa aktarımlar ve takma adlı canlı modül ad alanları
+- Varsayılan kapalı dosya, ağ, süreç, FFI, veritabanı ve GUI yetenekleri
+- Kaynak, çıktı, koleksiyon, dosya, ağ, süreç, SQL, tensor/matris ve benzeri
+  işlemlerde deterministik boyut/süre/iş sınırları
+- Yerleşik API’lerde katı argüman, boyut, sonluluk ve UTF-8 sözleşmeleri
+- Çevrim güvenli otomatik türev grafiği; hatada kısmi gradyan yazmayan ve
+  yinelenen geri yayılımda eski ara gradyan biriktirmeyen işlemsel güncelleme
+- Tam bağımlılık grafiğini önceden çözen, SemVer/kilit/özet doğrulayan ve
+  kurulum-kaldırmada geri alınabilir paket işlemleri
+- Kaynak/bytecode/AOT çıktılarında aynı dizinde hazırlama, `sync` ve atomik
+  etkinleştirme; başarısızlıkta eski çıktıyı geri yükleme
+- İzlenen Hüma kaynak havuzu, yorumlayıcı/VM diferansiyel regresyonları,
+  deterministik rastgele ayrıştırıcı dayanıklılık testi ve libFuzzer hedefi
+- RustSec ve npm bağımlılık denetimleri; Node 22 web lint/üretim derlemesi ve
+  Linux, macOS, Windows derleme matrisi
 
-## Bilinen sınırlar
+“Doğrulanmış”, kapsanan davranışın testle tekrar üretilebildiği ve hatanın
+makul görünen sahte sonuca çevrilmediği anlamındadır. “Bütün programlar
+hatasızdır” veya “işletim sistemi sandbox’ı vardır” anlamına gelmez.
 
-- VM fonksiyon gövdeleri, kapsam doğruluğu için halen yorumlayıcı semantiğinden yararlanır; bağımsız bir frame/closure VM’si değildir.
-- AOT yalnızca sayısal alt kümeyi kapsar ve bütün Hüma değer modelini taşımaz.
-- Statik tip denetleyici ve modül arayüz sistemi yoktur.
-- Doğal Türkçe biçimbilim/ünlü uyumu otomatik doğrulanmaz.
-- AI çalışma zamanı CPU/f64 odaklıdır; GPU, karma hassasiyet, aygıt grafiği ve dağıtık eğitim yoktur.
-- Güvenilmeyen Hüma kodunu işletim sistemi düzeyinde yalıtan sandbox yoktur. Dosya, ağ, FFI ve sistem işlevleri yetkili süreç haklarıyla çalışır.
-- İmzalı ikili yayın kanalı olmadığı için güvenli olmayan CLI kendini güncelleme yolu kaldırılmıştır; kurulum kaynaktan derlenir.
-- Uzak paket kaydı imzalı ve çok dosyalı bir aktarım biçimine sahip değildir; 0.6.0 paket yöneticisi yalnızca kaynak ağacındaki yerel paketleri kurar.
-- Performans karşılaştırması yayımlanmadığından Python, JavaScript, Rust veya başka bir dille hız eşitliği iddia edilmez.
+## Bilinen ve açıkça sınırlandırılmış alanlar
 
-## Sonraki aşamalar
+- Cranelift AOT yalnız sürümlenmemiş deneysel sayısal alt kümeyi kapsar; tam
+  Hüma değer modeli değildir.
+- Dil dinamiktir. Statik tip denetleyici, etkiler sistemi ve derleme zamanlı
+  modül arayüzleri henüz yoktur.
+- Yetenek modeli en az ayrıcalığı sağlar ancak işletim sistemi yalıtımı değildir.
+  İzin verilen süreç/FFI işlemi ev sahibi süreç haklarıyla çalışır; yanlış FFI
+  ABI’si süreci çökertebilir.
+- Uzak paket kaydı, yayıncı imzası ve şeffaf provenans günlüğü yoktur. Güvenli
+  protokol tanımlanana kadar uzak ve native paket kurulumu kapalıdır.
+- Yazımdan telaffuzu çıkarılamayan kısaltma/sayılı adlarda tam Türkçe ek uyumu
+  sözlük olmadan kanıtlanamaz; bu durum dil tanımında normatif istisnadır.
+- LSP ayrıştırma, tanı, tamamlama, hover ve tanıma gitme düzeyindedir; güvenli
+  yeniden adlandırma ve bütün referansları bulma henüz yoktur.
+- Bytecode opcode’ları, paket şeması ve yerleşik kamu API’si 1.0 öncesinde
+  geriye uyumluluk garantisi taşımaz; uyumsuz dosya biçimleri sürümle reddedilir.
+- Ölçülmüş performans sonucu olmayan başka dillerle hız eşitliği veya üstünlüğü
+  iddia edilmez.
 
-### 0.7 — Dil sözleşmesi
+## Sonraki mühendislik aşamaları
 
-- Ayrı tanım/atama semantiği ve açık modül dışa aktarımları
-- Kaynak konumunu koruyan AST ve bütün çalışma zamanı hatalarında stack trace
-- Özellik tabanlı/fuzz lexer-parser testleri
-- İmzalı, commit/sürüm sabitlemeli ve çok dosyalı paket kayıt protokolü
-- Türkçe yüzey biçimleri için isteğe bağlı ünlü uyumu linter’ı
-- LSP’de sembol tablosu tabanlı yeniden adlandırma ve referans bulma
+### 0.7 — Derleme zamanı sözleşmeleri
 
-### 0.8 — Yürütme arka uçları
+- İsteğe bağlı statik tip/etki denetimi ve sürümlü modül arayüz dosyası
+- LSP referans bulma, kapsam güvenli yeniden adlandırma ve kod eylemleri
+- Kamu yerleşik API kataloğunun makinece okunabilir imza/etki şeması
+- Linux, macOS ve Windows için açık destek tablosu ve AOT C araç zinciri seçimi
 
-- Gerçek VM çağrı frame’leri, closure ve modül kapsamları
-- Yorumlayıcı/VM diferansiyel test havuzu
-- AOT değer gösterimi, metin/liste/sözlük ve hata ABI’si
-- Tekrarlanabilir benchmark paketi ve bellek profilleri
+### 0.8 — Ölçülebilir yürütme
 
-### 0.9 — AI çalışma zamanı
+- Tam dil için sürekli yorumlayıcı/VM diferansiyel üretim testi
+- Uzun süreli fuzz, hata enjeksiyonu ve bellek profili iş akışları
+- Tekrarlanabilir benchmark veri kümesi; süre, tepe bellek ve çıktı boyutu raporu
+- Tam değer modeli, hata ABI’si ve çöp toplama stratejisi tanımlanmış AOT arka ucu
 
-- Tensor şekil/tip doğrulaması
-- Toplu geri yayılım ve veri yükleyici API’si
-- Kalıcı model dosyası, özel token politikası ve üretim ön-işleme kuralları olan tokenizer
-- Aygıt soyutlaması; yalnızca doğrulanmış bir backend bulunduğunda GPU desteği
-- Model biçimi sürümleme ve yükleme sırasında şema doğrulaması
+### 0.9 — Dağıtım ve ekosistem
 
-### 1.0 ölçütü
+- İmzalı kayıt indeksi, içerik adresli paket arşivi ve yayıncı anahtar politikası
+- Yeniden üretilebilir paket derlemesi ve SBOM/provenans doğrulaması
+- Native eklentiler için süreç dışı yalıtım veya sürümlü, dar ve doğrulanabilir ABI
 
-1. Dil tanımındaki bütün yapılar yorumlayıcı ve VM’de eş sonuç üretmeli.
-2. Desteklenen AOT kapsamı ayrı ve sürümlenmiş bir sözleşmeye sahip olmalı.
-3. Fuzz, diferansiyel, güvenlik ve uzun süreli testler CI’da çalışmalı.
-4. Kamu API’si ve paket biçimi geriye uyumluluk politikasıyla sabitlenmeli.
-5. Ölçülebilir performans ve bellek raporu yayımlanmalı.
+### 1.0 kabul ölçütü
+
+1. Normatif dil tanımındaki desteklenen yapılar yorumlayıcı ve VM’de eş sonuç
+   veya eş yapılandırılmış hata üretmeli.
+2. Her arka uç ve platformun destek kapsamı sürümlü, otomatik testli sözleşme
+   olmalı.
+3. Fuzz, diferansiyel, güvenlik, hata enjeksiyonu ve uzun süreli testler CI’da
+   düzenli çalışmalı.
+4. Kamu API’si, bytecode ve paket biçimi geriye uyumluluk politikasıyla sabitlenmeli.
+5. Sürümle birlikte yeniden üretilebilir performans ve tepe bellek raporu yayımlanmalı.

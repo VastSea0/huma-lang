@@ -5,6 +5,7 @@ description = "Unified CLI entry point for the Hüma programming language — bu
 authors = ["VastSea0 <vastseaoffical0@outlook.com>"]
 license = "MIT"
 edition = "2021"
+rust-version = "1.92"
 default-run = "huma"
 
 [[bin]]
@@ -28,3 +29,6 @@ semver = "1.0"
 chrono = "0.4"
 sha2 = "0.10"
 hex = "0.4"
+unicode-normalization = "0.1"
+wait-timeout = "0.2"
+shell-words = "1.1"

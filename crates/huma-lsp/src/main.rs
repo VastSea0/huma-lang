@@ -4,11 +4,15 @@ use huma_core::parser::Parser;
 use huma_core::HumaError;
 use regex::Regex;
 use std::collections::HashMap;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use tower_lsp::jsonrpc::Result as LspResult;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 use walkdir::WalkDir;
+
+const MAX_DOCUMENT_BYTES: usize = 64 * 1024 * 1024;
+const MAX_WORKSPACE_FILES: usize = 10_000;
 
 #[derive(Debug, Default)]
 struct Document {
@@ -25,12 +29,87 @@ struct Backend {
 impl Backend {
     fn scan_hb_files(root: &Path) -> Vec<PathBuf> {
         WalkDir::new(root)
+            .max_depth(32)
+            .follow_links(false)
             .into_iter()
+            .filter_entry(|entry| {
+                !matches!(
+                    entry.file_name().to_str(),
+                    Some(".git" | "target" | "huma_modulleri")
+                )
+            })
             .filter_map(|e| e.ok())
             .filter(|e| e.file_type().is_file())
             .map(|e| e.into_path())
             .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("hb"))
+            .take(MAX_WORKSPACE_FILES)
             .collect()
+    }
+
+    fn read_workspace_source(path: &Path) -> Option<String> {
+        let file = std::fs::File::open(path).ok()?;
+        if file
+            .metadata()
+            .ok()
+            .is_some_and(|metadata| metadata.len() > MAX_DOCUMENT_BYTES as u64)
+        {
+            return None;
+        }
+        let mut bytes = Vec::new();
+        file.take((MAX_DOCUMENT_BYTES as u64) + 1)
+            .read_to_end(&mut bytes)
+            .ok()?;
+        if bytes.len() > MAX_DOCUMENT_BYTES {
+            return None;
+        }
+        String::from_utf8(bytes).ok()
+    }
+
+    fn document_limit_diagnostic() -> Diagnostic {
+        Diagnostic {
+            range: Range {
+                start: Position::new(0, 0),
+                end: Position::new(0, 1),
+            },
+            severity: Some(DiagnosticSeverity::ERROR),
+            code: None,
+            code_description: None,
+            source: Some("huma".to_string()),
+            message: format!(
+                "Belge {} baytlık dil sunucusu sınırını aşıyor",
+                MAX_DOCUMENT_BYTES
+            ),
+            related_information: None,
+            tags: None,
+            data: None,
+        }
+    }
+
+    fn source_position_to_lsp(text: &str, line: usize, column: usize) -> Position {
+        let line_index = line.saturating_sub(1);
+        let character_index = column.saturating_sub(1);
+        let utf16_column = text
+            .lines()
+            .nth(line_index)
+            .map(|source_line| {
+                source_line
+                    .chars()
+                    .take(character_index)
+                    .map(char::len_utf16)
+                    .sum::<usize>()
+            })
+            .unwrap_or(0);
+        Position::new(
+            u32::try_from(line_index).unwrap_or(u32::MAX),
+            u32::try_from(utf16_column).unwrap_or(u32::MAX),
+        )
+    }
+
+    fn line_end_position(line_index: usize, line: &str) -> Position {
+        Position::new(
+            u32::try_from(line_index).unwrap_or(u32::MAX),
+            u32::try_from(line.encode_utf16().count()).unwrap_or(u32::MAX),
+        )
     }
 
     fn word_at_position(text: &str, pos: Position) -> Option<String> {
@@ -76,6 +155,9 @@ impl Backend {
     }
 
     fn diagnostics_for(text: &str) -> Vec<Diagnostic> {
+        if text.len() > MAX_DOCUMENT_BYTES {
+            return vec![Self::document_limit_diagnostic()];
+        }
         let lexer = Lexer::new(text);
         let mut parser = Parser::new(lexer);
         let (_program, errors) = parser.parse_program_with_diagnostics();
@@ -84,18 +166,11 @@ impl Backend {
             .into_iter()
             .filter_map(|e| match e {
                 HumaError::SyntaxError { line, col, message } => {
-                    let l = line.saturating_sub(1) as u32;
-                    let c = col.saturating_sub(1) as u32;
+                    let start = Self::source_position_to_lsp(text, line, col);
                     Some(Diagnostic {
                         range: Range {
-                            start: Position {
-                                line: l,
-                                character: c,
-                            },
-                            end: Position {
-                                line: l,
-                                character: c + 1,
-                            },
+                            start,
+                            end: Position::new(start.line, start.character.saturating_add(1)),
                         },
                         severity: Some(DiagnosticSeverity::ERROR),
                         code: None,
@@ -216,6 +291,13 @@ impl LanguageServer for Backend {
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         let uri = params.text_document.uri.clone();
         let text = params.text_document.text;
+        if text.len() > MAX_DOCUMENT_BYTES {
+            self.docs.lock().await.remove(&uri);
+            self.client
+                .publish_diagnostics(uri, vec![Self::document_limit_diagnostic()], None)
+                .await;
+            return;
+        }
         self.docs
             .lock()
             .await
@@ -229,6 +311,13 @@ impl LanguageServer for Backend {
         let uri = params.text_document.uri.clone();
         if let Some(change) = params.content_changes.into_iter().last() {
             let text = change.text;
+            if text.len() > MAX_DOCUMENT_BYTES {
+                self.docs.lock().await.remove(&uri);
+                self.client
+                    .publish_diagnostics(uri, vec![Self::document_limit_diagnostic()], None)
+                    .await;
+                return;
+            }
             self.docs
                 .lock()
                 .await
@@ -273,7 +362,7 @@ impl LanguageServer for Backend {
             .ok();
             if let Some(def_re) = def_re {
                 for p in files {
-                    if let Ok(text) = std::fs::read_to_string(&p) {
+                    if let Some(text) = Self::read_workspace_source(&p) {
                         if let Some(cap) = def_re.captures_iter(&text).next() {
                             let params_str = cap
                                 .get(1)
@@ -335,10 +424,7 @@ impl LanguageServer for Backend {
                                     line: idx as u32,
                                     character: 0,
                                 },
-                                end: Position {
-                                    line: idx as u32,
-                                    character: line.len() as u32,
-                                },
+                                end: Self::line_end_position(idx, line),
                             },
                         };
                         return Ok(Some(GotoDefinitionResponse::Scalar(loc)));
@@ -361,7 +447,7 @@ impl LanguageServer for Backend {
         .ok();
         if let Some(def_re) = def_re {
             for p in files {
-                if let Ok(text) = std::fs::read_to_string(&p) {
+                if let Some(text) = Self::read_workspace_source(&p) {
                     for (idx, line) in text.lines().enumerate() {
                         if def_re.is_match(line) {
                             if let Ok(u) = Url::from_file_path(&p) {
@@ -372,10 +458,7 @@ impl LanguageServer for Backend {
                                             line: idx as u32,
                                             character: 0,
                                         },
-                                        end: Position {
-                                            line: idx as u32,
-                                            character: line.len() as u32,
-                                        },
+                                        end: Self::line_end_position(idx, line),
                                     },
                                 };
                                 return Ok(Some(GotoDefinitionResponse::Scalar(loc)));
@@ -510,5 +593,18 @@ mod tests {
             },
         );
         assert!(word.is_none());
+    }
+
+    #[test]
+    fn kaynak_konumunu_lsp_utf16_konumuna_cevirir() {
+        let text = "🙂öğrenci = 1 olsun";
+        assert_eq!(
+            Backend::source_position_to_lsp(text, 1, 3),
+            Position::new(0, 3)
+        );
+        assert_eq!(
+            Backend::line_end_position(0, text),
+            Position::new(0, text.encode_utf16().count() as u32)
+        );
     }
 }

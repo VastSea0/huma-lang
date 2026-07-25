@@ -2,6 +2,7 @@
 name = "huma-lsp"
 version = "0.6.0"
 edition = "2021"
+rust-version = "1.92"
 license = "MIT"
 description = "Language Server Protocol (LSP) server for the Hüma programming language."
 

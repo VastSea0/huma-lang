@@ -23,7 +23,12 @@ Bu dosyalar binary içine gömülür ve her dizinden yüklenebilir:
 | `birim_test.hb` | `test_et`, `iddia_et`, `test_raporu` |
 | `yapay_zeka_temel.hb` | vektör/matris yardımcıları, aktivasyonlar, kayıplar, başlatıcılar, metrikler |
 
-Yaygın Rust yerleşikleri arasında `uzunluk`, `listeye_ekle`, `içeriyor`, `kırp`, `böl`, `birleştir`, `küçük_harf`, `büyük_harf`, JSON, dosya, ağ, SQLite, vektör/matris ve tensor işlevleri bulunur. Geçersiz argüman davranışı henüz bütün yerleşiklerde tek tip olmadığından yeni kod, dönüş değerlerini ve boyutları doğrulamalıdır.
+Yaygın Rust yerleşikleri arasında `uzunluk`, `listeye_ekle`, `içeriyor`,
+`kırp`, `böl`, `birleştir`, `küçük_harf`, `büyük_harf`, JSON, dosya, ağ,
+SQLite, vektör/matris ve tensor işlevleri bulunur. Kayıtlı yerleşikler argüman
+sayısını/türünü, sayısal sonluluğu ve işlemine uygun boyut sınırlarını doğrular;
+geçersiz girdi yakalanabilir `Hata` üretir. Koleksiyon veya dış kaynak
+kullanılan kod yine de bu hatayı ele almalıdır.
 
 ## `huma_modulleri/` paketleri
 
@@ -66,4 +71,12 @@ Yoğun katman, MSE tabanlı geri yayılım, Adam güncellemesi, gradyan kırpma 
 - `huma_sqlite`: SQLite bağlantı/sorgu API’si
 - `gui`: egui tabanlı masaüstü arayüz API’si
 
-Bu modüller dosya, ağ, veritabanı veya native kitaplıklara erişebilir. Güvenilmeyen kod için sandbox sağlamazlar.
+Bu modüller ilgili CLI yeteneği verilmeden dış kaynağa erişemez. Yetenek adları:
+`dosya-okuma`, `dosya-yazma`, `ağ-istemci`, `ağ-sunucu`, `süreç`, `ffi`,
+`veritabanı` ve `gui`. Bu model en az ayrıcalık denetimidir; işletim sistemi
+sandbox’ı değildir.
+
+FFI yalnız açık `f64()`, `f64(f64)` ve `f64(f64,f64)` imzalarını kabul eder.
+`ffi_yükle`, `ffi_çağır` ve `ffi_boşalt` ile yaşam döngüsü yönetilir. Yanlış
+haricî ABI ev sahibi süreci çökertebileceğinden FFI yalnız güvenilen
+kitaplıklarda kullanılmalıdır.

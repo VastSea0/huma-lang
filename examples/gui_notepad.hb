@@ -33,7 +33,7 @@ not_paneli_fks fonksiyon olsun {
 }
 
 liste_fks fonksiyon olsun {
-    liz = kaydedilen_notlar'nin uzunluğu olsun
+    liz = kaydedilen_notlar'ın uzunluğu olsun
     i = 0 olsun
     i < liz olduğu sürece {
         g_not = kaydedilen_notlar[i] olsun
@@ -64,7 +64,7 @@ ana_cizim_fks fonksiyon olsun {
     grup_kutusu_ekle("Yeni Not Oluştur", not_paneli_fks)
     
     boşluk_bırak(20.0)
-    yazı_ekle("Kayıtlı Notlar (" + kaydedilen_notlar'nin uzunluğu + ")", "kalın")
+    yazı_ekle("Kayıtlı Notlar (" + kaydedilen_notlar'ın uzunluğu + ")", "kalın")
     ayraç_çiz()
     
     kaydırılabilir_liste_ekle("notlar_scrol", liste_fks)

@@ -1,6 +1,11 @@
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 
+const MAX_BPE_INPUT_BYTES: usize = 16 * 1024 * 1024;
+const MAX_BPE_TOKENS: usize = 1_000_000;
+const MAX_BPE_TRAINING_WORK: usize = 100_000_000;
+const MAX_BPE_OUTPUT_BYTES: usize = 64 * 1024 * 1024;
+
 pub struct BPETokenizer {
     vocab: Vec<Vec<u8>>,
     token_to_id: HashMap<Vec<u8>, usize>,
@@ -32,10 +37,26 @@ impl BPETokenizer {
         }
     }
 
-    pub fn egit(&mut self, metin: &str, hedef_vocab_boyutu: usize) {
+    pub fn egit(&mut self, metin: &str, hedef_vocab_boyutu: usize) -> Result<(), String> {
+        if metin.len() > MAX_BPE_INPUT_BYTES {
+            return Err(format!(
+                "BPE eğitim metni {MAX_BPE_INPUT_BYTES} bayt sınırını aşıyor"
+            ));
+        }
+        let hedef_vocab_boyutu = hedef_vocab_boyutu.clamp(256, 65_536);
+        let merge_count = hedef_vocab_boyutu.saturating_sub(256);
+        let estimated_work = metin
+            .len()
+            .checked_mul(merge_count)
+            .ok_or_else(|| "BPE eğitim iş yükü hesabı taştı".to_string())?;
+        if estimated_work > MAX_BPE_TRAINING_WORK {
+            return Err(format!(
+                "BPE eğitim iş yükü {MAX_BPE_TRAINING_WORK} sınırını aşıyor; \
+                 metni veya hedef sözlük boyutunu küçültün"
+            ));
+        }
         // Her eğitim çağrısı aynı girdiden aynı modeli üretmelidir.
         *self = Self::new();
-        let hedef_vocab_boyutu = hedef_vocab_boyutu.clamp(256, 65_536);
         let mut tokens = metin
             .as_bytes()
             .iter()
@@ -84,9 +105,15 @@ impl BPETokenizer {
                 break;
             }
         }
+        Ok(())
     }
 
-    pub fn kodla(&self, metin: &str) -> Vec<usize> {
+    pub fn kodla(&self, metin: &str) -> Result<Vec<usize>, String> {
+        if metin.len() > MAX_BPE_INPUT_BYTES {
+            return Err(format!(
+                "BPE kodlama metni {MAX_BPE_INPUT_BYTES} bayt sınırını aşıyor"
+            ));
+        }
         let mut tokens = metin
             .as_bytes()
             .iter()
@@ -109,20 +136,43 @@ impl BPETokenizer {
             }
             tokens = yeni;
         }
-
+        if tokens.len() > MAX_BPE_TOKENS {
+            return Err(format!(
+                "BPE token sayısı {MAX_BPE_TOKENS} güvenlik sınırını aşıyor"
+            ));
+        }
         tokens
             .iter()
-            .filter_map(|token| self.token_to_id.get(token).copied())
+            .map(|token| {
+                self.token_to_id
+                    .get(token)
+                    .copied()
+                    .ok_or_else(|| "BPE sözlüğünde üretilen token bulunamadı".to_string())
+            })
             .collect()
     }
 
     pub fn coz(&self, token_ids: &[usize]) -> Result<String, String> {
+        if token_ids.len() > MAX_BPE_TOKENS {
+            return Err(format!(
+                "BPE token sayısı {MAX_BPE_TOKENS} güvenlik sınırını aşıyor"
+            ));
+        }
         let mut bytes = Vec::new();
         for id in token_ids {
             let token = self
                 .vocab
                 .get(*id)
                 .ok_or_else(|| format!("BPE sözlüğünde {} kimlikli token yok", id))?;
+            let next_size = bytes
+                .len()
+                .checked_add(token.len())
+                .ok_or_else(|| "BPE çıktı boyutu taştı".to_string())?;
+            if next_size > MAX_BPE_OUTPUT_BYTES {
+                return Err(format!(
+                    "BPE çıktı boyutu {MAX_BPE_OUTPUT_BYTES} bayt sınırını aşıyor"
+                ));
+            }
             bytes.extend_from_slice(token);
         }
         String::from_utf8(bytes).map_err(|_| "Token dizisi geçerli UTF-8 üretmedi".to_string())
@@ -140,8 +190,8 @@ mod tests {
     fn turkce_utf8_ve_bosluklar_kayipsiz_doner() {
         let metin = "İyi günler, şeker ölçümü!";
         let mut tokenizer = BPETokenizer::new();
-        tokenizer.egit(metin, 280);
-        let tokenler = tokenizer.kodla(metin);
+        tokenizer.egit(metin, 280).unwrap();
+        let tokenler = tokenizer.kodla(metin).unwrap();
 
         assert_eq!(tokenizer.coz(&tokenler).unwrap(), metin);
     }
@@ -150,14 +200,25 @@ mod tests {
     fn egitim_tekrarlanan_bayt_dizisini_sikistirir() {
         let metin = "merhaba merhaba merhaba";
         let mut tokenizer = BPETokenizer::new();
-        tokenizer.egit(metin, 270);
+        tokenizer.egit(metin, 270).unwrap();
 
-        assert!(tokenizer.kodla(metin).len() < metin.len());
+        assert!(tokenizer.kodla(metin).unwrap().len() < metin.len());
     }
 
     #[test]
     fn bilinmeyen_token_kimligi_hata_verir() {
         let tokenizer = BPETokenizer::new();
         assert!(tokenizer.coz(&[999]).is_err());
+    }
+
+    #[test]
+    fn egitim_tahmini_is_yukunu_baslamadan_sinirlar() {
+        let mut tokenizer = BPETokenizer::new();
+        let text = "a".repeat(2_000);
+        let error = tokenizer
+            .egit(&text, 65_536)
+            .expect_err("Aşırı BPE iş yükü reddedilmeli");
+        assert!(error.contains("iş yükü"));
+        assert_eq!(tokenizer.vocab.len(), 256, "Model kısmen değişmemeli");
     }
 }

@@ -6,25 +6,28 @@ use huma_core::interpreter::Yorumlayici;
 use huma_core::lexer::Lexer;
 use huma_core::parser::Parser;
 use huma_core::vm::VM;
-use std::cell::RefCell;
-use std::io::{self, Write};
+use std::io::{self, BufRead, Read, Write};
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
-use std::sync::mpsc;
+use std::process::{Command, Stdio};
 use std::time::Duration;
+use wait_timeout::ChildExt;
+
+const MAX_TEST_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
+const MAX_REPL_INPUT_BYTES: usize = 1024 * 1024;
+const MAX_TEST_FILES: usize = 10_000;
 
 /// Run a `.hb` source file through the tree-walking interpreter.
 pub fn run_file(path: &str) -> Result<()> {
-    let source =
-        std::fs::read_to_string(path).with_context(|| format!("'{}' dosyası okunamadı", path))?;
+    let source = huma_compiler::pipeline::read_source_file(path)
+        .with_context(|| format!("'{}' dosyası okunamadı", path))?;
 
     let interp = Yorumlayici::new();
     let mut interp = interp;
     execute_source(&source, &mut interp)?;
 
     // GUI isteği var mı kontrol et
-    if huma_core::gui::gui_istegi_var_mi() {
-        huma_core::gui::gui_calistir(interp);
+    if huma_core::gui::gui_istegi_var_mi().map_err(anyhow::Error::msg)? {
+        huma_core::gui::gui_calistir(interp).map_err(anyhow::Error::msg)?;
     }
 
     Ok(())
@@ -32,8 +35,8 @@ pub fn run_file(path: &str) -> Result<()> {
 
 /// Run a `.hb` source file by compiling to Bytecode and executing in Bytecode VM.
 pub fn run_vm_file(path: &str) -> Result<()> {
-    let source =
-        std::fs::read_to_string(path).with_context(|| format!("'{}' dosyası okunamadı", path))?;
+    let source = huma_compiler::pipeline::read_source_file(path)
+        .with_context(|| format!("'{}' dosyası okunamadı", path))?;
 
     let lexer = Lexer::new(&source);
     let mut parser = Parser::new(lexer);
@@ -83,8 +86,8 @@ pub fn exec_bytecode(path: &str) -> Result<()> {
 
 /// Compile a `.hb` file to a native machine code binary using Cranelift AOT.
 pub fn compile_aot(input: &str, output_name: &str, opt_level: u8) -> Result<()> {
-    let source =
-        std::fs::read_to_string(input).with_context(|| format!("'{}' dosyası okunamadı", input))?;
+    let source = huma_compiler::pipeline::read_source_file(input)
+        .with_context(|| format!("'{}' dosyası okunamadı", input))?;
 
     let out_path = std::path::Path::new(output_name);
     let opts = huma_compiler::aot::AotOptions {
@@ -118,14 +121,39 @@ pub fn start_repl() -> Result<()> {
 
     let mut interp = Yorumlayici::new();
     let mut input = String::new();
+    let stdin = io::stdin();
+    let mut stdin = stdin.lock();
 
     loop {
         print!("{} ", "hüma ❯".bright_cyan().bold());
         io::stdout().flush()?;
 
         input.clear();
-        if io::stdin().read_line(&mut input).is_err() {
+        let bytes_read = {
+            let mut limited = (&mut stdin).take((MAX_REPL_INPUT_BYTES as u64) + 1);
+            limited.read_line(&mut input)?
+        };
+        if bytes_read == 0 {
             break;
+        }
+        if input.len() > MAX_REPL_INPUT_BYTES {
+            loop {
+                let available = stdin.fill_buf()?;
+                if available.is_empty() {
+                    break;
+                }
+                if let Some(newline) = available.iter().position(|byte| *byte == b'\n') {
+                    stdin.consume(newline + 1);
+                    break;
+                }
+                let length = available.len();
+                stdin.consume(length);
+            }
+            eprintln!(
+                "REPL girdisi {} bayt sınırını aşıyor.",
+                MAX_REPL_INPUT_BYTES
+            );
+            continue;
         }
 
         let trimmed = input.trim();
@@ -261,50 +289,103 @@ enum TestOutcome {
 }
 
 fn run_test_file(path: &Path) -> Result<TestOutcome> {
-    let source = std::fs::read_to_string(path)
-        .with_context(|| format!("'{}' test dosyası okunamadı", path.display()))?;
-
-    // Run each test in its own thread with a timeout to avoid hangs
-    // (e.g., accidental infinite loops or blocking IO).
-    let (tx, rx) = mpsc::channel::<Result<String>>();
-    let src = source.clone();
-
-    std::thread::spawn(move || {
-        let output = Rc::new(RefCell::new(String::new()));
-        let mut interp = Yorumlayici::new().with_output_buffer(output.clone());
-
-        let run_res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            execute_source(&src, &mut interp)
-        }));
-
-        let send_res = match run_res {
-            Ok(Ok(())) => Ok(output.borrow().clone()),
-            Ok(Err(error)) => Err(error),
-            Err(p) => {
-                let msg = if let Some(s) = p.downcast_ref::<&str>() {
-                    s.to_string()
-                } else if let Some(s) = p.downcast_ref::<String>() {
-                    s.clone()
-                } else {
-                    "Bilinmeyen panic".to_string()
-                };
-                Err(anyhow::anyhow!("Panic: {}", msg))
-            }
-        };
-
-        // If receiver is gone, we can ignore.
-        let _ = tx.send(send_res);
-    });
-
-    let out = match rx.recv_timeout(Duration::from_secs(3)) {
-        Ok(res) => res?,
-        Err(mpsc::RecvTimeoutError::Timeout) => {
-            anyhow::bail!("Zaman aşımı (3s). Test dosyası kilitlenmiş olabilir.")
+    fn read_pipe_limited<R: Read>(pipe: R, name: &str) -> Result<Vec<u8>> {
+        let mut bytes = Vec::new();
+        pipe.take((MAX_TEST_OUTPUT_BYTES as u64) + 1)
+            .read_to_end(&mut bytes)
+            .with_context(|| format!("Test {name} okunamadı"))?;
+        if bytes.len() > MAX_TEST_OUTPUT_BYTES {
+            anyhow::bail!(
+                "Test {name} {} bayt sınırını aşıyor.",
+                MAX_TEST_OUTPUT_BYTES
+            );
         }
-        Err(mpsc::RecvTimeoutError::Disconnected) => {
-            anyhow::bail!("Test iş parçacığı beklenmedik şekilde sonlandı.")
+        Ok(bytes)
+    }
+
+    let executable =
+        std::env::current_exe().with_context(|| "Hüma test yürütülebilirinin yolu bulunamadı")?;
+    let mut child = Command::new(executable)
+        .arg("run")
+        .arg(path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .with_context(|| format!("'{}' test süreci başlatılamadı", path.display()))?;
+    let stdout = match child.stdout.take() {
+        Some(stdout) => stdout,
+        None => {
+            let _ = child.kill();
+            let _ = child.wait();
+            anyhow::bail!("Test standart çıktısı yakalanamadı")
         }
     };
+    let stderr = match child.stderr.take() {
+        Some(stderr) => stderr,
+        None => {
+            let _ = child.kill();
+            let _ = child.wait();
+            anyhow::bail!("Test standart hatası yakalanamadı")
+        }
+    };
+    let stdout_reader = match std::thread::Builder::new()
+        .name("huma-test-stdout".to_string())
+        .spawn(move || read_pipe_limited(stdout, "standart çıktısı"))
+    {
+        Ok(reader) => reader,
+        Err(error) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(error).with_context(|| "Test çıktı okuyucusu başlatılamadı");
+        }
+    };
+    let stderr_reader = match std::thread::Builder::new()
+        .name("huma-test-stderr".to_string())
+        .spawn(move || read_pipe_limited(stderr, "standart hatası"))
+    {
+        Ok(reader) => reader,
+        Err(error) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = stdout_reader.join();
+            return Err(error).with_context(|| "Test hata okuyucusu başlatılamadı");
+        }
+    };
+    let status = match child.wait_timeout(Duration::from_secs(3))? {
+        Some(status) => status,
+        None => {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = stdout_reader.join();
+            let _ = stderr_reader.join();
+            anyhow::bail!("Zaman aşımı (3s). Test süreci sonlandırıldı.")
+        }
+    };
+    let stdout = stdout_reader
+        .join()
+        .map_err(|_| anyhow::anyhow!("Test çıktı okuyucusu beklenmedik biçimde sonlandı"))??;
+    let stderr = stderr_reader
+        .join()
+        .map_err(|_| anyhow::anyhow!("Test hata okuyucusu beklenmedik biçimde sonlandı"))??;
+    let out =
+        String::from_utf8(stdout).with_context(|| "Test standart çıktısı geçerli UTF-8 değil")?;
+    let stderr =
+        String::from_utf8(stderr).with_context(|| "Test standart hatası geçerli UTF-8 değil")?;
+    if !status.success() {
+        let detail = if stderr.trim().is_empty() {
+            out.trim()
+        } else {
+            stderr.trim()
+        };
+        anyhow::bail!(
+            "Test süreci başarısız oldu (çıkış: {}): {}",
+            status
+                .code()
+                .map_or_else(|| "sinyal".to_string(), |code| code.to_string()),
+            detail
+        );
+    }
 
     if let Some(failed) = parse_birim_test_failed_count(&out) {
         return Ok(TestOutcome::Passed {
@@ -337,30 +418,62 @@ fn parse_birim_test_failed_count(output: &str) -> Option<usize> {
 }
 
 fn collect_test_files(root: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
-    if !root.exists() {
-        return Ok(());
-    }
-
-    if root.is_file() {
-        if is_test_file(root) {
-            out.push(root.to_path_buf());
+    fn collect(root: &Path, out: &mut Vec<PathBuf>, depth: usize) -> Result<()> {
+        if depth > 32 {
+            anyhow::bail!(
+                "Test dizin derinliği 32 sınırını aşıyor: {}",
+                root.display()
+            );
         }
-        return Ok(());
-    }
-
-    for entry in
-        std::fs::read_dir(root).with_context(|| format!("Dizin okunamadı: {}", root.display()))?
-    {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_dir() {
-            collect_test_files(&path, out)?;
-        } else if is_test_file(&path) {
-            out.push(path);
+        if out.len() > MAX_TEST_FILES {
+            anyhow::bail!("Test dosyası sayısı {} sınırını aşıyor.", MAX_TEST_FILES);
         }
+        if !root.exists() {
+            return Ok(());
+        }
+        let metadata = std::fs::symlink_metadata(root)
+            .with_context(|| format!("Test yolu incelenemedi: {}", root.display()))?;
+        if metadata.file_type().is_symlink() {
+            anyhow::bail!(
+                "Test keşfinde sembolik bağlantı reddedildi: {}",
+                root.display()
+            );
+        }
+        if metadata.is_file() {
+            if is_test_file(root) {
+                out.push(root.to_path_buf());
+            }
+            return Ok(());
+        }
+        if !metadata.is_dir() {
+            return Ok(());
+        }
+
+        for entry in std::fs::read_dir(root)
+            .with_context(|| format!("Dizin okunamadı: {}", root.display()))?
+        {
+            let entry = entry?;
+            let path = entry.path();
+            let file_type = entry.file_type()?;
+            if file_type.is_symlink() {
+                anyhow::bail!(
+                    "Test keşfinde sembolik bağlantı reddedildi: {}",
+                    path.display()
+                );
+            }
+            if file_type.is_dir() {
+                collect(&path, out, depth + 1)?;
+            } else if file_type.is_file() && is_test_file(&path) {
+                out.push(path);
+                if out.len() > MAX_TEST_FILES {
+                    anyhow::bail!("Test dosyası sayısı {} sınırını aşıyor.", MAX_TEST_FILES);
+                }
+            }
+        }
+        Ok(())
     }
 
-    Ok(())
+    collect(root, out, 0)
 }
 
 fn is_test_file(path: &Path) -> bool {

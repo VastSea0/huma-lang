@@ -51,6 +51,11 @@ pub enum Ifade {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Komut {
+    Konumlu {
+        komut: Box<Komut>,
+        satir: usize,
+        sutun: usize,
+    },
     DegiskenTanimla {
         ad: String,
         deger: Ifade,
@@ -75,7 +80,12 @@ pub enum Komut {
         govde: Vec<Komut>,
     },
     DondurKomutu(Ifade),
-    YukleKomutu(String),
+    YukleKomutu {
+        yol: String,
+        takma_ad: Option<String>,
+    },
+    /// Bir modül ad alanından açıkça dışa aktarılacak bağ.
+    DisaAktar(String),
     SinifTanimla {
         ad: String,
         metotlar: Vec<Komut>,

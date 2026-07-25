@@ -31,6 +31,8 @@ pub enum Token {
     Var,          // var
     Nin,          // 'nin / 'nın (kendisi'nin erişimi)
     Iyelik,       // 'si / 'sı / 'su / 'sü (özellik iyeliği)
+    Yonelme,      // 'a / 'e / 'ya / 'ye (doğal liste ekleme ayracı)
+    Ayrilma,      // 'dan / 'den / 'tan / 'ten (doğal liste çıkarma ayracı)
     Kadar,        // kadar
     Mi,           // mi / mı / mu / mü
     Ile,          // ile
@@ -38,6 +40,9 @@ pub enum Token {
     Cagir,        // çağır
     Devam,        // devam (continue)
     Kir,          // kır (break)
+    Olarak,       // olarak (modül takma adı)
+    Disa,         // dışa
+    Aktar,        // aktar
 
     // Tanımlayıcılar ve Literaller
     Tanimlayici(String),
@@ -103,6 +108,8 @@ impl fmt::Display for Token {
             Token::Var => "var",
             Token::Nin => "'nin/'nın",
             Token::Iyelik => "'si/'sı/'su/'sü",
+            Token::Yonelme => "'a/'e/'ya/'ye",
+            Token::Ayrilma => "'dan/'den/'tan/'ten",
             Token::Kadar => "kadar",
             Token::Mi => "mi/mı/mu/mü",
             Token::Ile => "ile",
@@ -110,6 +117,9 @@ impl fmt::Display for Token {
             Token::Cagir => "çağır",
             Token::Devam => "devam",
             Token::Kir => "kır",
+            Token::Olarak => "olarak",
+            Token::Disa => "dışa",
+            Token::Aktar => "aktar",
             Token::Tanimlayici(s) => s,
             Token::Sayi(n) => return write!(f, "{}", n),
             Token::Metin(s) => return write!(f, "\"{}\"", s),

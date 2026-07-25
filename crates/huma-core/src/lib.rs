@@ -8,26 +8,31 @@ pub mod ast;
 pub mod autograd;
 pub mod builtin_files;
 pub mod bytecode;
+pub mod capability;
 pub mod compiler;
 pub mod error;
 pub mod ffi;
 pub mod gui;
 pub mod interpreter;
 pub mod lexer;
+pub mod limits;
+pub mod morphology;
 pub mod parser;
+pub mod semantics;
 pub mod token;
 pub mod tokenizer;
 pub mod value;
 pub mod vm;
 
 /// Re-export most-used items at the crate root for convenience.
-pub use error::{HumaError, HumaResult};
+pub use error::{HumaError, HumaResult, RuntimeDiagnostic, SourceSpan, StackFrame};
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::cell::RefCell;
     use std::rc::Rc;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     // ─────────────────────────────────────────────
     // Yardımcı: kodu yorumlayıp string çıktısını döndürür
@@ -110,7 +115,127 @@ mod tests {
         assert!(eval_hatasi("rastgele(1)").contains("argüman beklenmiyordu"));
         assert!(eval_hatasi("sistem(42)").contains("metin komutu"));
         assert!(eval_hatasi("ffi_yükle(1, 2)").contains("2 metin"));
-        assert!(eval_hatasi("ffi_çağır(1, 2)").contains("en az 2 metin"));
+        assert!(eval_hatasi("ffi_çağır(1, 2)").contains("açık ABI imzası"));
+        assert!(eval_hatasi("ffi_boşalt(1)").contains("kütüphane adı metni"));
+        assert!(eval_hatasi("küçük_harf(1)").contains("metin bekleniyordu"));
+        assert!(eval_hatasi(r#"böl("a")"#).contains("tam olarak 2"));
+        assert!(eval_hatasi("birleştir([1])").contains("yalnızca metin"));
+        assert!(eval_hatasi(r#"değiştir("a", "a")"#).contains("tam olarak 3"));
+        assert!(eval_hatasi(r#"sayıya_çevir("sayı değil")"#).contains("geçerli bir sayı değil"));
+        assert!(eval_hatasi(r#"ascii_kodu("iki")"#).contains("tam olarak bir Unicode"));
+        assert!(eval_hatasi("karakterden(-1)").contains("sonlu bir tamsayı"));
+        assert!(eval_hatasi("içeriyor(1, 2)").contains("metin, liste, nesne veya sözlük"));
+        assert!(eval_hatasi("tipi()").contains("tam olarak 1"));
+        assert!(eval_hatasi(r#"dizi_dilim("abc", 0, 4)"#).contains("geçerli aralık"));
+    }
+
+    #[test]
+    fn unicode_buyuk_harf_birden_cok_kod_noktasi_uretebilir() {
+        assert_eq!(eval(r#"büyük_harf("straße ıi")'yi yazdır"#), "STRASSE Iİ\n");
+    }
+
+    #[test]
+    fn regex_degistirme_metnini_grup_sablonu_gibi_yorumlamaz() {
+        assert_eq!(
+            eval(r#"regex_degistir("a-a", "a", "$1")'ı yazdır"#),
+            "$1-$1\n"
+        );
+    }
+
+    #[test]
+    fn metrikler_uyumsuz_ve_gecersiz_veriyi_reddeder() {
+        assert!(eval_hatasi("f1_skoru([1], [1, 0])").contains("uzunlukları eşit"));
+        assert!(eval_hatasi("f1_skoru([], [])").contains("boş veri"));
+        assert!(eval_hatasi("f1_skoru([1.1], [1])").contains("0 ile 1"));
+        assert!(eval_hatasi("karisiklik_matrisi([0.5], [0], 2)").contains("tamsayı"));
+    }
+
+    #[test]
+    fn adam_durumu_alias_hatasinda_kismi_guncellenmez() {
+        let output = eval(
+            r#"
+                ağırlıklar = vektor_olustur(1, 1) olsun
+                gradyan = vektor_olustur(1, 1) olsun
+                durum = adam_vektor_durum_olustur(1) olsun
+                değer_ata(durum, "m", ağırlıklar) olsun
+                dene {
+                    adam_vektor_guncelle(ağırlıklar, gradyan, durum, 0.1) olsun
+                } yakala hata { }
+                vektor_al(ağırlıklar, 0)'ı yazdır
+                değer_al(durum, "adim")'ı yazdır
+            "#,
+        );
+        assert_eq!(output, "1\n0\n");
+    }
+
+    #[test]
+    fn csv_alintili_alanlari_kayipsiz_yazar_ve_okur() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Sistem saati Unix epoch sonrasında olmalı")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "huma_csv_roundtrip_{}_{}.csv",
+            std::process::id(),
+            nonce
+        ));
+        let escaped_path = path
+            .to_string_lossy()
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"");
+        let _guard = capability::install(
+            capability::CapabilitySet::deny_all()
+                .allow(capability::Capability::FileRead)
+                .allow(capability::Capability::FileWrite),
+        )
+        .expect("Dosya yetenekleri kurulmalı");
+        let output = eval(&format!(
+            r#"
+                satırlar = [["a,b", "iki\nsatır", "\"alıntı\""], [42, boş, "ç"]] olsun
+                csv_yaz("{escaped_path}", satırlar) olsun
+                okunan = csv_oku("{escaped_path}") olsun
+                nesneden_metine(okunan)'ı yazdır
+            "#
+        ));
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(
+            output,
+            "[\n  [\n    \"a,b\",\n    \"iki\\nsatır\",\n    \"\\\"alıntı\\\"\"\n  ],\n  [\n    \"42\",\n    \"\",\n    \"ç\"\n  ]\n]\n"
+        );
+        assert!(eval_hatasi(r#"csv_yaz("x", [], "ğ")"#).contains("tek baytlık ASCII"));
+        assert!(eval_hatasi(r#"csv_yaz("x", [[[]]])"#).contains("metin, sayı veya boş"));
+    }
+
+    #[test]
+    fn gui_yerlesikleri_baglam_disini_ve_gecersiz_boyutu_reddeder() {
+        let _guard = capability::install(
+            capability::CapabilitySet::deny_all().allow(capability::Capability::Gui),
+        )
+        .expect("GUI yeteneği kurulmalı");
+        assert!(eval_hatasi(r#"buton("Düğme")"#).contains("çizim fonksiyonu içinde"));
+        assert!(eval_hatasi(r#"buton("Düğme", -1, 10)"#).contains("pozitif"));
+    }
+
+    #[test]
+    fn sozluk_deger_api_sozlesmesi_gercekten_calisir() {
+        let output = eval(
+            r#"
+                harita = {} olsun
+                değer_ata(harita, "anahtar", 7) olsun
+                değer_al(harita, "anahtar")'ı yazdır
+                içeriyor(harita, "anahtar")'ı yazdır
+                değer_al(harita, "yok")'u yazdır
+            "#,
+        );
+        assert_eq!(output, "7\n1\nBoş\n");
+    }
+
+    #[test]
+    fn dis_dunya_yetenekleri_varsayilan_olarak_kapalidir() {
+        assert!(eval_hatasi(r#"dosya_oku("gizli.txt")"#).contains("yeteneği verilmedi"));
+        assert!(eval_hatasi(r#"sistem("echo güvenli-değil")"#).contains("yeteneği verilmedi"));
+        assert!(eval_hatasi(r#"dahili_istek("GET", "https://example.com")"#)
+            .contains("yeteneği verilmedi"));
     }
 
     #[test]
@@ -123,6 +248,117 @@ mod tests {
             "#,
         );
         assert_eq!(output, "6\n3\n2\n");
+    }
+
+    #[test]
+    fn anonim_fonksiyon_tanimlandigi_kapsami_yakalar() {
+        let output = eval(
+            r#"
+                toplayici_uret fonksiyon olsun taban alsın {
+                    toplayici = fonksiyon olsun deger alsın {
+                        taban + deger'i döndür
+                    } olsun
+                    toplayici'yi döndür
+                }
+                on_ekle = toplayici_uret(10) olsun
+                on_ekle(5)'i yazdır
+            "#,
+        );
+        assert_eq!(output, "15\n");
+    }
+
+    #[test]
+    fn fonksiyon_arguman_sayisi_tam_eslesmelidir() {
+        let eksik = eval_hatasi(
+            r#"
+                topla fonksiyon olsun a, b alsın { a + b'yi döndür }
+                topla(1)
+            "#,
+        );
+        assert!(eksik.contains("2 argüman bekliyor; 1 argüman geldi"));
+
+        let fazla = eval_hatasi(
+            r#"
+                kimlik fonksiyon olsun x alsın { x'i döndür }
+                kimlik(1, 2)
+            "#,
+        );
+        assert!(fazla.contains("1 argüman bekliyor; 2 argüman geldi"));
+    }
+
+    #[test]
+    fn uc_argumanli_dogal_turkce_cagri_gercekten_calisir() {
+        let output = eval(
+            r#"
+                topla3 fonksiyon olsun a, b, c alsın {
+                    (a + b + c)'yi döndür
+                }
+                1 ile 2 ve 3'ü topla3'ü yazdır
+            "#,
+        );
+        assert_eq!(output, "6\n");
+    }
+
+    #[test]
+    fn dogal_turkce_liste_ekleme_gercekten_calisir() {
+        let output = eval(
+            r#"
+                sayılar = [] olsun
+                sayılar'a [1, 2]'yi ekle
+                sayılar'a 3'ü ekle
+                nesneden_metine(sayılar)'ı yazdır
+            "#,
+        );
+        assert_eq!(output, "[\n  1.0,\n  2.0,\n  3.0\n]\n");
+    }
+
+    #[test]
+    fn dogal_turkce_liste_cikarma_gercekten_calisir() {
+        let output = eval(
+            r#"
+                öğeler = [10, 20, 30] olsun
+                öğeler'den 1'i çıkar
+                nesneden_metine(öğeler)'i yazdır
+            "#,
+        );
+        assert_eq!(output, "[\n  10.0,\n  30.0\n]\n");
+    }
+
+    #[test]
+    fn sinif_kurucusu_tanimsiz_argumanlari_reddeder() {
+        let error = eval_hatasi(
+            r#"
+                Ornek sınıf olsun { deger = 1 olsun }
+                Ornek(1)
+            "#,
+        );
+        assert!(error.contains("kurucu argümanı kabul etmiyor"));
+    }
+
+    #[test]
+    fn json_donusumu_veri_kaybini_ve_donguyu_reddeder() {
+        assert!(value::Deger::Sayi(f64::INFINITY)
+            .to_json_checked()
+            .expect_err("sonsuz sayı JSON'a dönüşmemeli")
+            .contains("sonlu"));
+
+        let liste = Rc::new(RefCell::new(Vec::new()));
+        liste
+            .borrow_mut()
+            .push(value::Deger::Liste(Rc::clone(&liste)));
+        assert!(value::Deger::Liste(liste)
+            .to_json_checked()
+            .expect_err("döngüsel liste JSON'a dönüşmemeli")
+            .contains("Döngüsel"));
+
+        assert!(eval_hatasi(r#"metinden_nesneye("{")"#).contains("geçersiz JSON"));
+        assert!(eval_hatasi(
+            r#"
+                f fonksiyon olsun { boş'u döndür }
+                nesneden_metine(f)
+            "#
+        )
+        .contains("temsil edilemez"));
     }
 
     #[test]
@@ -194,6 +430,7 @@ mod tests {
     #[test]
     fn lexer_bilinmeyen_metin_ekini_reddeder() {
         let mut lx = lexer::Lexer::new(r#""metin"'xyz"#);
+        assert_eq!(lx.next_token(), token::Token::Metin("metin".to_string()));
         assert!(matches!(lx.next_token(), token::Token::Hata(_)));
     }
 
@@ -423,7 +660,9 @@ mod tests {
     #[test]
     fn autograd_tensor_olustur() {
         let mut graf = autograd::AutogradGraph::new();
-        let t = graf.tensor_olustur(2, 3, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], true);
+        let t = graf
+            .tensor_olustur(2, 3, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], true)
+            .expect("Geçerli tensor oluşturulmalı");
         assert_eq!(t.satirlar, 2);
         assert_eq!(t.sutunlar, 3);
         assert!(t.requires_grad);
@@ -434,9 +673,13 @@ mod tests {
     #[test]
     fn autograd_topla_ileri() {
         let mut graf = autograd::AutogradGraph::new();
-        let a = graf.tensor_olustur(1, 3, vec![1.0, 2.0, 3.0], true);
-        let b = graf.tensor_olustur(1, 3, vec![4.0, 5.0, 6.0], true);
-        let c = graf.topla(&a, &b);
+        let a = graf
+            .tensor_olustur(1, 3, vec![1.0, 2.0, 3.0], true)
+            .expect("Sol tensor oluşturulmalı");
+        let b = graf
+            .tensor_olustur(1, 3, vec![4.0, 5.0, 6.0], true)
+            .expect("Sağ tensor oluşturulmalı");
+        let c = graf.topla(&a, &b).expect("Tensorlar toplanmalı");
         let veri = c.veri.lock().unwrap();
         assert_eq!(*veri, vec![5.0, 7.0, 9.0]);
     }
@@ -444,9 +687,13 @@ mod tests {
     #[test]
     fn autograd_topla_geri_yayilim() {
         let mut graf = autograd::AutogradGraph::new();
-        let a = graf.tensor_olustur(1, 2, vec![1.0, 2.0], true);
-        let b = graf.tensor_olustur(1, 2, vec![3.0, 4.0], true);
-        let c = graf.topla(&a, &b);
+        let a = graf
+            .tensor_olustur(1, 2, vec![1.0, 2.0], true)
+            .expect("Sol tensor oluşturulmalı");
+        let b = graf
+            .tensor_olustur(1, 2, vec![3.0, 4.0], true)
+            .expect("Sağ tensor oluşturulmalı");
+        let c = graf.topla(&a, &b).expect("Tensorlar toplanmalı");
         let c_id = c.id;
         let a_id = a.id;
         let b_id = b.id;
@@ -462,8 +709,12 @@ mod tests {
     fn autograd_matmul_ileri() {
         let mut graf = autograd::AutogradGraph::new();
         // 2x3 * 3x1 = 2x1
-        let a = graf.tensor_olustur(2, 3, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], true);
-        let b = graf.tensor_olustur(3, 1, vec![1.0, 0.0, -1.0], true);
+        let a = graf
+            .tensor_olustur(2, 3, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], true)
+            .expect("Sol tensor oluşturulmalı");
+        let b = graf
+            .tensor_olustur(3, 1, vec![1.0, 0.0, -1.0], true)
+            .expect("Sağ tensor oluşturulmalı");
         let c = graf.matris_carp(&a, &b).expect("MatMul başarısız oldu");
         let veri = c.veri.lock().unwrap();
         // [1*1+2*0+3*(-1), 4*1+5*0+6*(-1)] = [-2, -2]
@@ -473,8 +724,12 @@ mod tests {
     #[test]
     fn autograd_matmul_boyut_uyumsuzlugu() {
         let mut graf = autograd::AutogradGraph::new();
-        let a = graf.tensor_olustur(2, 3, vec![0.0; 6], false);
-        let b = graf.tensor_olustur(2, 2, vec![0.0; 4], false);
+        let a = graf
+            .tensor_olustur(2, 3, vec![0.0; 6], false)
+            .expect("Sol tensor oluşturulmalı");
+        let b = graf
+            .tensor_olustur(2, 2, vec![0.0; 4], false)
+            .expect("Sağ tensor oluşturulmalı");
         let sonuc = graf.matris_carp(&a, &b);
         assert!(sonuc.is_err(), "Boyut uyumsuzluğu hata döndürmeli");
     }
@@ -482,8 +737,10 @@ mod tests {
     #[test]
     fn autograd_relu_ileri() {
         let mut graf = autograd::AutogradGraph::new();
-        let a = graf.tensor_olustur(1, 4, vec![-2.0, -1.0, 0.0, 3.0], true);
-        let r = graf.relu(&a);
+        let a = graf
+            .tensor_olustur(1, 4, vec![-2.0, -1.0, 0.0, 3.0], true)
+            .expect("Tensor oluşturulmalı");
+        let r = graf.relu(&a).expect("ReLU çalışmalı");
         let veri = r.veri.lock().unwrap();
         assert_eq!(*veri, vec![0.0, 0.0, 0.0, 3.0]);
     }
@@ -491,8 +748,10 @@ mod tests {
     #[test]
     fn autograd_relu_geri_yayilim() {
         let mut graf = autograd::AutogradGraph::new();
-        let a = graf.tensor_olustur(1, 4, vec![-1.0, 2.0, -3.0, 4.0], true);
-        let r = graf.relu(&a);
+        let a = graf
+            .tensor_olustur(1, 4, vec![-1.0, 2.0, -3.0, 4.0], true)
+            .expect("Tensor oluşturulmalı");
+        let r = graf.relu(&a).expect("ReLU çalışmalı");
         let r_id = r.id;
         let a_id = a.id;
         graf.backward(r_id).unwrap();
@@ -570,5 +829,75 @@ mod tests {
             .run_checked()
             .expect_err("VM sıfıra bölmeyi reddetmeli");
         assert!(error.to_string().contains("Sıfıra bölme"));
+    }
+
+    #[test]
+    fn yorumlayici_sonsuz_donguyu_adim_sinirinda_durdurur() {
+        let mut parser = parser::Parser::new(lexer::Lexer::new("doğru olduğu sürece { }"));
+        let (program, diagnostics) = parser.parse_program_with_diagnostics();
+        assert!(diagnostics.is_empty());
+        let limits = limits::ExecutionLimits {
+            max_steps: 10,
+            ..limits::ExecutionLimits::default()
+        };
+        let mut interpreter = interpreter::Yorumlayici::new()
+            .with_limits(limits)
+            .expect("Sınırlar geçerli olmalı");
+        let error = interpreter
+            .yorumla_kontrollu(program)
+            .expect_err("Sonsuz döngü sınırda durmalı");
+        assert!(error.to_string().contains("adım sınırı"));
+    }
+
+    #[test]
+    fn vm_sonsuz_donguyu_adim_sinirinda_durdurur() {
+        let mut parser = parser::Parser::new(lexer::Lexer::new("doğru olduğu sürece { }"));
+        let (ast, diagnostics) = parser.parse_program_with_diagnostics();
+        assert!(diagnostics.is_empty());
+        let program = compiler::Derleyici::new()
+            .derle_kontrollu(ast)
+            .expect("Döngü bytecode'a derlenmeli");
+        let limits = limits::ExecutionLimits {
+            max_steps: 10,
+            ..limits::ExecutionLimits::default()
+        };
+        let mut vm = vm::VM::new(program)
+            .with_limits(limits)
+            .expect("Sınırlar geçerli olmalı");
+        let error = vm.run_checked().expect_err("Sonsuz döngü sınırda durmalı");
+        assert!(error.to_string().contains("adım sınırı"));
+    }
+
+    #[test]
+    fn cikti_siniri_iki_arka_ucta_uygulanir() {
+        let source = r#""1234"'ü yazdır"#;
+        let limits = limits::ExecutionLimits {
+            max_output_bytes: 4,
+            ..limits::ExecutionLimits::default()
+        };
+        let mut parser = parser::Parser::new(lexer::Lexer::new(source));
+        let (ast, diagnostics) = parser.parse_program_with_diagnostics();
+        assert!(diagnostics.is_empty());
+
+        let mut interpreter = interpreter::Yorumlayici::new()
+            .with_limits(limits)
+            .expect("Sınırlar geçerli olmalı");
+        assert!(interpreter
+            .yorumla_kontrollu(ast.clone())
+            .expect_err("Yorumlayıcı çıktı sınırını uygulamalı")
+            .to_string()
+            .contains("Çıktı sınırı"));
+
+        let bytecode = compiler::Derleyici::new()
+            .derle_kontrollu(ast)
+            .expect("Kaynak bytecode'a derlenmeli");
+        let mut vm = vm::VM::new(bytecode)
+            .with_limits(limits)
+            .expect("Sınırlar geçerli olmalı");
+        assert!(vm
+            .run_checked()
+            .expect_err("VM çıktı sınırını uygulamalı")
+            .to_string()
+            .contains("Çıktı sınırı"));
     }
 }

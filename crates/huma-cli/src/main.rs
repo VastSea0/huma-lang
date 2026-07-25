@@ -13,7 +13,7 @@ mod commands;
 mod package_manager;
 
 use anyhow::anyhow;
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use colored::Colorize;
 use tracing::error;
 
@@ -49,6 +49,49 @@ struct Cli {
     /// Output diagnostics in JSON (machine-readable) format
     #[arg(long, global = true)]
     json: bool,
+
+    /// Dış dünya yeteneği ver (tekrarlanabilir; ör. --izin dosya-okuma)
+    #[arg(long = "izin", global = true, value_enum)]
+    capabilities: Vec<CapabilityArg>,
+
+    /// Tüm dış dünya yeteneklerini ver (yalnızca güvenilen kod için)
+    #[arg(long = "tüm-izinler", alias = "allow-all", global = true)]
+    allow_all: bool,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum CapabilityArg {
+    #[value(name = "dosya-okuma", alias = "file-read")]
+    FileRead,
+    #[value(name = "dosya-yazma", alias = "file-write")]
+    FileWrite,
+    #[value(name = "ağ-istemci", alias = "network-client")]
+    NetworkClient,
+    #[value(name = "ağ-sunucu", alias = "network-server")]
+    NetworkServer,
+    #[value(name = "süreç", alias = "process")]
+    Process,
+    #[value(name = "ffi")]
+    Ffi,
+    #[value(name = "veritabanı", alias = "database")]
+    Database,
+    #[value(name = "gui")]
+    Gui,
+}
+
+impl From<CapabilityArg> for huma_core::capability::Capability {
+    fn from(value: CapabilityArg) -> Self {
+        match value {
+            CapabilityArg::FileRead => Self::FileRead,
+            CapabilityArg::FileWrite => Self::FileWrite,
+            CapabilityArg::NetworkClient => Self::NetworkClient,
+            CapabilityArg::NetworkServer => Self::NetworkServer,
+            CapabilityArg::Process => Self::Process,
+            CapabilityArg::Ffi => Self::Ffi,
+            CapabilityArg::Database => Self::Database,
+            CapabilityArg::Gui => Self::Gui,
+        }
+    }
 }
 
 #[derive(Subcommand)]
@@ -129,7 +172,7 @@ enum Commands {
         /// Paketin adı
         name: Option<String>,
 
-        /// Native kod içeren paketleri onay sormadan kur
+        /// Ayrılmış uyumluluk bayrağı; doğrulanmamış native ABI'yi etkinleştirmez
         #[arg(long = "güvenilir", alias = "trusted")]
         trusted: bool,
     },
@@ -146,7 +189,7 @@ enum Commands {
     Listele,
 
     /// Mevcut dizini ilklendirir (Kısa yol)
-    #[command(alias = "init", alias = "ilkle")]
+    #[command(name = "ilkle", alias = "init")]
     İlkle,
 }
 
@@ -158,7 +201,7 @@ pub enum PackageAction {
         /// Paketin adı (boş bırakılırsa tüm bağımlılıklar kurulur)
         name: Option<String>,
 
-        /// Native kod içeren paketleri onay sormadan kur
+        /// Ayrılmış uyumluluk bayrağı; doğrulanmamış native ABI'yi etkinleştirmez
         #[arg(long = "güvenilir", alias = "trusted")]
         trusted: bool,
     },
@@ -178,7 +221,7 @@ pub enum PackageAction {
         name: String,
     },
     /// Mevcut dizini bir Hüma projesi olarak ilklendirir
-    #[command(alias = "init", alias = "ilkle")]
+    #[command(name = "ilkle", alias = "init")]
     İlkle,
     /// Projenin yayınlanmaya hazır olup olmadığını kontrol eder
     #[command(alias = "verify")]
@@ -211,6 +254,21 @@ fn main() {
 }
 
 fn run(cli: Cli) -> i32 {
+    let capability_set = if cli.allow_all {
+        huma_core::capability::CapabilitySet::allow_all()
+    } else {
+        cli.capabilities.iter().copied().fold(
+            huma_core::capability::CapabilitySet::deny_all(),
+            |set, item| set.allow(item.into()),
+        )
+    };
+    let _capability_guard = match huma_core::capability::install(capability_set) {
+        Ok(guard) => guard,
+        Err(message) => {
+            error!("{}", message.bright_red());
+            return exit_codes::GENERAL_ERROR;
+        }
+    };
     let result = match cli.command {
         Some(Commands::Run { target, vm }) => {
             let runner = if vm {
@@ -219,48 +277,40 @@ fn run(cli: Cli) -> i32 {
                 commands::run_file
             };
             if let Some(t) = target {
-                // Eğer bir .hb dosyası ise direkt çalıştır
-                if t.ends_with(".hb") && std::path::Path::new(&t).exists() {
+                if std::path::Path::new(&t).is_file() {
                     runner(&t)
                 } else {
-                    // Script olup olmadığını kontrol et
-                    match package_manager::run_script(&t) {
-                        Ok(_) => Ok(()),
-                        Err(_e) => {
-                            // Eğer script değilse ve dosya olarak da yoksa hata ver
-                            if !std::path::Path::new(&t).exists() {
-                                return 1; // Hata kodu
-                            }
-                            runner(&t)
+                    match package_manager::has_local_script(&t) {
+                        Ok(true) => package_manager::run_script(&t),
+                        Ok(false) => {
+                            Err(anyhow!("'{}' adlı dosya veya proje betiği bulunamadı.", t))
                         }
+                        Err(error) if std::path::Path::new("huma.json").exists() => Err(error),
+                        Err(_) => Err(anyhow!("'{}' adlı dosya veya proje betiği bulunamadı.", t)),
                     }
                 }
             } else {
-                // Hiçbir şey verilmemişse:
-                if let Ok(meta) = package_manager::get_local_metadata() {
-                    if let Some(ref betikler) = meta.betikler {
-                        if betikler.contains_key("baslat") {
-                            return match package_manager::run_script("baslat") {
-                                Ok(_) => 0,
-                                Err(_) => 1,
-                            };
-                        } else if betikler.contains_key("start") {
-                            return match package_manager::run_script("start") {
-                                Ok(_) => 0,
-                                Err(_) => 1,
-                            };
+                match package_manager::get_local_metadata() {
+                    Ok(meta) => {
+                        if meta
+                            .betikler
+                            .as_ref()
+                            .is_some_and(|scripts| scripts.contains_key("baslat"))
+                        {
+                            package_manager::run_script("baslat")
+                        } else if meta
+                            .betikler
+                            .as_ref()
+                            .is_some_and(|scripts| scripts.contains_key("start"))
+                        {
+                            package_manager::run_script("start")
+                        } else {
+                            runner(&meta.giris)
                         }
                     }
-                    // Giriş dosyasını dene
-                    runner(&meta.giris)
-                } else {
-                    println!(
-                        "{} Ne bir .hb dosyası belirtildi ne de bir huma.json projesi bulundu.",
-                        "Hata:".bright_red()
-                    );
-                    Err(anyhow!(
-                        "Ne bir .hb dosyası belirtildi ne de bir huma.json projesi bulundu."
-                    ))
+                    Err(error) => Err(error.context(
+                        "Ne bir .hb dosyası belirtildi ne de geçerli bir huma.json projesi bulundu",
+                    )),
                 }
             }
         }
@@ -306,15 +356,20 @@ fn run(cli: Cli) -> i32 {
         // No subcommand — check if a bare file was passed
         None => {
             if let Some(file) = cli.file {
-                // Bare file passed
-                if file.ends_with(".hb") && std::path::Path::new(&file).exists() {
+                if std::path::Path::new(&file).is_file() {
                     commands::run_file(&file)
                 } else {
-                    // Try script first if it's a bare word
-                    if package_manager::run_script(&file).is_ok() {
-                        Ok(())
-                    } else {
-                        commands::run_file(&file)
+                    match package_manager::has_local_script(&file) {
+                        Ok(true) => package_manager::run_script(&file),
+                        Ok(false) => Err(anyhow!(
+                            "'{}' adlı dosya veya proje betiği bulunamadı.",
+                            file
+                        )),
+                        Err(error) if std::path::Path::new("huma.json").exists() => Err(error),
+                        Err(_) => Err(anyhow!(
+                            "'{}' adlı dosya veya proje betiği bulunamadı.",
+                            file
+                        )),
                     }
                 }
             } else {

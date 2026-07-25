@@ -38,7 +38,7 @@ metin_islemci sınıf olsun {
         (uzunluk(gecici) > 0) ise {
             tokens = listeye_ekle(tokens, gecici) olsun
         }
-        tokens'ı döndür
+        tokens'i döndür
     }
 
     karakter_tokenize fonksiyon olsun metin alsın {

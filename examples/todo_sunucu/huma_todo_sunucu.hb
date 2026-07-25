@@ -51,7 +51,7 @@ sunucu.gönder("/api/sil", fonksiyon olsun istek, cevap alsın {
         g = gorevler[i] olsun
         g_id = g.id olsun
         g_id != sil_id ise {
-            yeni_list'ye [g]'yi ekle
+            yeni_list'e [g]'yi ekle
         }
         i = i + 1 olsun
     }

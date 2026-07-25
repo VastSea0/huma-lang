@@ -9,7 +9,9 @@ pub mod pipeline;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use huma_core::{compiler::Derleyici, lexer::Lexer, parser::Parser, vm::VM};
+    use huma_core::{
+        compiler::Derleyici, interpreter::Yorumlayici, lexer::Lexer, parser::Parser, vm::VM,
+    };
     use std::{cell::RefCell, rc::Rc};
 
     fn compile_and_run(kod: &str) {
@@ -32,6 +34,38 @@ mod tests {
         vm.run_checked().expect("VM programı hatasız çalışmalı");
         let result = output.borrow().clone();
         result
+    }
+
+    fn yorumlayici_sonucu(kod: &str) -> Result<String, String> {
+        let mut parser = Parser::new(Lexer::new(kod));
+        let (program, diagnostics) = parser.parse_program_with_diagnostics();
+        if let Some(error) = diagnostics.into_iter().next() {
+            return Err(error.to_string());
+        }
+        let output = Rc::new(RefCell::new(String::new()));
+        let mut yorumlayici = Yorumlayici::new().with_output_buffer(output.clone());
+        yorumlayici
+            .yorumla_kontrollu(program)
+            .map_err(|error| error.to_string())?;
+        let result = output.borrow().clone();
+        Ok(result)
+    }
+
+    fn vm_sonucu(kod: &str) -> Result<String, String> {
+        let program = pipeline::compile_source(kod).map_err(|error| error.to_string())?;
+        let output = Rc::new(RefCell::new(String::new()));
+        let mut vm = VM::new(program).with_output_buffer(output.clone());
+        vm.run_checked().map_err(|error| error.to_string())?;
+        let result = output.borrow().clone();
+        Ok(result)
+    }
+
+    fn arka_uclar_esit(kod: &str) {
+        assert_eq!(
+            yorumlayici_sonucu(kod),
+            vm_sonucu(kod),
+            "yorumlayıcı ve VM farklı sonuç üretti"
+        );
     }
 
     // ─────────────────────────────────────────────
@@ -127,6 +161,62 @@ mod tests {
             fibonacci(7)'yi yazdır
         "#;
         assert_eq!(vm_output(kod), "0\n1\n1\n13\n");
+    }
+
+    #[test]
+    fn compiler_vm_closure_bytecode_olarak_kapsam_yakalar() {
+        let kod = r#"
+            toplayici_uret fonksiyon olsun taban alsın {
+                toplayici = fonksiyon olsun deger alsın {
+                    taban + deger'i döndür
+                } olsun
+                toplayici'yi döndür
+            }
+            on_ekle = toplayici_uret(10) olsun
+            on_ekle(5)'i yazdır
+        "#;
+        arka_uclar_esit(kod);
+        let program = pipeline::compile_source(kod).expect("Closure bytecode'a derlenmeli");
+        assert_eq!(
+            program.functions.len(),
+            2,
+            "İç ve dış fonksiyonlar düz fonksiyon tablosunda bulunmalı"
+        );
+        let output = Rc::new(RefCell::new(String::new()));
+        let mut vm = VM::new(program).with_output_buffer(output.clone());
+        vm.run_checked().expect("Bytecode closure çalışmalı");
+        assert_eq!(output.borrow().as_str(), "15\n");
+    }
+
+    #[test]
+    fn compiler_vm_hata_izi_fonksiyon_cercevelerini_gosterir() {
+        let kod = r#"
+            ic fonksiyon olsun { 1 / 0'ı döndür }
+            dis fonksiyon olsun { ic()'i döndür }
+            dis()
+        "#;
+        let program = pipeline::compile_source(kod).expect("Kaynak bytecode'a derlenmeli");
+        let error = VM::new(program)
+            .run_checked()
+            .expect_err("Sıfıra bölme hata vermeli")
+            .to_string();
+        assert!(error.contains("Çağrı izi: ic"), "{error}");
+        assert!(error.contains("<- dis"), "{error}");
+    }
+
+    #[test]
+    fn yorumlayici_vm_normatif_deger_semantiginde_esittir() {
+        for kod in [
+            r#"{} ise { "dolu"'yu yazdır } yoksa { "boş"'u yazdır }"#,
+            r#""2" < "10"'u yazdır"#,
+            r#""değer: " + 42'yi yazdır"#,
+            r#"f fonksiyon olsun x alsın { x'i döndür } f()'ı yazdır"#,
+            r#"{1: "geçersiz"}'i yazdır"#,
+            r#""2" * 3'ü yazdır"#,
+            r#"1e308 * 1e308'i yazdır"#,
+        ] {
+            arka_uclar_esit(kod);
+        }
     }
 
     #[test]

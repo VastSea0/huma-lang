@@ -1,10 +1,13 @@
 use crate::ast::{Ifade, Komut};
-use crate::bytecode::{Constant, OpCode, Program};
+use crate::bytecode::{validate_program, Constant, FunctionPrototype, OpCode, Program};
+use crate::error::SourceSpan;
 use crate::token::Token;
 
 pub struct Derleyici {
     constants: Vec<Constant>,
+    functions: Vec<FunctionPrototype>,
     instructions: Vec<OpCode>,
+    instruction_spans: Vec<Option<SourceSpan>>,
     errors: Vec<String>,
 }
 
@@ -18,31 +21,38 @@ impl Derleyici {
     pub fn new() -> Self {
         Self {
             constants: Vec::new(),
+            functions: Vec::new(),
             instructions: Vec::new(),
+            instruction_spans: Vec::new(),
             errors: Vec::new(),
         }
     }
 
     pub fn derle(&mut self, program: Vec<Komut>) -> Program {
         self.constants.clear();
+        self.functions.clear();
         self.instructions.clear();
+        self.instruction_spans.clear();
         self.errors.clear();
         for komut in program {
             self.komut_derle(komut);
         }
+        self.instruction_spans.resize(self.instructions.len(), None);
         Program {
             constants: self.constants.clone(),
+            functions: self.functions.clone(),
             instructions: self.instructions.clone(),
+            instruction_spans: self.instruction_spans.clone(),
         }
     }
 
     pub fn derle_kontrollu(&mut self, program: Vec<Komut>) -> Result<Program, String> {
         let compiled = self.derle(program);
-        if self.errors.is_empty() {
-            Ok(compiled)
-        } else {
-            Err(self.errors.join("\n"))
+        if !self.errors.is_empty() {
+            return Err(self.errors.join("\n"));
         }
+        validate_program(&compiled).map_err(|error| error.to_string())?;
+        Ok(compiled)
     }
 
     fn constant_ekle(&mut self, c: Constant) -> usize {
@@ -58,6 +68,69 @@ impl Derleyici {
         }
     }
 
+    fn opcode_yeniden_konumlandir(
+        opcode: &mut OpCode,
+        constant_map: &[usize],
+        function_base: usize,
+    ) {
+        match opcode {
+            OpCode::PushConstant(index) => {
+                if let Some(mapped) = constant_map.get(*index) {
+                    *index = *mapped;
+                }
+            }
+            OpCode::DefineFunction { function_index, .. } | OpCode::MakeClosure(function_index) => {
+                *function_index = function_index.saturating_add(function_base);
+            }
+            _ => {}
+        }
+    }
+
+    fn fonksiyon_ekle(&mut self, params: Vec<String>, body: Vec<Komut>) -> Option<usize> {
+        let mut child = Derleyici::new();
+        for command in body {
+            child.komut_derle(command);
+        }
+        child.instructions.push(OpCode::Bos);
+        child.instructions.push(OpCode::Return);
+        child
+            .instruction_spans
+            .resize(child.instructions.len(), None);
+        if !child.errors.is_empty() {
+            self.errors.extend(
+                child
+                    .errors
+                    .into_iter()
+                    .map(|error| format!("Fonksiyon gövdesi: {error}")),
+            );
+            return None;
+        }
+
+        let constant_map = child
+            .constants
+            .into_iter()
+            .map(|constant| self.constant_ekle(constant))
+            .collect::<Vec<_>>();
+        let function_base = self.functions.len();
+        for mut function in child.functions {
+            for opcode in &mut function.instructions {
+                Self::opcode_yeniden_konumlandir(opcode, &constant_map, function_base);
+            }
+            self.functions.push(function);
+        }
+        for opcode in &mut child.instructions {
+            Self::opcode_yeniden_konumlandir(opcode, &constant_map, function_base);
+        }
+
+        let function_index = self.functions.len();
+        self.functions.push(FunctionPrototype {
+            params,
+            instructions: child.instructions,
+            instruction_spans: child.instruction_spans,
+        });
+        Some(function_index)
+    }
+
     fn ifade_derle(&mut self, ifade: Ifade) {
         match ifade {
             Ifade::Sayi(n) => {
@@ -69,7 +142,7 @@ impl Derleyici {
                 self.instructions.push(OpCode::PushConstant(idx));
             }
             Ifade::Degisken(ad) => {
-                self.instructions.push(OpCode::LoadVar(ad));
+                self.instructions.push(OpCode::LoadVar(ad.into()));
             }
             Ifade::Dogru => {
                 let idx = self.constant_ekle(Constant::Sayi(1.0));
@@ -145,14 +218,20 @@ impl Derleyici {
             Ifade::Cagri {
                 fonksiyon,
                 argumanlar,
-                ..
+                pos,
             } => {
                 let arg_len = argumanlar.len();
                 for arg in argumanlar {
                     self.ifade_derle(arg);
                 }
                 self.ifade_derle(*fonksiyon);
+                let call_index = self.instructions.len();
                 self.instructions.push(OpCode::Call(arg_len));
+                self.instruction_spans.resize(self.instructions.len(), None);
+                self.instruction_spans[call_index] = Some(SourceSpan {
+                    line: pos.0,
+                    column: pos.1,
+                });
             }
             Ifade::Bekle(e) => {
                 self.ifade_derle(*e);
@@ -186,6 +265,14 @@ impl Derleyici {
                 self.instructions.push(OpCode::PushConstant(idx));
                 self.instructions.push(OpCode::ListAccess);
             }
+            Ifade::FonksiyonIfadesi {
+                parametreler,
+                govde,
+            } => {
+                if let Some(function_index) = self.fonksiyon_ekle(parametreler, govde) {
+                    self.instructions.push(OpCode::MakeClosure(function_index));
+                }
+            }
             unsupported => {
                 self.errors.push(format!(
                     "Bytecode derleyici tarafından henüz desteklenmeyen ifade: {:?}",
@@ -197,17 +284,34 @@ impl Derleyici {
 
     fn komut_derle(&mut self, komut: Komut) {
         match komut {
+            Komut::Konumlu {
+                komut,
+                satir,
+                sutun,
+            } => {
+                let start = self.instructions.len();
+                self.komut_derle(*komut);
+                self.instruction_spans.resize(self.instructions.len(), None);
+                for span in &mut self.instruction_spans[start..] {
+                    if span.is_none() {
+                        *span = Some(SourceSpan {
+                            line: satir,
+                            column: sutun,
+                        });
+                    }
+                }
+            }
             Komut::YazdirKomutu(ifade) => {
                 self.ifade_derle(ifade);
                 self.instructions.push(OpCode::Print);
             }
             Komut::DegiskenTanimla { ad, deger } => {
                 self.ifade_derle(deger);
-                self.instructions.push(OpCode::DefineVar(ad));
+                self.instructions.push(OpCode::DefineVar(ad.into()));
             }
             Komut::Atama { ad, deger } => {
                 self.ifade_derle(deger);
-                self.instructions.push(OpCode::StoreVar(ad));
+                self.instructions.push(OpCode::StoreVar(ad.into()));
             }
             Komut::IfadeKomutu(ifade) => {
                 if let Ifade::IkiliIslem {
@@ -218,7 +322,7 @@ impl Derleyici {
                 {
                     self.ifade_derle(*sag);
                     match *sol {
-                        Ifade::Degisken(ad) => self.instructions.push(OpCode::StoreVar(ad)),
+                        Ifade::Degisken(ad) => self.instructions.push(OpCode::StoreVar(ad.into())),
                         other => self.errors.push(format!(
                             "Bytecode derleyici bu atama hedefini desteklemiyor: {:?}",
                             other
@@ -285,11 +389,13 @@ impl Derleyici {
             } => {
                 // Initialize loop variable
                 self.ifade_derle(baslangic);
-                self.instructions.push(OpCode::DefineVar(degisken.clone()));
+                self.instructions
+                    .push(OpCode::DefineVar(degisken.clone().into()));
 
                 let start_idx = self.instructions.len();
                 // Condition check: var <= bitis
-                self.instructions.push(OpCode::LoadVar(degisken.clone()));
+                self.instructions
+                    .push(OpCode::LoadVar(degisken.clone().into()));
                 self.ifade_derle(bitis);
                 self.instructions.push(OpCode::LessOrEqual);
 
@@ -301,11 +407,12 @@ impl Derleyici {
                 }
 
                 // Increment var = var + 1
-                self.instructions.push(OpCode::LoadVar(degisken.clone()));
+                self.instructions
+                    .push(OpCode::LoadVar(degisken.clone().into()));
                 let one_idx = self.constant_ekle(Constant::Sayi(1.0));
                 self.instructions.push(OpCode::PushConstant(one_idx));
                 self.instructions.push(OpCode::Add);
-                self.instructions.push(OpCode::StoreVar(degisken));
+                self.instructions.push(OpCode::StoreVar(degisken.into()));
 
                 self.instructions.push(OpCode::Jump(start_idx));
                 let end_idx = self.instructions.len();
@@ -316,11 +423,12 @@ impl Derleyici {
                 parametreler,
                 govde,
             } => {
-                self.instructions.push(OpCode::MakeFunction {
-                    name: ad,
-                    params: parametreler,
-                    body: govde,
-                });
+                if let Some(function_index) = self.fonksiyon_ekle(parametreler, govde) {
+                    self.instructions.push(OpCode::DefineFunction {
+                        name: ad.into(),
+                        function_index,
+                    });
+                }
             }
             Komut::DeneKomutu {
                 dene_govde,
@@ -343,7 +451,7 @@ impl Derleyici {
                 self.instructions[try_start_idx] = OpCode::TryBlockStart(catch_start);
 
                 if let Some(ad) = hata_degisken {
-                    self.instructions.push(OpCode::DefineVar(ad));
+                    self.instructions.push(OpCode::DefineVar(ad.into()));
                 } else {
                     self.instructions.push(OpCode::Pop);
                 }

@@ -10,6 +10,7 @@ use huma_core as huma;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Proje kökünü döndürür (huma-lang dizini).
 fn proje_koku() -> PathBuf {
@@ -26,6 +27,8 @@ fn proje_koku() -> PathBuf {
 /// Verilen kök dizin ve kaynak kodu ile yorumlayıcıyı çalıştırır.
 /// `extra_yollar` listesi ek arama yolları ekler (modül dosyaları için).
 fn eval_with_paths(kod: &str, extra_yollar: Vec<String>) -> (String, bool) {
+    let _capability_guard = huma::capability::install(huma::capability::CapabilitySet::allow_all())
+        .expect("Test yetenekleri kurulmalı");
     let buf = Rc::new(RefCell::new(String::new()));
     let mut yorumlayici = Yorumlayici::new().with_output_buffer(Rc::clone(&buf));
     for yol in extra_yollar {
@@ -43,6 +46,66 @@ fn eval_with_paths(kod: &str, extra_yollar: Vec<String>) -> (String, bool) {
         Ok(()) => (out, false),
         Err(error) => (format!("{}{}", out, error), true),
     }
+}
+
+fn gecici_modul_dizini(test_adi: &str) -> PathBuf {
+    let benzersiz = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Sistem saati Unix epoch sonrasında olmalı")
+        .as_nanos();
+    let path = std::env::temp_dir().join(format!(
+        "huma_modul_test_{}_{}_{}",
+        test_adi,
+        std::process::id(),
+        benzersiz
+    ));
+    std::fs::create_dir_all(&path).expect("Geçici modül dizini oluşturulmalı");
+    path
+}
+
+#[test]
+fn ad_alanli_modul_yalniz_acik_dis_aktarimlari_gosterir() {
+    let root = gecici_modul_dizini("ad_alani");
+    let module_path = root.join("hesap.hb");
+    std::fs::write(
+        &module_path,
+        r#"
+            gizli = 40 olsun
+            sayac = 0 olsun
+
+            topla fonksiyon olsun deger alsın {
+                gizli + deger'i döndür
+            }
+            artır fonksiyon olsun {
+                sayac = sayac + 1
+                sayac'ı döndür
+            }
+
+            topla'yı dışa aktar
+            artır'ı dışa aktar
+        "#,
+    )
+    .expect("Geçici modül yazılmalı");
+
+    let source = r#"
+        yükle "hesap.hb" olarak hesap
+        hesap'ın topla(2)'yi yazdır
+        hesap'ın artır()'ı yazdır
+        hesap'ın artır()'ı yazdır
+        hesap'ın gizli'yi yazdır
+    "#;
+    let (output, failed) = eval_with_paths(source, vec![root.to_string_lossy().to_string()]);
+    assert!(!failed, "{output}");
+    assert_eq!(output, "42\n1\n2\nBoş\n");
+
+    std::fs::remove_dir_all(root).expect("Geçici modül dizini temizlenmeli");
+}
+
+#[test]
+fn dis_a_aktar_modul_disinda_reddedilir() {
+    let (output, failed) = eval_with_paths("deger = 1 olsun\ndeger'i dışa aktar", Vec::new());
+    assert!(failed);
+    assert!(output.contains("yalnızca yüklenen bir modül"));
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -324,4 +387,65 @@ fn yorumlayici_modul_sonrasi_devam_edebilir() {
         "Modül yüklemesi temel işlemleri bozmamalı, çıktı: {}",
         cikti
     );
+}
+
+#[test]
+fn ayni_modul_farkli_goreli_yollardan_bir_kez_yuklenir() {
+    let dizin = gecici_modul_dizini("kanonik");
+    std::fs::write(dizin.join("tek.hb"), r#""yalnız bir kez"'i yazdır"#).expect("Modül yazılmalı");
+
+    let kod = r#"
+        yükle "tek.hb"
+        yükle "./tek.hb"
+    "#;
+    let (cikti, hata_var) = eval_with_paths(kod, vec![dizin.to_string_lossy().to_string()]);
+    assert!(!hata_var, "Kanonik modül yükleme başarısız: {cikti}");
+    assert_eq!(cikti, "yalnız bir kez\n");
+
+    std::fs::remove_dir_all(dizin).expect("Geçici modül dizini temizlenmeli");
+}
+
+#[test]
+fn dongusel_modul_yukleme_acik_hata_verir() {
+    let dizin = gecici_modul_dizini("dongu");
+    std::fs::write(dizin.join("a.hb"), r#"yükle "b.hb""#).expect("a modülü yazılmalı");
+    std::fs::write(dizin.join("b.hb"), r#"yükle "a.hb""#).expect("b modülü yazılmalı");
+
+    let (cikti, hata_var) =
+        eval_with_paths(r#"yükle "a.hb""#, vec![dizin.to_string_lossy().to_string()]);
+    assert!(hata_var, "Döngüsel modül yükleme reddedilmeliydi");
+    assert!(cikti.contains("Döngüsel modül yükleme"));
+
+    std::fs::remove_dir_all(dizin).expect("Geçici modül dizini temizlenmeli");
+}
+
+#[test]
+fn basarisiz_modul_duzeltildikten_sonra_yeniden_yuklenebilir() {
+    let dizin = gecici_modul_dizini("yeniden");
+    let modul = dizin.join("duzelt.hb");
+    std::fs::write(&modul, "bu =").expect("Bozuk modül yazılmalı");
+
+    let output = Rc::new(RefCell::new(String::new()));
+    let mut yorumlayici = Yorumlayici::new().with_output_buffer(Rc::clone(&output));
+    yorumlayici
+        .arama_yolları
+        .insert(0, dizin.to_string_lossy().to_string());
+
+    let mut parser = Parser::new(Lexer::new(r#"yükle "duzelt.hb""#));
+    let program = parser.parse_program();
+    assert!(yorumlayici.yorumla_kontrollu(program).is_err());
+    assert!(
+        yorumlayici.yuklenen_dosyalar.is_empty(),
+        "Başarısız modül yüklenmiş sayılmamalı"
+    );
+
+    std::fs::write(&modul, r#""düzeltildi"'yi yazdır"#).expect("Modül düzeltilmeli");
+    let mut parser = Parser::new(Lexer::new(r#"yükle "duzelt.hb""#));
+    let program = parser.parse_program();
+    yorumlayici
+        .yorumla_kontrollu(program)
+        .expect("Düzeltilen modül yeniden yüklenebilmeli");
+    assert_eq!(output.borrow().as_str(), "düzeltildi\n");
+
+    std::fs::remove_dir_all(dizin).expect("Geçici modül dizini temizlenmeli");
 }

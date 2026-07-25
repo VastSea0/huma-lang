@@ -1,9 +1,9 @@
 use crate::ast::{Ifade, Komut};
 use crate::builtin_files;
-use crate::error::{HumaError, HumaResult};
+use crate::error::{HumaError, HumaResult, RuntimeDiagnostic, SourceSpan, StackFrame};
 use crate::token::Token;
-use crate::value::Deger;
-use futures_util::FutureExt;
+use crate::value::{BuiltinRuntime, Deger};
+use futures_util::{FutureExt, StreamExt};
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server};
 use once_cell::sync::Lazy;
@@ -12,9 +12,12 @@ use rand::{Rng, SeedableRng};
 use regex::Regex;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-use std::io::{self, Write};
-use std::path::Path;
+use std::fmt::Write as FmtWrite;
+use std::io::{self, BufRead, Read, Write};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::rc::Rc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
@@ -24,6 +27,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tokio::task::LocalSet;
 use unicode_normalization::UnicodeNormalization;
+use wait_timeout::ChildExt;
 
 // Async server (hyper) state
 struct IncomingRequest {
@@ -34,18 +38,36 @@ struct IncomingRequest {
     respond_to: oneshot::Sender<Response<Body>>,
 }
 
-static SUNUCULAR: Lazy<Mutex<HashMap<u64, mpsc::UnboundedSender<IncomingRequest>>>> =
+static SUNUCULAR: Lazy<Mutex<HashMap<u64, mpsc::Sender<IncomingRequest>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
-static SUNUCU_RX: Lazy<tokio::sync::Mutex<HashMap<u64, mpsc::UnboundedReceiver<IncomingRequest>>>> =
+static SUNUCU_RX: Lazy<tokio::sync::Mutex<HashMap<u64, mpsc::Receiver<IncomingRequest>>>> =
     Lazy::new(|| tokio::sync::Mutex::new(HashMap::new()));
 static YANITLAR: Lazy<Mutex<HashMap<u64, oneshot::Sender<Response<Body>>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 static SQL_CONNECTIONS: Lazy<Mutex<HashMap<u64, rusqlite::Connection>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
-static NEXT_ID: Lazy<Mutex<u64>> = Lazy::new(|| Mutex::new(1));
+static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+const EN_BUYUK_GUVENLI_SAYISAL_KIMLIK: u64 = (1_u64 << 53) - 1;
+const EN_FAZLA_DOSYA_BYTES: usize = 64 * 1024 * 1024;
+const EN_FAZLA_BUILTIN_OGE: usize = 1_000_000;
+const EN_FAZLA_HTTP_GOVDE_BYTES: usize = 16 * 1024 * 1024;
+const EN_FAZLA_HTTP_BASLIK: usize = 128;
+const EN_FAZLA_BEKLEYEN_ISTEK: usize = 4096;
+const EN_FAZLA_SQL_BAGLANTI: usize = 1024;
+const EN_FAZLA_SQL_METIN_BYTES: usize = 1024 * 1024;
+const EN_FAZLA_SQL_SUTUN: usize = 1024;
+const EN_FAZLA_GIRDI_BYTES: usize = 1024 * 1024;
+const EN_FAZLA_SAYISAL_ISLEM: usize = 100_000_000;
+const EN_FAZLA_SISTEM_KOMUTU_BYTES: usize = 64 * 1024;
+const EN_FAZLA_SISTEM_CIKTISI_BYTES: usize = 16 * 1024 * 1024;
+const SISTEM_ZAMAN_ASIMI: Duration = Duration::from_secs(30);
+// AST yorumlayıcısı çağrıları Rust yığını üzerinde yürütür. Bu sınır, hata
+// denetimi devreye girmeden önce ev sahibi sürecin yığın taşmasıyla kapanmasını
+// önler. Daha derin çağrılar yığın tabanlı VM'de çalıştırılmalıdır.
+const INTERPRETER_MAX_CALL_DEPTH: usize = 32;
 
 struct YaprakExecutor {
-    rt: Runtime,
+    rt: Option<Runtime>,
     local: LocalSet,
     next_id: u64,
     tasks: HashMap<u64, JoinHandle<Deger>>,
@@ -54,10 +76,7 @@ struct YaprakExecutor {
 impl YaprakExecutor {
     fn new() -> Self {
         Self {
-            rt: Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .expect("tokio runtime init failed"),
+            rt: Builder::new_current_thread().enable_all().build().ok(),
             local: LocalSet::new(),
             next_id: 1,
             tasks: HashMap::new(),
@@ -68,16 +87,36 @@ impl YaprakExecutor {
     where
         F: std::future::Future<Output = Deger> + 'static,
     {
+        if self.rt.is_none() {
+            return Deger::Hata("Asenkron çalışma zamanı başlatılamadı".to_string());
+        }
         let id = self.next_id;
-        self.next_id += 1;
+        let Some(next_id) = self.next_id.checked_add(1) else {
+            return Deger::Hata("Görev kimliği alanı tükendi".to_string());
+        };
+        self.next_id = next_id;
         let handle = self.local.spawn_local(fut);
         self.tasks.insert(id, handle);
         Deger::GorevId(id)
     }
 
+    fn spawn_background<F>(&mut self, fut: F) -> Result<(), String>
+    where
+        F: std::future::Future<Output = ()> + 'static,
+    {
+        if self.rt.is_none() {
+            return Err("Asenkron çalışma zamanı başlatılamadı".to_string());
+        }
+        std::mem::drop(self.local.spawn_local(fut));
+        Ok(())
+    }
+
     fn await_task(&mut self, id: u64) -> Deger {
+        let Some(runtime) = self.rt.as_mut() else {
+            return Deger::Hata("Asenkron çalışma zamanı kullanılamıyor".to_string());
+        };
         match self.tasks.remove(&id) {
-            Some(handle) => match self.rt.block_on(self.local.run_until(handle)) {
+            Some(handle) => match runtime.block_on(self.local.run_until(handle)) {
                 Ok(v) => v,
                 Err(e) => Deger::Hata(format!("Görev hatası: {}", e)),
             },
@@ -88,6 +127,16 @@ impl YaprakExecutor {
 
 thread_local! {
     static YAPRAK: std::cell::RefCell<YaprakExecutor> = std::cell::RefCell::new(YaprakExecutor::new());
+}
+
+pub(crate) fn gorev_bekle(id: u64) -> Deger {
+    YAPRAK.with(|executor| match executor.try_borrow_mut() {
+        Ok(mut executor) => executor.await_task(id),
+        Err(_) => Deger::Hata(
+            "Görev beklenemedi: asenkron çalışma zamanı başka bir çağrı tarafından kullanılıyor"
+                .to_string(),
+        ),
+    })
 }
 
 const EN_FAZLA_TENSOR_ELEMANI: usize = 10_000_000;
@@ -129,22 +178,658 @@ fn indeks_dogrula(deger: f64, uzunluk: usize, islem: &str) -> Result<usize, Stri
     }
     if deger >= uzunluk as f64 {
         return Err(format!(
-            "{islem}: indeks {deger} sınır dışında (uzunluk {uzunluk})"
+            "{islem}: indeks sınır dışında: {deger} (uzunluk {uzunluk})"
         ));
     }
     Ok(deger as usize)
 }
 
-fn get_id() -> u64 {
-    let mut id = NEXT_ID.lock().unwrap();
-    let old = *id;
-    *id += 1;
-    old
+fn get_id() -> Result<u64, String> {
+    NEXT_ID
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+            (current < EN_BUYUK_GUVENLI_SAYISAL_KIMLIK).then_some(current + 1)
+        })
+        .map_err(|_| "Sayısal kimlik alanı tükendi".to_string())
+}
+
+fn safe_numeric_id(value: f64, operation_name: &str) -> Result<u64, String> {
+    if !value.is_finite()
+        || value < 0.0
+        || value.fract() != 0.0
+        || value > EN_BUYUK_GUVENLI_SAYISAL_KIMLIK as f64
+    {
+        return Err(format!(
+            "{operation_name}: kimlik güvenli aralıkta negatif olmayan tamsayı olmalıdır"
+        ));
+    }
+    Ok(value as u64)
+}
+
+fn yetenek_hatasi(capability: crate::capability::Capability, operation: &str) -> Option<Deger> {
+    crate::capability::require(capability, operation)
+        .err()
+        .map(Deger::Hata)
+}
+
+fn read_file_limited(path: impl AsRef<Path>, operation_name: &str) -> Result<Vec<u8>, String> {
+    let path = path.as_ref();
+    let file = std::fs::File::open(path)
+        .map_err(|error| format!("{operation_name}: '{}': {}", path.display(), error))?;
+    if let Ok(metadata) = file.metadata() {
+        if metadata.len() > EN_FAZLA_DOSYA_BYTES as u64 {
+            return Err(format!(
+                "{operation_name}: dosya {} baytlık güvenlik sınırını aşıyor",
+                EN_FAZLA_DOSYA_BYTES
+            ));
+        }
+    }
+    let mut bytes = Vec::new();
+    file.take((EN_FAZLA_DOSYA_BYTES as u64) + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("{operation_name}: '{}': {}", path.display(), error))?;
+    if bytes.len() > EN_FAZLA_DOSYA_BYTES {
+        return Err(format!(
+            "{operation_name}: dosya {} baytlık güvenlik sınırını aşıyor",
+            EN_FAZLA_DOSYA_BYTES
+        ));
+    }
+    Ok(bytes)
+}
+
+fn read_utf8_file_limited(path: impl AsRef<Path>, operation_name: &str) -> Result<String, String> {
+    String::from_utf8(read_file_limited(path, operation_name)?)
+        .map_err(|error| format!("{operation_name}: dosya geçerli UTF-8 değil: {error}"))
+}
+
+fn append_utf8_line_limited(path: &str, line: &str, operation_name: &str) -> Result<(), String> {
+    let existing_size = match std::fs::metadata(path) {
+        Ok(metadata) => metadata.len(),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => 0,
+        Err(error) => return Err(format!("{operation_name}: '{}': {}", path, error)),
+    };
+    let added_size = line
+        .len()
+        .checked_add(1)
+        .ok_or_else(|| format!("{operation_name}: satır boyutu taştı"))?;
+    let final_size = existing_size
+        .checked_add(added_size as u64)
+        .ok_or_else(|| format!("{operation_name}: dosya boyutu taştı"))?;
+    if final_size > EN_FAZLA_DOSYA_BYTES as u64 {
+        return Err(format!(
+            "{operation_name}: işlem dosyayı {} baytlık güvenlik sınırının üzerine çıkarır",
+            EN_FAZLA_DOSYA_BYTES
+        ));
+    }
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .map_err(|error| format!("{operation_name}: '{}': {}", path, error))?;
+    writeln!(file, "{line}").map_err(|error| format!("{operation_name}: '{}': {}", path, error))
+}
+
+fn pipe_oku_sinirli<R: Read>(
+    pipe: R,
+    limit: usize,
+    stream_name: &'static str,
+) -> Result<Vec<u8>, String> {
+    let mut bytes = Vec::new();
+    let mut limited = pipe.take((limit as u64) + 1);
+    limited
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("sistem: {stream_name} okunamadı: {error}"))?;
+    if bytes.len() > limit {
+        return Err(format!(
+            "sistem: {stream_name} {limit} baytlık çıktı sınırını aşıyor"
+        ));
+    }
+    Ok(bytes)
+}
+
+fn sistem_komutu_calistir(command: &str) -> Result<String, String> {
+    if command.is_empty() {
+        return Err("sistem: komut boş olamaz".to_string());
+    }
+    if command.len() > EN_FAZLA_SISTEM_KOMUTU_BYTES {
+        return Err(format!(
+            "sistem: komut {} bayt sınırını aşıyor",
+            EN_FAZLA_SISTEM_KOMUTU_BYTES
+        ));
+    }
+
+    let mut process = if cfg!(target_os = "windows") {
+        let mut process = Command::new("cmd");
+        process.args(["/C", command]);
+        process
+    } else {
+        let mut process = Command::new("sh");
+        process.args(["-c", command]);
+        process
+    };
+    let mut child = process
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("sistem: komut başlatılamadı: {error}"))?;
+
+    let stdout = match child.stdout.take() {
+        Some(stdout) => stdout,
+        None => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err("sistem: standart çıktı yakalanamadı".to_string());
+        }
+    };
+    let stderr = match child.stderr.take() {
+        Some(stderr) => stderr,
+        None => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err("sistem: standart hata yakalanamadı".to_string());
+        }
+    };
+
+    let stream_limit = EN_FAZLA_SISTEM_CIKTISI_BYTES;
+    let stdout_reader = match thread::Builder::new()
+        .name("huma-sistem-stdout".to_string())
+        .spawn(move || pipe_oku_sinirli(stdout, stream_limit, "standart çıktı"))
+    {
+        Ok(reader) => reader,
+        Err(error) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(format!("sistem: çıktı okuyucusu başlatılamadı: {error}"));
+        }
+    };
+    let stderr_reader = match thread::Builder::new()
+        .name("huma-sistem-stderr".to_string())
+        .spawn(move || pipe_oku_sinirli(stderr, stream_limit, "standart hata"))
+    {
+        Ok(reader) => reader,
+        Err(error) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = stdout_reader.join();
+            return Err(format!(
+                "sistem: hata çıktısı okuyucusu başlatılamadı: {error}"
+            ));
+        }
+    };
+
+    let status = match child.wait_timeout(SISTEM_ZAMAN_ASIMI) {
+        Ok(Some(status)) => status,
+        Ok(None) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = stdout_reader.join();
+            let _ = stderr_reader.join();
+            return Err(format!(
+                "sistem: komut {} saniyede tamamlanmadı",
+                SISTEM_ZAMAN_ASIMI.as_secs()
+            ));
+        }
+        Err(error) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = stdout_reader.join();
+            let _ = stderr_reader.join();
+            return Err(format!("sistem: komut beklenemedi: {error}"));
+        }
+    };
+
+    let stdout = stdout_reader.join().map_err(|_| {
+        "sistem: standart çıktı okuyucusu beklenmedik biçimde sonlandı".to_string()
+    })??;
+    let stderr = stderr_reader.join().map_err(|_| {
+        "sistem: standart hata okuyucusu beklenmedik biçimde sonlandı".to_string()
+    })??;
+    let total = stdout
+        .len()
+        .checked_add(stderr.len())
+        .ok_or_else(|| "sistem: toplam çıktı boyutu taştı".to_string())?;
+    if total > EN_FAZLA_SISTEM_CIKTISI_BYTES {
+        return Err(format!(
+            "sistem: toplam çıktı {} bayt sınırını aşıyor",
+            EN_FAZLA_SISTEM_CIKTISI_BYTES
+        ));
+    }
+
+    if status.success() {
+        let output = String::from_utf8(stdout)
+            .map_err(|_| "sistem: standart çıktı geçerli UTF-8 değil".to_string())?;
+        Ok(output.trim().to_string())
+    } else {
+        let code = status
+            .code()
+            .map_or_else(|| "sinyal".to_string(), |value| value.to_string());
+        let stderr = String::from_utf8(stderr)
+            .map_err(|_| "sistem: standart hata geçerli UTF-8 değil".to_string())?;
+        let stderr = stderr.trim();
+        if stderr.is_empty() {
+            Err(format!("sistem: komut başarısız oldu (çıkış: {code})"))
+        } else {
+            Err(format!(
+                "sistem: komut başarısız oldu (çıkış: {code}): {stderr}"
+            ))
+        }
+    }
+}
+
+fn csv_delimiter(value: Option<&Deger>, operation_name: &str) -> Result<u8, String> {
+    let Some(value) = value else {
+        return Ok(b',');
+    };
+    let Deger::Metin(delimiter) = value else {
+        return Err(format!(
+            "{operation_name}: ayraç tek baytlık ASCII metin olmalıdır; {} geldi",
+            value
+        ));
+    };
+    let bytes = delimiter.as_bytes();
+    if bytes.len() != 1 || !bytes[0].is_ascii() || matches!(bytes[0], b'\0' | b'\r' | b'\n' | b'"')
+    {
+        return Err(format!(
+            "{operation_name}: ayraç tırnak, satır sonu ve NUL dışında tek baytlık ASCII olmalıdır"
+        ));
+    }
+    Ok(bytes[0])
+}
+
+fn csv_field(
+    value: &Deger,
+    operation_name: &str,
+    row: usize,
+    column: usize,
+) -> Result<String, String> {
+    match value {
+        Deger::Metin(text) => Ok(text.clone()),
+        Deger::Sayi(number) if number.is_finite() => Ok(number.to_string()),
+        Deger::Sayi(_) => Err(format!(
+            "{operation_name}: {}. satır {}. sütunda sonlu sayı gerekir",
+            row + 1,
+            column + 1
+        )),
+        Deger::Bos => Ok(String::new()),
+        other => Err(format!(
+            "{operation_name}: {}. satır {}. sütunda metin, sayı veya boş değer gerekir; {} geldi",
+            row + 1,
+            column + 1,
+            other
+        )),
+    }
+}
+
+struct LimitedBuffer {
+    bytes: Vec<u8>,
+    limit: usize,
+}
+
+struct LimitedText {
+    text: String,
+    limit: usize,
+}
+
+impl LimitedText {
+    fn new(limit: usize) -> Self {
+        Self {
+            text: String::new(),
+            limit,
+        }
+    }
+}
+
+impl std::fmt::Write for LimitedText {
+    fn write_str(&mut self, text: &str) -> std::fmt::Result {
+        let next_size = self
+            .text
+            .len()
+            .checked_add(text.len())
+            .ok_or(std::fmt::Error)?;
+        if next_size > self.limit {
+            return Err(std::fmt::Error);
+        }
+        self.text.push_str(text);
+        Ok(())
+    }
+}
+
+impl LimitedBuffer {
+    fn new(limit: usize) -> Self {
+        Self {
+            bytes: Vec::new(),
+            limit,
+        }
+    }
+}
+
+impl Write for LimitedBuffer {
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        let next_size = self
+            .bytes
+            .len()
+            .checked_add(buffer.len())
+            .ok_or_else(|| io::Error::new(io::ErrorKind::FileTooLarge, "çıktı boyutu taştı"))?;
+        if next_size > self.limit {
+            return Err(io::Error::new(
+                io::ErrorKind::FileTooLarge,
+                "çıktı güvenlik sınırını aşıyor",
+            ));
+        }
+        self.bytes.extend_from_slice(buffer);
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+fn json_serialize_limited(
+    value: &serde_json::Value,
+    pretty: bool,
+    operation_name: &str,
+) -> Result<String, String> {
+    let mut output = LimitedBuffer::new(EN_FAZLA_DOSYA_BYTES);
+    let result = if pretty {
+        serde_json::to_writer_pretty(&mut output, value)
+    } else {
+        serde_json::to_writer(&mut output, value)
+    };
+    result.map_err(|error| format!("{operation_name}: JSON yazılamadı: {error}"))?;
+    String::from_utf8(output.bytes)
+        .map_err(|error| format!("{operation_name}: JSON çıktısı UTF-8 değil: {error}"))
+}
+
+fn display_value_limited(value: &Deger, operation_name: &str) -> Result<String, String> {
+    value
+        .to_string_limited(EN_FAZLA_DOSYA_BYTES)
+        .map_err(|error| format!("{operation_name}: {error}"))
+}
+
+fn replacement_output_size(
+    text: &str,
+    pattern: &str,
+    replacement: &str,
+    match_count: usize,
+    operation_name: &str,
+) -> Result<usize, String> {
+    let removed = pattern
+        .len()
+        .checked_mul(match_count)
+        .ok_or_else(|| format!("{operation_name}: çıktı boyutu hesabı taştı"))?;
+    let added = replacement
+        .len()
+        .checked_mul(match_count)
+        .ok_or_else(|| format!("{operation_name}: çıktı boyutu hesabı taştı"))?;
+    let result = text
+        .len()
+        .checked_sub(removed)
+        .and_then(|size| size.checked_add(added))
+        .ok_or_else(|| format!("{operation_name}: çıktı boyutu hesabı taştı"))?;
+    if result > EN_FAZLA_DOSYA_BYTES {
+        return Err(format!(
+            "{operation_name}: çıktı {} bayt sınırını aşıyor",
+            EN_FAZLA_DOSYA_BYTES
+        ));
+    }
+    Ok(result)
+}
+
+fn compile_regex(pattern: &str, operation_name: &str) -> Result<Regex, String> {
+    if pattern.len() > EN_FAZLA_SQL_METIN_BYTES {
+        return Err(format!(
+            "{operation_name}: desen {} bayt sınırını aşıyor",
+            EN_FAZLA_SQL_METIN_BYTES
+        ));
+    }
+    Regex::new(pattern).map_err(|error| format!("{operation_name}: geçersiz desen — {error}"))
+}
+
+fn validate_regex_text(text: &str, operation_name: &str) -> Result<(), String> {
+    if text.len() > EN_FAZLA_DOSYA_BYTES {
+        Err(format!(
+            "{operation_name}: metin {} bayt sınırını aşıyor",
+            EN_FAZLA_DOSYA_BYTES
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn unary_numeric_builtin(
+    args: Vec<Deger>,
+    operation_name: &str,
+    operation: fn(f64) -> f64,
+) -> Deger {
+    match args.as_slice() {
+        [Deger::Sayi(value)] if value.is_finite() => {
+            let result = operation(*value);
+            if result.is_finite() {
+                Deger::Sayi(result)
+            } else {
+                Deger::Hata(format!(
+                    "{operation_name}: işlem sonlu olmayan sonuç üretti"
+                ))
+            }
+        }
+        [Deger::Sayi(_)] => Deger::Hata(format!("{operation_name}: sayı sonlu olmalıdır")),
+        [other] => Deger::Hata(format!(
+            "{operation_name}: sayı bekleniyordu; {} geldi",
+            other
+        )),
+        _ => Deger::Hata(format!(
+            "{operation_name}: tam olarak 1 argüman bekleniyordu; {} geldi",
+            args.len()
+        )),
+    }
+}
+
+fn positive_unary_numeric_builtin(
+    args: Vec<Deger>,
+    operation_name: &str,
+    operation: fn(f64) -> f64,
+) -> Deger {
+    match args.as_slice() {
+        [Deger::Sayi(value)] if value.is_finite() && *value > 0.0 => {
+            let result = operation(*value);
+            if result.is_finite() {
+                Deger::Sayi(result)
+            } else {
+                Deger::Hata(format!(
+                    "{operation_name}: işlem sonlu olmayan sonuç üretti"
+                ))
+            }
+        }
+        [Deger::Sayi(_)] => Deger::Hata(format!("{operation_name}: pozitif ve sonlu sayı gerekir")),
+        [other] => Deger::Hata(format!(
+            "{operation_name}: sayı bekleniyordu; {} geldi",
+            other
+        )),
+        _ => Deger::Hata(format!(
+            "{operation_name}: tam olarak 1 argüman bekleniyordu; {} geldi",
+            args.len()
+        )),
+    }
+}
+
+fn value_to_finite_vector(value: &Deger, operation_name: &str) -> Result<Vec<f64>, String> {
+    let values = match value {
+        Deger::Vektor(vector) => vector
+            .try_borrow()
+            .map_err(|_| format!("{operation_name}: vektör kullanımda"))?
+            .clone(),
+        Deger::Liste(list) => {
+            let borrowed = list
+                .try_borrow()
+                .map_err(|_| format!("{operation_name}: liste kullanımda"))?;
+            let mut values = Vec::with_capacity(borrowed.len());
+            for (index, value) in borrowed.iter().enumerate() {
+                match value {
+                    Deger::Sayi(number) if number.is_finite() => values.push(*number),
+                    Deger::Sayi(_) => {
+                        return Err(format!(
+                            "{operation_name}: {index}. eleman sonlu sayı olmalıdır"
+                        ))
+                    }
+                    other => {
+                        return Err(format!(
+                            "{operation_name}: {index}. eleman sayı olmalıdır; {} geldi",
+                            other
+                        ))
+                    }
+                }
+            }
+            values
+        }
+        other => {
+            return Err(format!(
+                "{operation_name}: vektör veya sayı listesi bekleniyordu; {} geldi",
+                other
+            ))
+        }
+    };
+    if values.iter().any(|value| !value.is_finite()) {
+        return Err(format!(
+            "{operation_name}: bütün vektör elemanları sonlu olmalıdır"
+        ));
+    }
+    Ok(values)
+}
+
+fn value_to_finite_matrix(
+    value: &Deger,
+    operation_name: &str,
+) -> Result<(usize, usize, Vec<f64>), String> {
+    let Deger::Matris {
+        satirlar,
+        sutunlar,
+        veri,
+    } = value
+    else {
+        return Err(format!(
+            "{operation_name}: matris bekleniyordu; {} geldi",
+            value
+        ));
+    };
+    let expected = eleman_sayisi_dogrula(*satirlar, *sutunlar, operation_name)?;
+    let values = veri
+        .try_borrow()
+        .map_err(|_| format!("{operation_name}: matris kullanımda"))?;
+    if values.len() != expected {
+        return Err(format!("{operation_name}: bozuk matris veri boyutu"));
+    }
+    if values.iter().any(|value| !value.is_finite()) {
+        return Err(format!(
+            "{operation_name}: bütün matris elemanları sonlu olmalıdır"
+        ));
+    }
+    Ok((*satirlar, *sutunlar, values.clone()))
+}
+
+fn insert_keyed_value(
+    values: &Rc<RefCell<HashMap<String, Deger>>>,
+    key: String,
+    value: Deger,
+    maximum_items: usize,
+    operation_name: &str,
+) -> Result<(), String> {
+    let mut values = values
+        .try_borrow_mut()
+        .map_err(|_| format!("{operation_name}: hedef kullanımda"))?;
+    if !values.contains_key(&key) && values.len() >= maximum_items {
+        return Err(format!(
+            "{operation_name}: öğe sınırı aşıldı: {}",
+            maximum_items
+        ));
+    }
+    values.insert(key, value);
+    Ok(())
+}
+
+fn get_keyed_value(
+    values: &Rc<RefCell<HashMap<String, Deger>>>,
+    key: &str,
+    operation_name: &str,
+) -> Result<Option<Deger>, String> {
+    values
+        .try_borrow()
+        .map_err(|_| format!("{operation_name}: hedef kullanımda"))
+        .map(|values| values.get(key).cloned())
+}
+
+fn unary_matrix_builtin(
+    args: Vec<Deger>,
+    operation_name: &str,
+    operation: fn(f64) -> f64,
+) -> Deger {
+    let [value] = args.as_slice() else {
+        return Deger::Hata(format!(
+            "{operation_name}: tam olarak 1 argüman bekleniyordu; {} geldi",
+            args.len()
+        ));
+    };
+    let (rows, columns, values) = match value_to_finite_matrix(value, operation_name) {
+        Ok(matrix) => matrix,
+        Err(error) => return Deger::Hata(error),
+    };
+    let result = values.into_iter().map(operation).collect::<Vec<_>>();
+    if result.iter().any(|value| !value.is_finite()) {
+        return Deger::Hata(format!(
+            "{operation_name}: işlem sonlu olmayan sonuç üretti"
+        ));
+    }
+    Deger::Matris {
+        satirlar: rows,
+        sutunlar: columns,
+        veri: Rc::new(RefCell::new(result)),
+    }
+}
+
+fn binary_matrix_builtin(
+    args: Vec<Deger>,
+    operation_name: &str,
+    operation: fn(f64, f64) -> f64,
+) -> Deger {
+    let [left, right] = args.as_slice() else {
+        return Deger::Hata(format!(
+            "{operation_name}: tam olarak 2 argüman bekleniyordu; {} geldi",
+            args.len()
+        ));
+    };
+    let (left_rows, left_columns, left_values) = match value_to_finite_matrix(left, operation_name)
+    {
+        Ok(matrix) => matrix,
+        Err(error) => return Deger::Hata(error),
+    };
+    let (right_rows, right_columns, right_values) =
+        match value_to_finite_matrix(right, operation_name) {
+            Ok(matrix) => matrix,
+            Err(error) => return Deger::Hata(error),
+        };
+    if left_rows != right_rows || left_columns != right_columns {
+        return Deger::Hata(format!("{operation_name}: boyutlar eşit olmalıdır"));
+    }
+    let result = left_values
+        .into_iter()
+        .zip(right_values)
+        .map(|(left, right)| operation(left, right))
+        .collect::<Vec<_>>();
+    if result.iter().any(|value| !value.is_finite()) {
+        return Deger::Hata(format!(
+            "{operation_name}: işlem sonlu olmayan sonuç üretti"
+        ));
+    }
+    Deger::Matris {
+        satirlar: left_rows,
+        sutunlar: left_columns,
+        veri: Rc::new(RefCell::new(result)),
+    }
 }
 
 fn adam_matris_durumu(args: Vec<Deger>) -> Deger {
-    let (satirlar, sutunlar) = match (args.first(), args.get(1)) {
-        (Some(Deger::Sayi(r)), Some(Deger::Sayi(c))) => {
+    let (satirlar, sutunlar) = match args.as_slice() {
+        [Deger::Sayi(r), Deger::Sayi(c)] => {
             let satirlar = match boyut_dogrula(*r, "adam_durum_olustur", false) {
                 Ok(deger) => deger,
                 Err(hata) => return Deger::Hata(hata),
@@ -155,8 +840,14 @@ fn adam_matris_durumu(args: Vec<Deger>) -> Deger {
             };
             (satirlar, sutunlar)
         }
+        [_, _] => {
+            return Deger::Hata("adam_durum_olustur: pozitif tamsayı boyutlar gerekir".to_string());
+        }
         _ => {
-            return Deger::Hata("adam_durum_olustur: pozitif tamsayı boyutlar gerekir".to_string())
+            return Deger::Hata(format!(
+                "adam_durum_olustur: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            ));
         }
     };
     let eleman_sayisi = match eleman_sayisi_dogrula(satirlar, sutunlar, "adam_durum_olustur") {
@@ -185,15 +876,21 @@ fn adam_matris_durumu(args: Vec<Deger>) -> Deger {
 }
 
 fn adam_vektor_durumu(args: Vec<Deger>) -> Deger {
-    let boyut = match args.first() {
-        Some(Deger::Sayi(n)) => match boyut_dogrula(*n, "adam_vektor_durum_olustur", false) {
+    let boyut = match args.as_slice() {
+        [Deger::Sayi(n)] => match boyut_dogrula(*n, "adam_vektor_durum_olustur", false) {
             Ok(deger) => deger,
             Err(hata) => return Deger::Hata(hata),
         },
-        _ => {
+        [_] => {
             return Deger::Hata(
                 "adam_vektor_durum_olustur: pozitif tamsayı boyut gerekir".to_string(),
             )
+        }
+        _ => {
+            return Deger::Hata(format!(
+                "adam_vektor_durum_olustur: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            ));
         }
     };
     let mut durum = HashMap::new();
@@ -210,136 +907,252 @@ fn adam_vektor_durumu(args: Vec<Deger>) -> Deger {
 }
 
 fn adam_matris_guncelle(args: Vec<Deger>) -> Deger {
-    let (
-        Deger::Matris {
-            satirlar: wr,
-            sutunlar: wc,
-            veri: w,
-        },
-        Deger::Matris {
-            satirlar: gr,
-            sutunlar: gc,
-            veri: g,
-        },
-        Deger::Sozluk(durum),
-        Deger::Sayi(ogrenme_hizi),
-    ) = (match (args.first(), args.get(1), args.get(2), args.get(3)) {
-        (Some(w), Some(g), Some(d), Some(lr)) => (w, g, d, lr),
-        _ => {
-            return Deger::Hata(
-                "adam_matris_guncelle: W, gradyan, durum ve öğrenme hızı gerekir".to_string(),
-            )
-        }
-    })
+    let [weights @ Deger::Matris {
+        veri: weights_cell, ..
+    }, gradient @ Deger::Matris { .. }, Deger::Sozluk(state), Deger::Sayi(learning_rate)] =
+        args.as_slice()
     else {
-        return Deger::Hata("adam_matris_guncelle: geçersiz argüman türleri".to_string());
+        return if args.len() == 4 {
+            Deger::Hata(
+                "adam_matris_guncelle: iki matris, Adam durumu ve öğrenme hızı gerekir".to_string(),
+            )
+        } else {
+            Deger::Hata(format!(
+                "adam_matris_guncelle: tam olarak 4 argüman bekleniyordu; {} geldi",
+                args.len()
+            ))
+        };
     };
-    if wr != gr || wc != gc {
-        return Deger::Hata(
-            "adam_matris_guncelle: ağırlık ve gradyan boyutları eşit olmalı".to_string(),
-        );
-    }
-    if !ogrenme_hizi.is_finite() || *ogrenme_hizi <= 0.0 {
+    if !learning_rate.is_finite() || *learning_rate <= 0.0 {
         return Deger::Hata(
             "adam_matris_guncelle: öğrenme hızı pozitif ve sonlu olmalı".to_string(),
         );
     }
-
-    let (m_degeri, v_degeri, adim) = {
-        let mut map = durum.borrow_mut();
-        let adim = match map.get("adim") {
-            Some(Deger::Sayi(t)) => *t + 1.0,
-            _ => 1.0,
+    let (rows, columns, weights_values) =
+        match value_to_finite_matrix(weights, "adam_matris_guncelle") {
+            Ok(matrix) => matrix,
+            Err(error) => return Deger::Hata(error),
         };
-        map.insert("adim".to_string(), Deger::Sayi(adim));
-        (map.get("m").cloned(), map.get("v").cloned(), adim)
+    let (gradient_rows, gradient_columns, gradient_values) =
+        match value_to_finite_matrix(gradient, "adam_matris_guncelle") {
+            Ok(matrix) => matrix,
+            Err(error) => return Deger::Hata(error),
+        };
+    if rows != gradient_rows || columns != gradient_columns {
+        return Deger::Hata(
+            "adam_matris_guncelle: ağırlık ve gradyan boyutları eşit olmalı".to_string(),
+        );
+    }
+    let (m_value, v_value, current_step) = {
+        let map = match state.try_borrow() {
+            Ok(map) => map,
+            Err(_) => {
+                return Deger::Hata("adam_matris_guncelle: durum kullanımda".to_string());
+            }
+        };
+        let current_step = match map.get("adim") {
+            Some(Deger::Sayi(step)) if step.is_finite() && *step >= 0.0 && step.fract() == 0.0 => {
+                *step
+            }
+            _ => {
+                return Deger::Hata(
+                    "adam_matris_guncelle: durumdaki adım negatif olmayan tamsayı olmalı"
+                        .to_string(),
+                )
+            }
+        };
+        (map.get("m").cloned(), map.get("v").cloned(), current_step)
     };
-    let (Some(Deger::Matris { veri: m, .. }), Some(Deger::Matris { veri: v, .. })) =
-        (m_degeri, v_degeri)
+    let (
+        Some(m_value @ Deger::Matris { veri: m_cell, .. }),
+        Some(v_value @ Deger::Matris { veri: v_cell, .. }),
+    ) = (&m_value, &v_value)
     else {
         return Deger::Hata("adam_matris_guncelle: bozuk optimizör durumu".to_string());
     };
-
+    let (m_rows, m_columns, m_values) =
+        match value_to_finite_matrix(m_value, "adam_matris_guncelle") {
+            Ok(matrix) => matrix,
+            Err(error) => return Deger::Hata(error),
+        };
+    let (v_rows, v_columns, v_values) =
+        match value_to_finite_matrix(v_value, "adam_matris_guncelle") {
+            Ok(matrix) => matrix,
+            Err(error) => return Deger::Hata(error),
+        };
+    if (m_rows, m_columns) != (rows, columns) || (v_rows, v_columns) != (rows, columns) {
+        return Deger::Hata("adam_matris_guncelle: durum boyutu uyuşmuyor".to_string());
+    }
+    let next_step = current_step + 1.0;
+    if !next_step.is_finite() {
+        return Deger::Hata("adam_matris_guncelle: adım sayacı taştı".to_string());
+    }
     let beta1: f64 = 0.9;
     let beta2: f64 = 0.999;
     let epsilon = 1e-8;
-    let mut w = w.borrow_mut();
-    let g = g.borrow();
-    let mut m = m.borrow_mut();
-    let mut v = v.borrow_mut();
-    if w.len() != g.len() || w.len() != m.len() || w.len() != v.len() {
-        return Deger::Hata("adam_matris_guncelle: durum boyutu uyuşmuyor".to_string());
+    let correction1 = 1.0 - beta1.powf(next_step);
+    let correction2 = 1.0 - beta2.powf(next_step);
+    let mut next_weights = Vec::with_capacity(weights_values.len());
+    let mut next_m = Vec::with_capacity(weights_values.len());
+    let mut next_v = Vec::with_capacity(weights_values.len());
+    for index in 0..weights_values.len() {
+        let m = beta1 * m_values[index] + (1.0 - beta1) * gradient_values[index];
+        let v = beta2 * v_values[index]
+            + (1.0 - beta2) * gradient_values[index] * gradient_values[index];
+        let weight = weights_values[index]
+            - *learning_rate * (m / correction1) / ((v / correction2).sqrt() + epsilon);
+        if !m.is_finite() || !v.is_finite() || !weight.is_finite() {
+            return Deger::Hata(
+                "adam_matris_guncelle: güncelleme sonlu olmayan sonuç üretti".to_string(),
+            );
+        }
+        next_m.push(m);
+        next_v.push(v);
+        next_weights.push(weight);
     }
-    if g.iter().any(|deger| !deger.is_finite()) {
-        return Deger::Hata("adam_matris_guncelle: gradyanlar sonlu olmalı".to_string());
-    }
-    let duzeltme1 = 1.0 - beta1.powf(adim);
-    let duzeltme2 = 1.0 - beta2.powf(adim);
-    for index in 0..w.len() {
-        m[index] = beta1 * m[index] + (1.0 - beta1) * g[index];
-        v[index] = beta2 * v[index] + (1.0 - beta2) * g[index] * g[index];
-        let m_hat = m[index] / duzeltme1;
-        let v_hat = v[index] / duzeltme2;
-        w[index] -= *ogrenme_hizi * m_hat / (v_hat.sqrt() + epsilon);
-    }
+    let mut state_map = match state.try_borrow_mut() {
+        Ok(map) => map,
+        Err(_) => return Deger::Hata("adam_matris_guncelle: durum kullanımda".to_string()),
+    };
+    let mut weights_output = match weights_cell.try_borrow_mut() {
+        Ok(values) => values,
+        Err(_) => {
+            return Deger::Hata("adam_matris_guncelle: ağırlık matrisi kullanımda".to_string())
+        }
+    };
+    let mut m_output = match m_cell.try_borrow_mut() {
+        Ok(values) => values,
+        Err(_) => return Deger::Hata("adam_matris_guncelle: m matrisi kullanımda".to_string()),
+    };
+    let mut v_output = match v_cell.try_borrow_mut() {
+        Ok(values) => values,
+        Err(_) => return Deger::Hata("adam_matris_guncelle: v matrisi kullanımda".to_string()),
+    };
+    weights_output.copy_from_slice(&next_weights);
+    m_output.copy_from_slice(&next_m);
+    v_output.copy_from_slice(&next_v);
+    state_map.insert("adim".to_string(), Deger::Sayi(next_step));
     Deger::Bos
 }
 
 fn adam_vektor_guncelle(args: Vec<Deger>) -> Deger {
-    let (Deger::Vektor(w), Deger::Vektor(g), Deger::Sozluk(durum), Deger::Sayi(ogrenme_hizi)) =
-        (match (args.first(), args.get(1), args.get(2), args.get(3)) {
-            (Some(w), Some(g), Some(d), Some(lr)) => (w, g, d, lr),
-            _ => {
-                return Deger::Hata(
-                    "adam_vektor_guncelle: vektör, gradyan, durum ve öğrenme hızı gerekir"
-                        .to_string(),
-                )
-            }
-        })
+    let [weights @ Deger::Vektor(weights_cell), gradient @ Deger::Vektor(_), Deger::Sozluk(state), Deger::Sayi(learning_rate)] =
+        args.as_slice()
     else {
-        return Deger::Hata("adam_vektor_guncelle: geçersiz argüman türleri".to_string());
+        return if args.len() == 4 {
+            Deger::Hata(
+                "adam_vektor_guncelle: iki vektör, Adam durumu ve öğrenme hızı gerekir".to_string(),
+            )
+        } else {
+            Deger::Hata(format!(
+                "adam_vektor_guncelle: tam olarak 4 argüman bekleniyordu; {} geldi",
+                args.len()
+            ))
+        };
     };
-    if !ogrenme_hizi.is_finite() || *ogrenme_hizi <= 0.0 {
+    if !learning_rate.is_finite() || *learning_rate <= 0.0 {
         return Deger::Hata(
             "adam_vektor_guncelle: öğrenme hızı pozitif ve sonlu olmalı".to_string(),
         );
     }
-
-    let (m_degeri, v_degeri, adim) = {
-        let mut map = durum.borrow_mut();
-        let adim = match map.get("adim") {
-            Some(Deger::Sayi(t)) => *t + 1.0,
-            _ => 1.0,
-        };
-        map.insert("adim".to_string(), Deger::Sayi(adim));
-        (map.get("m").cloned(), map.get("v").cloned(), adim)
+    let weights_values = match value_to_finite_vector(weights, "adam_vektor_guncelle") {
+        Ok(values) => values,
+        Err(error) => return Deger::Hata(error),
     };
-    let (Some(Deger::Vektor(m)), Some(Deger::Vektor(v))) = (m_degeri, v_degeri) else {
+    let gradient_values = match value_to_finite_vector(gradient, "adam_vektor_guncelle") {
+        Ok(values) => values,
+        Err(error) => return Deger::Hata(error),
+    };
+    if weights_values.len() != gradient_values.len() {
+        return Deger::Hata(
+            "adam_vektor_guncelle: ağırlık ve gradyan boyutları eşit olmalı".to_string(),
+        );
+    }
+    let (m_value, v_value, current_step) = {
+        let map = match state.try_borrow() {
+            Ok(map) => map,
+            Err(_) => {
+                return Deger::Hata("adam_vektor_guncelle: durum kullanımda".to_string());
+            }
+        };
+        let current_step = match map.get("adim") {
+            Some(Deger::Sayi(step)) if step.is_finite() && *step >= 0.0 && step.fract() == 0.0 => {
+                *step
+            }
+            _ => {
+                return Deger::Hata(
+                    "adam_vektor_guncelle: durumdaki adım negatif olmayan tamsayı olmalı"
+                        .to_string(),
+                )
+            }
+        };
+        (map.get("m").cloned(), map.get("v").cloned(), current_step)
+    };
+    let (Some(m_value @ Deger::Vektor(m_cell)), Some(v_value @ Deger::Vektor(v_cell))) =
+        (&m_value, &v_value)
+    else {
         return Deger::Hata("adam_vektor_guncelle: bozuk optimizör durumu".to_string());
     };
-
+    let m_values = match value_to_finite_vector(m_value, "adam_vektor_guncelle") {
+        Ok(values) => values,
+        Err(error) => return Deger::Hata(error),
+    };
+    let v_values = match value_to_finite_vector(v_value, "adam_vektor_guncelle") {
+        Ok(values) => values,
+        Err(error) => return Deger::Hata(error),
+    };
+    if weights_values.len() != m_values.len() || weights_values.len() != v_values.len() {
+        return Deger::Hata("adam_vektor_guncelle: durum boyutu uyuşmuyor".to_string());
+    }
+    let next_step = current_step + 1.0;
+    if !next_step.is_finite() {
+        return Deger::Hata("adam_vektor_guncelle: adım sayacı taştı".to_string());
+    }
     let beta1: f64 = 0.9;
     let beta2: f64 = 0.999;
     let epsilon = 1e-8;
-    let mut w = w.borrow_mut();
-    let g = g.borrow();
-    let mut m = m.borrow_mut();
-    let mut v = v.borrow_mut();
-    if w.len() != g.len() || w.len() != m.len() || w.len() != v.len() {
-        return Deger::Hata("adam_vektor_guncelle: durum boyutu uyuşmuyor".to_string());
+    let correction1 = 1.0 - beta1.powf(next_step);
+    let correction2 = 1.0 - beta2.powf(next_step);
+    let mut next_weights = Vec::with_capacity(weights_values.len());
+    let mut next_m = Vec::with_capacity(weights_values.len());
+    let mut next_v = Vec::with_capacity(weights_values.len());
+    for index in 0..weights_values.len() {
+        let m = beta1 * m_values[index] + (1.0 - beta1) * gradient_values[index];
+        let v = beta2 * v_values[index]
+            + (1.0 - beta2) * gradient_values[index] * gradient_values[index];
+        let weight = weights_values[index]
+            - *learning_rate * (m / correction1) / ((v / correction2).sqrt() + epsilon);
+        if !m.is_finite() || !v.is_finite() || !weight.is_finite() {
+            return Deger::Hata(
+                "adam_vektor_guncelle: güncelleme sonlu olmayan sonuç üretti".to_string(),
+            );
+        }
+        next_m.push(m);
+        next_v.push(v);
+        next_weights.push(weight);
     }
-    if g.iter().any(|deger| !deger.is_finite()) {
-        return Deger::Hata("adam_vektor_guncelle: gradyanlar sonlu olmalı".to_string());
-    }
-    let duzeltme1 = 1.0 - beta1.powf(adim);
-    let duzeltme2 = 1.0 - beta2.powf(adim);
-    for index in 0..w.len() {
-        m[index] = beta1 * m[index] + (1.0 - beta1) * g[index];
-        v[index] = beta2 * v[index] + (1.0 - beta2) * g[index] * g[index];
-        let m_hat = m[index] / duzeltme1;
-        let v_hat = v[index] / duzeltme2;
-        w[index] -= *ogrenme_hizi * m_hat / (v_hat.sqrt() + epsilon);
-    }
+    let mut state_map = match state.try_borrow_mut() {
+        Ok(map) => map,
+        Err(_) => return Deger::Hata("adam_vektor_guncelle: durum kullanımda".to_string()),
+    };
+    let mut weights_output = match weights_cell.try_borrow_mut() {
+        Ok(values) => values,
+        Err(_) => {
+            return Deger::Hata("adam_vektor_guncelle: ağırlık vektörü kullanımda".to_string())
+        }
+    };
+    let mut m_output = match m_cell.try_borrow_mut() {
+        Ok(values) => values,
+        Err(_) => return Deger::Hata("adam_vektor_guncelle: m vektörü kullanımda".to_string()),
+    };
+    let mut v_output = match v_cell.try_borrow_mut() {
+        Ok(values) => values,
+        Err(_) => return Deger::Hata("adam_vektor_guncelle: v vektörü kullanımda".to_string()),
+    };
+    weights_output.copy_from_slice(&next_weights);
+    m_output.copy_from_slice(&next_m);
+    v_output.copy_from_slice(&next_v);
+    state_map.insert("adim".to_string(), Deger::Sayi(next_step));
     Deger::Bos
 }
 
@@ -348,12 +1161,23 @@ pub struct Yorumlayici {
     pub yerel_scopes: Vec<HashMap<String, Deger>>,
     pub donus_degeri: Option<Deger>,
     pub yuklenen_dosyalar: HashSet<String>,
+    yuklenmekte_olan_dosyalar: HashSet<String>,
+    module_namespaces: HashMap<String, HashMap<String, Deger>>,
+    module_environments: HashMap<String, HashMap<String, Deger>>,
+    active_exports: Vec<HashSet<String>>,
+    active_module_bindings: Vec<HashSet<String>>,
+    active_module_calls: Vec<String>,
     pub arama_yolları: Vec<String>,
     pub output_buffer: Option<Rc<RefCell<String>>>,
     pub call_depth: usize,
-    runtime_errors: Vec<String>,
+    runtime_errors: Vec<RuntimeDiagnostic>,
+    current_location: Option<SourceSpan>,
+    call_stack: Vec<StackFrame>,
     dongu_kontrolu: Option<DonguKontrolu>,
     dongu_derinligi: usize,
+    limits: crate::limits::ExecutionLimits,
+    executed_steps: u64,
+    output_bytes: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -387,9 +1211,18 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
         Deger::DahiliFonksiyon(|args| match args.as_slice() {
             [Deger::Metin(value)] => Deger::Sayi(value.chars().count() as f64),
             [Deger::Bayt(value)] => Deger::Sayi(value.len() as f64),
-            [Deger::Liste(value)] => Deger::Sayi(value.borrow().len() as f64),
-            [Deger::Sozluk(value)] => Deger::Sayi(value.borrow().len() as f64),
-            [Deger::Vektor(value)] => Deger::Sayi(value.borrow().len() as f64),
+            [Deger::Liste(value)] => match value.try_borrow() {
+                Ok(value) => Deger::Sayi(value.len() as f64),
+                Err(_) => Deger::Hata("uzunluk: liste kullanımda".to_string()),
+            },
+            [Deger::Sozluk(value)] => match value.try_borrow() {
+                Ok(value) => Deger::Sayi(value.len() as f64),
+                Err(_) => Deger::Hata("uzunluk: sözlük kullanımda".to_string()),
+            },
+            [Deger::Vektor(value)] => match value.try_borrow() {
+                Ok(value) => Deger::Sayi(value.len() as f64),
+                Err(_) => Deger::Hata("uzunluk: vektör kullanımda".to_string()),
+            },
             [other] => Deger::Hata(format!(
                 "uzunluk: metin, bayt, liste, sözlük veya vektör bekleniyordu; {} geldi",
                 other
@@ -403,29 +1236,57 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "oku".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(msg) = args.first() {
-                print!("{}", msg);
-                let _ = io::stdout().flush();
+            let prompt = match args.as_slice() {
+                [] => None,
+                [Deger::Metin(prompt)] if prompt.len() <= 4096 => Some(prompt),
+                [Deger::Metin(_)] => {
+                    return Deger::Hata("oku: istem 4096 baytı aşamaz".to_string())
+                }
+                [other] => {
+                    return Deger::Hata(format!("oku: istem metin olmalıdır; {} geldi", other))
+                }
+                _ => {
+                    return Deger::Hata(format!(
+                        "oku: 0 veya 1 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                }
+            };
+            if let Some(prompt) = prompt {
+                print!("{}", prompt);
+                if let Err(error) = io::stdout().flush() {
+                    return Deger::Hata(format!("oku: istem yazılamadı: {error}"));
+                }
             }
             let mut input = String::new();
-            if io::stdin().read_line(&mut input).is_ok() {
-                Deger::Metin(input.trim().to_string())
-            } else {
-                Deger::Bos
+            let stdin = io::stdin();
+            let mut limited = stdin.lock().take((EN_FAZLA_GIRDI_BYTES as u64) + 1);
+            match limited.read_line(&mut input) {
+                Ok(_) if input.len() <= EN_FAZLA_GIRDI_BYTES => {
+                    Deger::Metin(input.trim_end_matches(['\r', '\n']).to_string())
+                }
+                Ok(_) => Deger::Hata(format!(
+                    "oku: girdi {} bayt sınırını aşıyor",
+                    EN_FAZLA_GIRDI_BYTES
+                )),
+                Err(error) => Deger::Hata(format!("oku: girdi okunamadı: {error}")),
             }
         }),
     );
     globals.insert(
         "uyut".to_string(),
         Deger::DahiliFonksiyon(|args| match args.as_slice() {
-            [Deger::Sayi(ms)] if ms.is_finite() && *ms >= 0.0 && *ms <= u64::MAX as f64 => {
+            [Deger::Sayi(ms)]
+                if ms.is_finite() && *ms >= 0.0 && ms.fract() == 0.0 && *ms <= 60_000.0 =>
+            {
                 if *ms != 0.0 {
                     thread::sleep(Duration::from_millis(*ms as u64));
                 }
                 Deger::Bos
             }
             [Deger::Sayi(_)] => Deger::Hata(
-                "uyut: milisaniye sonlu ve negatif olmayan bir sayı olmalıdır".to_string(),
+                "uyut: milisaniye 0..60000 aralığında negatif olmayan bir tamsayı olmalıdır"
+                    .to_string(),
             ),
             [other] => Deger::Hata(format!("uyut: sayı bekleniyordu; {} geldi", other)),
             _ => Deger::Hata(format!(
@@ -453,7 +1314,17 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
         "listeye_ekle".to_string(),
         Deger::DahiliFonksiyon(|args| match args.as_slice() {
             [Deger::Liste(list), value] => {
-                let mut yeni = list.borrow().clone();
+                let borrowed = match list.try_borrow() {
+                    Ok(values) => values,
+                    Err(_) => return Deger::Hata("listeye_ekle: liste kullanımda".to_string()),
+                };
+                if borrowed.len() >= EN_FAZLA_BUILTIN_OGE {
+                    return Deger::Hata(format!(
+                        "listeye_ekle: liste {} öğelik güvenlik sınırına ulaştı",
+                        EN_FAZLA_BUILTIN_OGE
+                    ));
+                }
+                let mut yeni = borrowed.clone();
                 yeni.push(value.clone());
                 Deger::Liste(Rc::new(RefCell::new(yeni)))
             }
@@ -490,34 +1361,45 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
                     args.len()
                 ));
             }
-            match SystemTime::now().duration_since(UNIX_EPOCH) {
-                Ok(duration) => {
-                    let nanos = duration.as_nanos() as f64;
-                    Deger::Sayi((nanos % 1_000_000.0) / 1_000_000.0)
-                }
-                Err(error) => Deger::Hata(format!("rastgele: sistem saati hatası: {}", error)),
-            }
+            Deger::Sayi(rand::thread_rng().gen::<f64>())
         }),
     );
     globals.insert(
         "dosya_oku".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            let Some(Deger::Metin(yol)) = args.first() else {
-                return Deger::Hata("dosya_oku: dosya yolu gerekir".to_string());
+            let [Deger::Metin(yol)] = args.as_slice() else {
+                return Deger::Hata("dosya_oku: tam olarak bir dosya yolu gerekir".to_string());
             };
-            match std::fs::read_to_string(yol) {
+            if let Some(error) =
+                yetenek_hatasi(crate::capability::Capability::FileRead, "dosya_oku")
+            {
+                return error;
+            }
+            match read_utf8_file_limited(yol, "dosya_oku") {
                 Ok(icerik) => Deger::Metin(icerik),
-                Err(hata) => Deger::Hata(format!("dosya_oku: '{}': {}", yol, hata)),
+                Err(hata) => Deger::Hata(hata),
             }
         }),
     );
     globals.insert(
         "dosya_yaz".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            let (Some(Deger::Metin(yol)), Some(Deger::Metin(icerik))) = (args.first(), args.get(1))
-            else {
-                return Deger::Hata("dosya_yaz: dosya yolu ve metin gerekir".to_string());
+            let [Deger::Metin(yol), Deger::Metin(icerik)] = args.as_slice() else {
+                return Deger::Hata(
+                    "dosya_yaz: tam olarak dosya yolu ve metin gerekir".to_string(),
+                );
             };
+            if let Some(error) =
+                yetenek_hatasi(crate::capability::Capability::FileWrite, "dosya_yaz")
+            {
+                return error;
+            }
+            if icerik.len() > EN_FAZLA_DOSYA_BYTES {
+                return Deger::Hata(format!(
+                    "dosya_yaz: içerik {} baytlık güvenlik sınırını aşıyor",
+                    EN_FAZLA_DOSYA_BYTES
+                ));
+            }
             match std::fs::write(yol, icerik) {
                 Ok(()) => Deger::Sayi(1.0),
                 Err(hata) => Deger::Hata(format!("dosya_yaz: '{}': {}", yol, hata)),
@@ -533,6 +1415,9 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
                         .to_string(),
                 );
             };
+            if let Some(error) = yetenek_hatasi(crate::capability::Capability::Ffi, "ffi_yükle") {
+                return error;
+            }
             let mut manager = match crate::ffi::FFI_YONETICI.lock() {
                 Ok(manager) => manager,
                 Err(_) => {
@@ -548,135 +1433,240 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "ffi_çağır".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            let (Some(Deger::Metin(library)), Some(Deger::Metin(function))) =
-                (args.first(), args.get(1))
+            let (
+                Some(Deger::Metin(library)),
+                Some(Deger::Metin(function)),
+                Some(Deger::Metin(signature)),
+            ) = (args.first(), args.get(1), args.get(2))
             else {
                 return Deger::Hata(
-                    "ffi_çağır: kütüphane ve fonksiyon adı olmak üzere en az 2 metin gerekir"
+                    "ffi_çağır: kütüphane adı, fonksiyon adı ve açık ABI imzası gerekir"
                         .to_string(),
                 );
             };
+            if let Some(error) = yetenek_hatasi(crate::capability::Capability::Ffi, "ffi_çağır")
+            {
+                return error;
+            }
             let manager = match crate::ffi::FFI_YONETICI.lock() {
                 Ok(manager) => manager,
                 Err(_) => {
                     return Deger::Hata("ffi_çağır: FFI yöneticisi kilidi bozuldu".to_string())
                 }
             };
-            match manager.cagir_esnek(library, function, args[2..].to_vec()) {
+            match manager.cagir_imzali(library, function, signature, args[3..].to_vec()) {
                 Ok(result) => result,
                 Err(error) => Deger::Hata(format!("ffi_çağır: {}", error)),
             }
         }),
     );
     globals.insert(
+        "ffi_boşalt".to_string(),
+        Deger::DahiliFonksiyon(|args| {
+            let [Deger::Metin(name)] = args.as_slice() else {
+                return Deger::Hata(
+                    "ffi_boşalt: tam olarak bir kütüphane adı metni gerekir".to_string(),
+                );
+            };
+            if let Some(error) = yetenek_hatasi(crate::capability::Capability::Ffi, "ffi_boşalt") {
+                return error;
+            }
+            let mut manager = match crate::ffi::FFI_YONETICI.lock() {
+                Ok(manager) => manager,
+                Err(_) => {
+                    return Deger::Hata("ffi_boşalt: FFI yöneticisi kilidi bozuldu".to_string())
+                }
+            };
+            match manager.bosalt(name) {
+                Ok(()) => Deger::Sayi(1.0),
+                Err(error) => Deger::Hata(format!("ffi_boşalt: {}", error)),
+            }
+        }),
+    );
+    globals.insert(
         "tensor_olustur".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 3 {
-                if let (Deger::Sayi(r), Deger::Sayi(c), Deger::Liste(l)) =
-                    (&args[0], &args[1], &args[2])
-                {
-                    let req_grad = args
-                        .get(3)
-                        .map(|v| match v {
-                            Deger::Sayi(n) => *n != 0.0,
-                            _ => true,
-                        })
-                        .unwrap_or(true);
-                    let veri: Vec<f64> = l
-                        .borrow()
-                        .iter()
-                        .map(|d| match d {
-                            Deger::Sayi(n) => *n,
-                            _ => 0.0,
-                        })
-                        .collect();
-                    if let Ok(mut g) = crate::autograd::AUTOGRAD_GRAF.lock() {
-                        let t = g.tensor_olustur(*r as usize, *c as usize, veri, req_grad);
-                        return Deger::Tensor(t);
+            if !(3..=4).contains(&args.len()) {
+                return Deger::Hata(format!(
+                    "tensor_olustur: 3 veya 4 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            }
+            let (Deger::Sayi(r), Deger::Sayi(c), Deger::Liste(liste)) =
+                (&args[0], &args[1], &args[2])
+            else {
+                return Deger::Hata(
+                    "tensor_olustur: satır, sütun ve sayı listesi gerekir".to_string(),
+                );
+            };
+            let satirlar = match boyut_dogrula(*r, "tensor_olustur", false) {
+                Ok(value) => value,
+                Err(error) => return Deger::Hata(error),
+            };
+            let sutunlar = match boyut_dogrula(*c, "tensor_olustur", false) {
+                Ok(value) => value,
+                Err(error) => return Deger::Hata(error),
+            };
+            let expected = match eleman_sayisi_dogrula(satirlar, sutunlar, "tensor_olustur") {
+                Ok(value) => value,
+                Err(error) => return Deger::Hata(error),
+            };
+            let req_grad = match args.get(3) {
+                None => true,
+                Some(Deger::Sayi(value)) if *value == 0.0 => false,
+                Some(Deger::Sayi(value)) if *value == 1.0 => true,
+                Some(_) => {
+                    return Deger::Hata(
+                        "tensor_olustur: gradyan bayrağı 0 veya 1 olmalı".to_string(),
+                    )
+                }
+            };
+            let borrowed = match liste.try_borrow() {
+                Ok(values) => values,
+                Err(_) => {
+                    return Deger::Hata("tensor_olustur: liste kullanımda".to_string());
+                }
+            };
+            if borrowed.len() != expected {
+                return Deger::Hata(format!(
+                    "tensor_olustur: {}x{} boyut için {} eleman gerekir; {} geldi",
+                    satirlar,
+                    sutunlar,
+                    expected,
+                    borrowed.len()
+                ));
+            }
+            let mut veri = Vec::with_capacity(expected);
+            for (index, value) in borrowed.iter().enumerate() {
+                match value {
+                    Deger::Sayi(number) if number.is_finite() => veri.push(*number),
+                    Deger::Sayi(_) => {
+                        return Deger::Hata(format!(
+                            "tensor_olustur: {index}. eleman sonlu sayı olmalı"
+                        ))
+                    }
+                    _ => {
+                        return Deger::Hata(format!("tensor_olustur: {index}. eleman sayı olmalı"))
                     }
                 }
             }
-            Deger::Bos
+            drop(borrowed);
+            let mut graph = match crate::autograd::AUTOGRAD_GRAF.lock() {
+                Ok(graph) => graph,
+                Err(_) => {
+                    return Deger::Hata("tensor_olustur: autograd kilidi bozuldu".to_string())
+                }
+            };
+            match graph.tensor_olustur(satirlar, sutunlar, veri, req_grad) {
+                Ok(tensor) => Deger::Tensor(tensor),
+                Err(error) => Deger::Hata(error),
+            }
         }),
     );
     globals.insert(
         "tensor_topla".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Tensor(t1), Deger::Tensor(t2)) = (&args[0], &args[1]) {
-                    if let Ok(mut g) = crate::autograd::AUTOGRAD_GRAF.lock() {
-                        let res = g.topla(t1, t2);
-                        return Deger::Tensor(res);
-                    }
-                }
+            let [Deger::Tensor(left), Deger::Tensor(right)] = args.as_slice() else {
+                return Deger::Hata(
+                    "tensor_topla: tam olarak iki tensor argümanı gerekir".to_string(),
+                );
+            };
+            let mut graph = match crate::autograd::AUTOGRAD_GRAF.lock() {
+                Ok(graph) => graph,
+                Err(_) => return Deger::Hata("tensor_topla: autograd kilidi bozuldu".to_string()),
+            };
+            match graph.topla(left, right) {
+                Ok(tensor) => Deger::Tensor(tensor),
+                Err(error) => Deger::Hata(error),
             }
-            Deger::Bos
         }),
     );
     globals.insert(
         "tensor_matris_carp".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Tensor(t1), Deger::Tensor(t2)) = (&args[0], &args[1]) {
-                    if let Ok(mut g) = crate::autograd::AUTOGRAD_GRAF.lock() {
-                        match g.matris_carp(t1, t2) {
-                            Ok(res) => return Deger::Tensor(res),
-                            Err(e) => return Deger::Hata(e),
-                        }
-                    }
+            let [Deger::Tensor(left), Deger::Tensor(right)] = args.as_slice() else {
+                return Deger::Hata(
+                    "tensor_matris_carp: tam olarak iki tensor argümanı gerekir".to_string(),
+                );
+            };
+            let mut graph = match crate::autograd::AUTOGRAD_GRAF.lock() {
+                Ok(graph) => graph,
+                Err(_) => {
+                    return Deger::Hata("tensor_matris_carp: autograd kilidi bozuldu".to_string())
                 }
+            };
+            match graph.matris_carp(left, right) {
+                Ok(tensor) => Deger::Tensor(tensor),
+                Err(error) => Deger::Hata(error),
             }
-            Deger::Bos
         }),
     );
     globals.insert(
         "tensor_relu".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Tensor(t1)) = args.first() {
-                if let Ok(mut g) = crate::autograd::AUTOGRAD_GRAF.lock() {
-                    let res = g.relu(t1);
-                    return Deger::Tensor(res);
-                }
+            let [Deger::Tensor(input)] = args.as_slice() else {
+                return Deger::Hata(
+                    "tensor_relu: tam olarak bir tensor argümanı gerekir".to_string(),
+                );
+            };
+            let mut graph = match crate::autograd::AUTOGRAD_GRAF.lock() {
+                Ok(graph) => graph,
+                Err(_) => return Deger::Hata("tensor_relu: autograd kilidi bozuldu".to_string()),
+            };
+            match graph.relu(input) {
+                Ok(tensor) => Deger::Tensor(tensor),
+                Err(error) => Deger::Hata(error),
             }
-            Deger::Bos
         }),
     );
     globals.insert(
         "tensor_geri_yayilim".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Tensor(t1)) = args.first() {
-                if let Ok(mut g) = crate::autograd::AUTOGRAD_GRAF.lock() {
-                    if let Ok(()) = g.backward(t1.id) {
-                        return Deger::Sayi(1.0);
-                    }
+            let [Deger::Tensor(target)] = args.as_slice() else {
+                return Deger::Hata(
+                    "tensor_geri_yayilim: tam olarak bir tensor argümanı gerekir".to_string(),
+                );
+            };
+            let mut graph = match crate::autograd::AUTOGRAD_GRAF.lock() {
+                Ok(graph) => graph,
+                Err(_) => {
+                    return Deger::Hata("tensor_geri_yayilim: autograd kilidi bozuldu".to_string())
                 }
+            };
+            match graph.backward(target.id) {
+                Ok(()) => Deger::Sayi(1.0),
+                Err(error) => Deger::Hata(error),
             }
-            Deger::Sayi(0.0)
         }),
     );
     globals.insert(
         "tensor_gradyan".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Tensor(t1)) = args.first() {
-                let grad_vec = t1
-                    .gradyan
-                    .lock()
-                    .unwrap()
-                    .iter()
-                    .map(|n| Deger::Sayi(*n))
-                    .collect();
-                return Deger::Liste(Rc::new(RefCell::new(grad_vec)));
-            }
-            Deger::Bos
+            let [Deger::Tensor(tensor)] = args.as_slice() else {
+                return Deger::Hata(
+                    "tensor_gradyan: tam olarak bir tensor argümanı gerekir".to_string(),
+                );
+            };
+            let gradient = match tensor.gradyan.lock() {
+                Ok(gradient) => gradient,
+                Err(_) => return Deger::Hata("tensor_gradyan: gradyan kilidi bozuldu".to_string()),
+            };
+            let values = gradient.iter().copied().map(Deger::Sayi).collect();
+            Deger::Liste(Rc::new(RefCell::new(values)))
         }),
     );
     globals.insert(
         "bpe_eğit".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            let (Some(Deger::Metin(metin)), Some(Deger::Sayi(vocab_boyutu))) =
-                (args.first(), args.get(1))
-            else {
-                return Deger::Hata("bpe_eğit: metin ve sözlük boyutu gerekir".to_string());
+            let [Deger::Metin(metin), Deger::Sayi(vocab_boyutu)] = args.as_slice() else {
+                return if args.len() == 2 {
+                    Deger::Hata("bpe_eğit: metin ve sözlük boyutu gerekir".to_string())
+                } else {
+                    Deger::Hata(format!(
+                        "bpe_eğit: tam olarak 2 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
             };
             if !vocab_boyutu.is_finite()
                 || vocab_boyutu.fract() != 0.0
@@ -687,53 +1677,72 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
                 );
             }
             if let Ok(mut tok) = crate::tokenizer::BPE_TOKENIZER.lock() {
-                tok.egit(metin, *vocab_boyutu as usize);
-                return Deger::Sayi(1.0);
+                return match tok.egit(metin, *vocab_boyutu as usize) {
+                    Ok(()) => Deger::Sayi(1.0),
+                    Err(error) => Deger::Hata(format!("bpe_eğit: {error}")),
+                };
             }
             Deger::Hata("bpe_eğit: tokenizer kilidi alınamadı".to_string())
         }),
     );
     globals.insert(
         "bpe_kodla".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Metin(metin)) = args.first() {
-                if let Ok(tok) = crate::tokenizer::BPE_TOKENIZER.lock() {
-                    let ids = tok.kodla(metin);
-                    let list: Vec<Deger> =
-                        ids.into_iter().map(|id| Deger::Sayi(id as f64)).collect();
-                    return Deger::Liste(Rc::new(RefCell::new(list)));
-                }
-            }
-            Deger::Hata("bpe_kodla: metin gerekir".to_string())
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(metin)] => match crate::tokenizer::BPE_TOKENIZER.lock() {
+                Ok(tokenizer) => match tokenizer.kodla(metin) {
+                    Ok(ids) => Deger::Liste(Rc::new(RefCell::new(
+                        ids.into_iter().map(|id| Deger::Sayi(id as f64)).collect(),
+                    ))),
+                    Err(error) => Deger::Hata(format!("bpe_kodla: {error}")),
+                },
+                Err(_) => Deger::Hata("bpe_kodla: tokenizer kilidi alınamadı".to_string()),
+            },
+            [other] => Deger::Hata(format!("bpe_kodla: metin bekleniyordu; {} geldi", other)),
+            _ => Deger::Hata(format!(
+                "bpe_kodla: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
     globals.insert(
         "bpe_çöz".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Liste(l)) = args.first() {
-                let mut ids = Vec::with_capacity(l.borrow().len());
-                for deger in l.borrow().iter() {
-                    let Deger::Sayi(id) = deger else {
-                        return Deger::Hata(
-                            "bpe_çöz: token kimlikleri sayılardan oluşmalı".to_string(),
-                        );
-                    };
-                    if !id.is_finite() || *id < 0.0 || id.fract() != 0.0 {
-                        return Deger::Hata(
-                            "bpe_çöz: token kimlikleri negatif olmayan tamsayılar olmalı"
-                                .to_string(),
-                        );
-                    }
-                    ids.push(*id as usize);
+            let [Deger::Liste(list)] = args.as_slice() else {
+                return if args.len() == 1 {
+                    Deger::Hata("bpe_çöz: token kimliği listesi gerekir".to_string())
+                } else {
+                    Deger::Hata(format!(
+                        "bpe_çöz: tam olarak 1 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            let values = match list.try_borrow() {
+                Ok(values) => values,
+                Err(_) => return Deger::Hata("bpe_çöz: liste kullanımda".to_string()),
+            };
+            let mut ids = Vec::with_capacity(values.len());
+            for deger in values.iter() {
+                let Deger::Sayi(id) = deger else {
+                    return Deger::Hata(
+                        "bpe_çöz: token kimlikleri sayılardan oluşmalı".to_string(),
+                    );
+                };
+                if !id.is_finite() || *id < 0.0 || id.fract() != 0.0 || *id > usize::MAX as f64 {
+                    return Deger::Hata(
+                        "bpe_çöz: token kimlikleri negatif olmayan tamsayılar olmalı".to_string(),
+                    );
                 }
-                if let Ok(tok) = crate::tokenizer::BPE_TOKENIZER.lock() {
-                    return match tok.coz(&ids) {
-                        Ok(text) => Deger::Metin(text),
-                        Err(hata) => Deger::Hata(format!("bpe_çöz: {}", hata)),
-                    };
-                }
+                ids.push(*id as usize);
             }
-            Deger::Hata("bpe_çöz: token kimliği listesi gerekir".to_string())
+            drop(values);
+            match crate::tokenizer::BPE_TOKENIZER.lock() {
+                Ok(tokenizer) => match tokenizer.coz(&ids) {
+                    Ok(text) => Deger::Metin(text),
+                    Err(hata) => Deger::Hata(format!("bpe_çöz: {}", hata)),
+                },
+                Err(_) => Deger::Hata("bpe_çöz: tokenizer kilidi alınamadı".to_string()),
+            }
         }),
     );
     globals.insert(
@@ -742,37 +1751,13 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
             let [Deger::Metin(command)] = args.as_slice() else {
                 return Deger::Hata("sistem: tam olarak 1 metin komutu gerekir".to_string());
             };
+            if let Some(error) = yetenek_hatasi(crate::capability::Capability::Process, "sistem") {
+                return error;
+            }
 
-            let mut process = if cfg!(target_os = "windows") {
-                let mut process = std::process::Command::new("cmd");
-                process.args(["/C", command]);
-                process
-            } else {
-                let mut process = std::process::Command::new("sh");
-                process.args(["-c", command]);
-                process
-            };
-
-            match process.output() {
-                Ok(output) if output.status.success() => {
-                    Deger::Metin(String::from_utf8_lossy(&output.stdout).trim().to_string())
-                }
-                Ok(output) => {
-                    let code = output
-                        .status
-                        .code()
-                        .map_or_else(|| "sinyal".to_string(), |value| value.to_string());
-                    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-                    if stderr.is_empty() {
-                        Deger::Hata(format!("sistem: komut başarısız oldu (çıkış: {})", code))
-                    } else {
-                        Deger::Hata(format!(
-                            "sistem: komut başarısız oldu (çıkış: {}): {}",
-                            code, stderr
-                        ))
-                    }
-                }
-                Err(error) => Deger::Hata(format!("sistem: komut başlatılamadı: {}", error)),
+            match sistem_komutu_calistir(command) {
+                Ok(output) => Deger::Metin(output),
+                Err(error) => Deger::Hata(error),
             }
         }),
     );
@@ -780,18 +1765,64 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "dahili_sunucu_baslat".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            let port = match args.first() {
-                Some(Deger::Sayi(n)) => *n as u16,
-                _ => 8080,
+            if let Some(error) = yetenek_hatasi(
+                crate::capability::Capability::NetworkServer,
+                "dahili_sunucu_baslat",
+            ) {
+                return error;
+            }
+            let port = match args.as_slice() {
+                [Deger::Sayi(port)]
+                    if port.is_finite()
+                        && port.fract() == 0.0
+                        && (1.0..=u16::MAX as f64).contains(port) =>
+                {
+                    *port as u16
+                }
+                [other] => {
+                    return Deger::Hata(format!(
+                        "dahili_sunucu_baslat: 1..65535 arasında tamsayı port bekleniyordu; \
+                         {} geldi",
+                        other
+                    ))
+                }
+                _ => {
+                    return Deger::Hata(format!(
+                        "dahili_sunucu_baslat: tam olarak 1 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                }
             };
-            let sid = get_id();
+            let sid = match get_id() {
+                Ok(id) => id,
+                Err(error) => {
+                    return Deger::Hata(format!("dahili_sunucu_baslat: {error}"));
+                }
+            };
+            let addr = ([0, 0, 0, 0], port).into();
+            let server = match Server::try_bind(&addr) {
+                Ok(server) => server,
+                Err(error) => {
+                    return Deger::Hata(format!(
+                        "dahili_sunucu_baslat: {} portu dinlenemedi: {}",
+                        port, error
+                    ))
+                }
+            };
 
-            let (tx, rx) = mpsc::unbounded_channel::<IncomingRequest>();
-            SUNUCULAR.lock().unwrap().insert(sid, tx);
+            let (tx, rx) = mpsc::channel::<IncomingRequest>(1024);
+            match SUNUCULAR.lock() {
+                Ok(mut servers) => {
+                    servers.insert(sid, tx);
+                }
+                Err(_) => {
+                    return Deger::Hata(
+                        "dahili_sunucu_baslat: sunucu kayıt kilidi bozuldu".to_string(),
+                    )
+                }
+            }
             SUNUCU_RX.blocking_lock().insert(sid, rx);
 
-            // Spawn the hyper server on the Yaprak runtime.
-            let addr = ([0, 0, 0, 0], port).into();
             let make_svc = make_service_fn(move |_conn| {
                 let sid2 = sid;
                 async move {
@@ -799,14 +1830,88 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
                         let sid3 = sid2;
                         async move {
                             let url = req.uri().to_string();
+                            if url.len() > 8192 {
+                                return Ok::<_, hyper::Error>(
+                                    Response::builder()
+                                        .status(414)
+                                        .body(Body::from("istek hedefi çok uzun"))
+                                        .unwrap_or_else(|_| {
+                                            Response::new(Body::from("istek hedefi çok uzun"))
+                                        }),
+                                );
+                            }
                             let metot = req.method().to_string();
-                            let bytes = hyper::body::to_bytes(req.into_body())
-                                .await
-                                .unwrap_or_default();
-                            let govde = String::from_utf8_lossy(&bytes).to_string();
-
+                            let mut body = req.into_body();
+                            let mut bytes = Vec::new();
+                            while let Some(chunk) = body.next().await {
+                                let chunk = match chunk {
+                                    Ok(chunk) => chunk,
+                                    Err(_) => {
+                                        return Ok::<_, hyper::Error>(
+                                            Response::builder()
+                                                .status(400)
+                                                .body(Body::from("istek gövdesi okunamadı"))
+                                                .unwrap_or_else(|_| {
+                                                    Response::new(Body::from(
+                                                        "istek gövdesi okunamadı",
+                                                    ))
+                                                }),
+                                        )
+                                    }
+                                };
+                                let Some(next_size) = bytes.len().checked_add(chunk.len()) else {
+                                    return Ok::<_, hyper::Error>(
+                                        Response::builder()
+                                            .status(413)
+                                            .body(Body::from("istek gövdesi çok büyük"))
+                                            .unwrap_or_else(|_| {
+                                                Response::new(Body::from("istek gövdesi çok büyük"))
+                                            }),
+                                    );
+                                };
+                                if next_size > EN_FAZLA_HTTP_GOVDE_BYTES {
+                                    return Ok::<_, hyper::Error>(
+                                        Response::builder()
+                                            .status(413)
+                                            .body(Body::from("istek gövdesi çok büyük"))
+                                            .unwrap_or_else(|_| {
+                                                Response::new(Body::from("istek gövdesi çok büyük"))
+                                            }),
+                                    );
+                                }
+                                bytes.extend_from_slice(&chunk);
+                            }
+                            let govde = match String::from_utf8(bytes) {
+                                Ok(body) => body,
+                                Err(_) => {
+                                    return Ok::<_, hyper::Error>(
+                                        Response::builder()
+                                            .status(415)
+                                            .body(Body::from("istek gövdesi geçerli UTF-8 değil"))
+                                            .unwrap_or_else(|_| {
+                                                Response::new(Body::from(
+                                                    "istek gövdesi geçerli UTF-8 değil",
+                                                ))
+                                            }),
+                                    )
+                                }
+                            };
                             let (resp_tx, resp_rx) = oneshot::channel::<Response<Body>>();
-                            let rid = get_id();
+                            let rid = match get_id() {
+                                Ok(id) => id,
+                                Err(error) => {
+                                    return Ok::<_, hyper::Error>(
+                                        Response::builder()
+                                            .status(503)
+                                            .body(Body::from(error))
+                                            .unwrap_or_else(|_| {
+                                                Response::new(Body::from(
+                                                    "istek kimliği üretilemedi",
+                                                ))
+                                            }),
+                                    );
+                                }
+                            };
                             let incoming = IncomingRequest {
                                 id: rid,
                                 url,
@@ -815,29 +1920,75 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
                                 respond_to: resp_tx,
                             };
 
-                            if let Some(sender) = SUNUCULAR.lock().unwrap().get(&sid3) {
-                                let _ = sender.send(incoming);
+                            let sender = match SUNUCULAR.lock() {
+                                Ok(servers) => servers.get(&sid3).cloned(),
+                                Err(_) => None,
+                            };
+                            let Some(sender) = sender else {
+                                return Ok::<_, hyper::Error>(
+                                    Response::builder()
+                                        .status(503)
+                                        .body(Body::from("sunucu kuyruğu kullanılamıyor"))
+                                        .unwrap_or_else(|_| {
+                                            Response::new(Body::from("sunucu kullanılamıyor"))
+                                        }),
+                                );
+                            };
+                            if sender.send(incoming).await.is_err() {
+                                return Ok::<_, hyper::Error>(
+                                    Response::builder()
+                                        .status(503)
+                                        .body(Body::from("sunucu kuyruğu kullanılamıyor"))
+                                        .unwrap_or_else(|_| {
+                                            Response::new(Body::from("sunucu kullanılamıyor"))
+                                        }),
+                                );
                             }
 
-                            match resp_rx.await {
-                                Ok(resp) => Ok::<_, hyper::Error>(resp),
-                                Err(_) => Ok::<_, hyper::Error>(
+                            match tokio::time::timeout(Duration::from_secs(30), resp_rx).await {
+                                Ok(Ok(response)) => Ok::<_, hyper::Error>(response),
+                                Ok(Err(_)) => Ok::<_, hyper::Error>(
                                     Response::builder()
                                         .status(500)
-                                        .body(Body::from("handler dropped"))
-                                        .unwrap(),
+                                        .body(Body::from("yanıtlayıcı kapandı"))
+                                        .unwrap_or_else(|_| {
+                                            Response::new(Body::from("yanıtlayıcı kapandı"))
+                                        }),
                                 ),
+                                Err(_) => {
+                                    if let Ok(mut responses) = YANITLAR.lock() {
+                                        responses.remove(&rid);
+                                    }
+                                    Ok::<_, hyper::Error>(
+                                        Response::builder()
+                                            .status(504)
+                                            .body(Body::from("yanıt zaman aşımına uğradı"))
+                                            .unwrap_or_else(|_| {
+                                                Response::new(Body::from(
+                                                    "yanıt zaman aşımına uğradı",
+                                                ))
+                                            }),
+                                    )
+                                }
                             }
                         }
                     }))
                 }
             });
 
-            YAPRAK.with(|y| {
-                let y = y.borrow_mut();
-                let fut = hyper::Server::bind(&addr).serve(make_svc).map(|_| ());
-                std::mem::drop(y.local.spawn_local(fut));
+            let spawn_result = YAPRAK.with(|executor| {
+                let mut executor = executor.try_borrow_mut().map_err(|_| {
+                    "asenkron çalışma zamanı başka bir çağrı tarafından kullanılıyor".to_string()
+                })?;
+                executor.spawn_background(server.serve(make_svc).map(|_| ()))
             });
+            if let Err(error) = spawn_result {
+                if let Ok(mut servers) = SUNUCULAR.lock() {
+                    servers.remove(&sid);
+                }
+                SUNUCU_RX.blocking_lock().remove(&sid);
+                return Deger::Hata(format!("dahili_sunucu_baslat: {error}"));
+            }
 
             Deger::Sayi(sid as f64)
         }),
@@ -846,23 +1997,69 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "dahili_sunucu_bekle".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            let sid = match args.first() {
-                Some(Deger::Sayi(n)) => *n as u64,
-                _ => return Deger::Bos,
+            if let Some(error) = yetenek_hatasi(
+                crate::capability::Capability::NetworkServer,
+                "dahili_sunucu_bekle",
+            ) {
+                return error;
+            }
+            let sid = match args.as_slice() {
+                [Deger::Sayi(id)]
+                    if id.is_finite()
+                        && id.fract() == 0.0
+                        && *id >= 0.0
+                        && *id <= EN_BUYUK_GUVENLI_SAYISAL_KIMLIK as f64 =>
+                {
+                    *id as u64
+                }
+                [other] => {
+                    return Deger::Hata(format!(
+                        "dahili_sunucu_bekle: geçerli sunucu kimliği bekleniyordu; {} geldi",
+                        other
+                    ))
+                }
+                _ => {
+                    return Deger::Hata(format!(
+                        "dahili_sunucu_bekle: tam olarak 1 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                }
             };
-            YAPRAK.with(|y| {
-                y.borrow_mut().spawn(async move {
+            YAPRAK.with(|executor| {
+                let Ok(mut executor) = executor.try_borrow_mut() else {
+                    return Deger::Hata(
+                        "dahili_sunucu_bekle: asenkron çalışma zamanı kullanımda".to_string(),
+                    );
+                };
+                executor.spawn(async move {
                     let mut guard = SUNUCU_RX.lock().await;
                     let rx = match guard.get_mut(&sid) {
-                        Some(r) => r,
-                        None => return Deger::Bos,
+                        Some(receiver) => receiver,
+                        None => {
+                            return Deger::Hata(format!(
+                                "dahili_sunucu_bekle: bilinmeyen sunucu kimliği: {}",
+                                sid
+                            ))
+                        }
                     };
                     match rx.recv().await {
                         Some(incoming) => {
-                            YANITLAR
-                                .lock()
-                                .unwrap()
-                                .insert(incoming.id, incoming.respond_to);
+                            match YANITLAR.lock() {
+                                Ok(mut responses) => {
+                                    if responses.len() >= EN_FAZLA_BEKLEYEN_ISTEK {
+                                        return Deger::Hata(format!(
+                                            "dahili_sunucu_bekle: en fazla {} yanıt bekleyebilir",
+                                            EN_FAZLA_BEKLEYEN_ISTEK
+                                        ));
+                                    }
+                                    responses.insert(incoming.id, incoming.respond_to);
+                                }
+                                Err(_) => {
+                                    return Deger::Hata(
+                                        "dahili_sunucu_bekle: yanıt kilidi bozuldu".to_string(),
+                                    )
+                                }
+                            }
                             let mut fields = HashMap::new();
                             fields.insert("id".to_string(), Deger::Sayi(incoming.id as f64));
                             fields.insert("url".to_string(), Deger::Metin(incoming.url));
@@ -871,9 +2068,12 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
                             Deger::Nesne {
                                 sinif_adi: "İstek".to_string(),
                                 alanlar: Rc::new(RefCell::new(fields)),
+                                module_kimligi: None,
                             }
                         }
-                        None => Deger::Bos,
+                        None => Deger::Hata(
+                            "dahili_sunucu_bekle: sunucu istek kanalı kapandı".to_string(),
+                        ),
                     }
                 })
             })
@@ -883,63 +2083,160 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "dahili_sunucu_yanitla".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Sayi(0.0);
+            if let Some(error) = yetenek_hatasi(
+                crate::capability::Capability::NetworkServer,
+                "dahili_sunucu_yanitla",
+            ) {
+                return error;
             }
-            let i_id = match &args[0] {
-                Deger::Sayi(n) => *n as u64,
-                _ => return Deger::Sayi(0.0),
+            if !(2..=5).contains(&args.len()) {
+                return Deger::Hata(format!(
+                    "dahili_sunucu_yanitla: 2 ile 5 arasında argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            }
+            let request_id = match &args[0] {
+                Deger::Sayi(id) => match safe_numeric_id(*id, "dahili_sunucu_yanitla") {
+                    Ok(id) => id,
+                    Err(error) => return Deger::Hata(error),
+                },
+                other => {
+                    return Deger::Hata(format!(
+                        "dahili_sunucu_yanitla: geçerli istek kimliği bekleniyordu; {} geldi",
+                        other
+                    ))
+                }
+            };
+            let data = match &args[1] {
+                Deger::Metin(text) => text.as_bytes().to_vec(),
+                Deger::Bayt(bytes) => bytes.clone(),
+                other => {
+                    return Deger::Hata(format!(
+                        "dahili_sunucu_yanitla: içerik metin veya bayt olmalıdır; {} geldi",
+                        other
+                    ))
+                }
+            };
+            if data.len() > EN_FAZLA_HTTP_GOVDE_BYTES {
+                return Deger::Hata(format!(
+                    "dahili_sunucu_yanitla: içerik {} bayt sınırını aşıyor",
+                    EN_FAZLA_HTTP_GOVDE_BYTES
+                ));
+            }
+            let status = match args.get(2) {
+                Some(Deger::Sayi(status))
+                    if status.is_finite()
+                        && status.fract() == 0.0
+                        && (100.0..=599.0).contains(status) =>
+                {
+                    *status as u16
+                }
+                Some(other) => {
+                    return Deger::Hata(format!(
+                        "dahili_sunucu_yanitla: HTTP durum kodu 100..599 arasında tamsayı \
+                         olmalıdır; {} geldi",
+                        other
+                    ))
+                }
+                None => 200,
+            };
+            let content_type = match args.get(3) {
+                Some(Deger::Metin(content_type)) => content_type.as_str(),
+                Some(other) => {
+                    return Deger::Hata(format!(
+                        "dahili_sunucu_yanitla: içerik türü metin olmalıdır; {} geldi",
+                        other
+                    ))
+                }
+                None => "text/html; charset=utf-8",
             };
 
-            let (data, _len) = match &args[1] {
-                Deger::Metin(s) => (s.as_bytes().to_vec(), s.len()),
-                Deger::Bayt(b) => (b.clone(), b.len()),
-                _ => (Vec::new(), 0),
-            };
-
-            let durum = match args.get(2) {
-                Some(Deger::Sayi(n)) => *n as u16,
-                _ => 200,
-            };
-            let tip = match args.get(3) {
-                Some(Deger::Metin(s)) => s.as_str(),
-                _ => "text/html; charset=utf-8",
-            };
-
-            if let Some(tx) = YANITLAR.lock().unwrap().remove(&i_id) {
-                let mut builder = Response::builder()
-                    .status(durum)
-                    .header("content-type", tip);
-
-                if args.len() >= 5 {
-                    if let Deger::Nesne { alanlar, .. } = &args[4] {
-                        for (k, v) in alanlar.borrow().iter() {
-                            builder = builder.header(k.as_str(), v.to_string());
+            let mut builder = Response::builder()
+                .status(status)
+                .header("content-type", content_type);
+            if let Some(headers) = args.get(4) {
+                match headers {
+                    Deger::Nesne { alanlar, .. } | Deger::Sozluk(alanlar) => {
+                        let headers = match alanlar.try_borrow() {
+                            Ok(headers) => headers,
+                            Err(_) => {
+                                return Deger::Hata(
+                                    "dahili_sunucu_yanitla: başlıklar kullanımda".to_string(),
+                                )
+                            }
+                        };
+                        if headers.len() > EN_FAZLA_HTTP_BASLIK {
+                            return Deger::Hata(format!(
+                                "dahili_sunucu_yanitla: en fazla {} başlık desteklenir",
+                                EN_FAZLA_HTTP_BASLIK
+                            ));
+                        }
+                        for (key, value) in headers.iter() {
+                            let Deger::Metin(value) = value else {
+                                return Deger::Hata(format!(
+                                    "dahili_sunucu_yanitla: '{key}' başlık değeri metin olmalıdır"
+                                ));
+                            };
+                            builder = builder.header(key.as_str(), value.as_str());
                         }
                     }
+                    other => {
+                        return Deger::Hata(format!(
+                        "dahili_sunucu_yanitla: başlıklar nesne veya sözlük olmalıdır; {} geldi",
+                        other
+                    ))
+                    }
                 }
-
-                let body = Body::from(data);
-                let resp = builder
-                    .body(body)
-                    .unwrap_or_else(|_| Response::new(Body::from("response build error")));
-                let _ = tx.send(resp);
-                return Deger::Sayi(1.0);
             }
-
-            Deger::Sayi(0.0)
+            let response = match builder.body(Body::from(data)) {
+                Ok(response) => response,
+                Err(error) => {
+                    return Deger::Hata(format!(
+                        "dahili_sunucu_yanitla: HTTP yanıtı oluşturulamadı: {}",
+                        error
+                    ))
+                }
+            };
+            let sender = match YANITLAR.lock() {
+                Ok(mut responses) => responses.remove(&request_id),
+                Err(_) => {
+                    return Deger::Hata("dahili_sunucu_yanitla: yanıt kilidi bozuldu".to_string())
+                }
+            };
+            let Some(sender) = sender else {
+                return Deger::Hata(format!(
+                    "dahili_sunucu_yanitla: bilinmeyen veya yanıtlanmış istek kimliği: {}",
+                    request_id
+                ));
+            };
+            if sender.send(response).is_err() {
+                return Deger::Hata(
+                    "dahili_sunucu_yanitla: istemci bağlantısı kapandı".to_string(),
+                );
+            }
+            Deger::Sayi(1.0)
         }),
     );
+    if let Some(function) = globals.get("dahili_sunucu_yanitla").cloned() {
+        globals.insert("dahili_sunucu_yanıtla".to_string(), function);
+    }
 
     globals.insert(
         "dosya_oku_bayt".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            let Some(Deger::Metin(yol)) = args.first() else {
-                return Deger::Hata("dosya_oku_bayt: dosya yolu gerekir".to_string());
+            let [Deger::Metin(yol)] = args.as_slice() else {
+                return Deger::Hata(
+                    "dosya_oku_bayt: tam olarak bir dosya yolu gerekir".to_string(),
+                );
             };
-            match std::fs::read(yol) {
+            if let Some(error) =
+                yetenek_hatasi(crate::capability::Capability::FileRead, "dosya_oku_bayt")
+            {
+                return error;
+            }
+            match read_file_limited(yol, "dosya_oku_bayt") {
                 Ok(baytlar) => Deger::Bayt(baytlar),
-                Err(hata) => Deger::Hata(format!("dosya_oku_bayt: '{}': {}", yol, hata)),
+                Err(hata) => Deger::Hata(hata),
             }
         }),
     );
@@ -948,58 +2245,168 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "dahili_istek".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
+            if !(2..=4).contains(&args.len()) {
+                return Deger::Hata(format!(
+                    "dahili_istek: 2 ile 4 arasında argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
             }
-            let metot = match &args[0] {
-                Deger::Metin(s) => s.to_uppercase(),
-                _ => "GET".to_string(),
+            if let Some(error) =
+                yetenek_hatasi(crate::capability::Capability::NetworkClient, "dahili_istek")
+            {
+                return error;
+            }
+            let (Deger::Metin(method_text), Deger::Metin(url_text)) = (&args[0], &args[1]) else {
+                return Deger::Hata("dahili_istek: yöntem ve URL metin olmalıdır".to_string());
             };
-            let url = match &args[1] {
-                Deger::Metin(s) => s.clone(),
-                _ => return Deger::Bos,
-            };
-            let govdeli = args.len() >= 3 && !matches!(args[2], Deger::Bos);
-            let govde = if govdeli {
-                match &args[2] {
-                    Deger::Metin(s) => s.clone(),
-                    _ => String::new(),
+            let method = match reqwest::Method::from_bytes(method_text.as_bytes()) {
+                Ok(method) => method,
+                Err(error) => {
+                    return Deger::Hata(format!("dahili_istek: geçersiz HTTP yöntemi: {error}"))
                 }
-            } else {
-                String::new()
             };
-            let headers = if args.len() >= 4 {
-                args[3].clone()
-            } else {
-                Deger::Bos
+            let url = match reqwest::Url::parse(url_text) {
+                Ok(url) if matches!(url.scheme(), "http" | "https") => url,
+                Ok(_) => {
+                    return Deger::Hata(
+                        "dahili_istek: yalnızca http ve https URL'leri desteklenir".to_string(),
+                    )
+                }
+                Err(error) => return Deger::Hata(format!("dahili_istek: geçersiz URL: {error}")),
             };
+            let body = match args.get(2) {
+                None | Some(Deger::Bos) => None,
+                Some(Deger::Metin(text)) => Some(text.as_bytes().to_vec()),
+                Some(Deger::Bayt(bytes)) => Some(bytes.clone()),
+                Some(other) => {
+                    return Deger::Hata(format!(
+                        "dahili_istek: gövde metin, bayt veya boş olmalıdır; {other} geldi"
+                    ))
+                }
+            };
+            if body
+                .as_ref()
+                .is_some_and(|body| body.len() > EN_FAZLA_HTTP_GOVDE_BYTES)
+            {
+                return Deger::Hata(format!(
+                    "dahili_istek: istek gövdesi {} bayt sınırını aşıyor",
+                    EN_FAZLA_HTTP_GOVDE_BYTES
+                ));
+            }
+            let mut header_pairs = Vec::new();
+            match args.get(3) {
+                None | Some(Deger::Bos) => {}
+                Some(Deger::Nesne { alanlar, .. }) | Some(Deger::Sozluk(alanlar)) => {
+                    let borrowed = match alanlar.try_borrow() {
+                        Ok(borrowed) => borrowed,
+                        Err(_) => {
+                            return Deger::Hata(
+                                "dahili_istek: başlık nesnesi kullanımda".to_string(),
+                            )
+                        }
+                    };
+                    if borrowed.len() > EN_FAZLA_HTTP_BASLIK {
+                        return Deger::Hata(format!(
+                            "dahili_istek: en fazla {} başlık desteklenir",
+                            EN_FAZLA_HTTP_BASLIK
+                        ));
+                    }
+                    for (key, value) in borrowed.iter() {
+                        let Deger::Metin(value) = value else {
+                            return Deger::Hata(format!(
+                                "dahili_istek: '{key}' başlığının değeri metin olmalıdır"
+                            ));
+                        };
+                        let name = match reqwest::header::HeaderName::from_bytes(key.as_bytes()) {
+                            Ok(name) => name,
+                            Err(error) => {
+                                return Deger::Hata(format!(
+                                    "dahili_istek: geçersiz başlık adı '{key}': {error}"
+                                ))
+                            }
+                        };
+                        let value = match reqwest::header::HeaderValue::from_str(value) {
+                            Ok(value) => value,
+                            Err(error) => {
+                                return Deger::Hata(format!(
+                                    "dahili_istek: '{key}' başlık değeri geçersiz: {error}"
+                                ))
+                            }
+                        };
+                        header_pairs.push((name, value));
+                    }
+                }
+                Some(other) => {
+                    return Deger::Hata(format!(
+                        "dahili_istek: başlıklar nesne, sözlük veya boş olmalıdır; {other} geldi"
+                    ))
+                }
+            }
 
             YAPRAK.with(|y| {
-                y.borrow_mut().spawn(async move {
-                    let client = reqwest::Client::new();
-                    let method = metot.parse().unwrap_or(reqwest::Method::GET);
+                let Ok(mut executor) = y.try_borrow_mut() else {
+                    return Deger::Hata(
+                        "dahili_istek: asenkron çalışma zamanı kullanımda".to_string(),
+                    );
+                };
+                executor.spawn(async move {
+                    const MAX_HTTP_RESPONSE_BYTES: usize = 16 * 1024 * 1024;
+                    let client = match reqwest::Client::builder()
+                        .timeout(Duration::from_secs(30))
+                        .build()
+                    {
+                        Ok(client) => client,
+                        Err(error) => {
+                            return Deger::Hata(format!(
+                                "dahili_istek: HTTP istemcisi oluşturulamadı: {error}"
+                            ))
+                        }
+                    };
                     let mut req = client.request(method, url);
 
-                    if let Deger::Nesne { alanlar, .. } = headers {
-                        for (k, v) in alanlar.borrow().iter() {
-                            if let Ok(hn) = reqwest::header::HeaderName::from_bytes(k.as_bytes()) {
-                                if let Ok(hv) =
-                                    reqwest::header::HeaderValue::from_str(&v.to_string())
-                                {
-                                    req = req.header(hn, hv);
-                                }
-                            }
-                        }
+                    for (name, value) in header_pairs {
+                        req = req.header(name, value);
                     }
-
-                    if govdeli {
-                        req = req.body(govde);
+                    if let Some(body) = body {
+                        req = req.body(body);
                     }
 
                     match req.send().await {
-                        Ok(res) => {
-                            let durum = res.status().as_u16() as f64;
-                            let icerik = res.text().await.unwrap_or_default();
+                        Ok(response) => {
+                            if response
+                                .content_length()
+                                .is_some_and(|length| length > MAX_HTTP_RESPONSE_BYTES as u64)
+                            {
+                                return Deger::Hata(format!(
+                                    "dahili_istek: yanıt {} bayt sınırını aşıyor",
+                                    MAX_HTTP_RESPONSE_BYTES
+                                ));
+                            }
+                            let durum = response.status().as_u16() as f64;
+                            let mut bytes = Vec::new();
+                            let mut stream = response.bytes_stream();
+                            while let Some(chunk) = stream.next().await {
+                                let chunk = match chunk {
+                                    Ok(chunk) => chunk,
+                                    Err(error) => {
+                                        return Deger::Hata(format!(
+                                            "dahili_istek: yanıt gövdesi okunamadı: {error}"
+                                        ))
+                                    }
+                                };
+                                let next_len = match bytes.len().checked_add(chunk.len()) {
+                                    Some(length) if length <= MAX_HTTP_RESPONSE_BYTES => length,
+                                    _ => {
+                                        return Deger::Hata(format!(
+                                            "dahili_istek: yanıt {} bayt sınırını aşıyor",
+                                            MAX_HTTP_RESPONSE_BYTES
+                                        ))
+                                    }
+                                };
+                                bytes.reserve(next_len - bytes.len());
+                                bytes.extend_from_slice(&chunk);
+                            }
+                            let icerik = String::from_utf8_lossy(&bytes).into_owned();
                             let alanlar = HashMap::from([
                                 ("durum".to_string(), Deger::Sayi(durum)),
                                 ("içerik".to_string(), Deger::Metin(icerik)),
@@ -1007,17 +2414,10 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
                             Deger::Nesne {
                                 sinif_adi: "İstekCevabı".to_string(),
                                 alanlar: Rc::new(RefCell::new(alanlar)),
+                                module_kimligi: None,
                             }
                         }
-                        Err(e) => {
-                            let mut alanlar = HashMap::new();
-                            alanlar.insert("durum".to_string(), Deger::Sayi(0.0));
-                            alanlar.insert("hata".to_string(), Deger::Metin(e.to_string()));
-                            Deger::Nesne {
-                                sinif_adi: "İstekHatası".to_string(),
-                                alanlar: Rc::new(RefCell::new(alanlar)),
-                            }
-                        }
+                        Err(error) => Deger::Hata(format!("dahili_istek: {error}")),
                     }
                 })
             })
@@ -1027,57 +2427,84 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "dosya_var_mı".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Metin(yol)) = args.first() {
-                return Deger::Sayi(if Path::new(yol).exists() { 1.0 } else { 0.0 });
+            let [Deger::Metin(yol)] = args.as_slice() else {
+                return Deger::Hata("dosya_var_mı: tam olarak bir dosya yolu gerekir".to_string());
+            };
+            if let Some(error) =
+                yetenek_hatasi(crate::capability::Capability::FileRead, "dosya_var_mı")
+            {
+                return error;
             }
-            Deger::Sayi(0.0)
+            Deger::Sayi(if Path::new(yol).exists() { 1.0 } else { 0.0 })
         }),
     );
     // JSON Fonksiyonları
     globals.insert(
         "nesneden_metine".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(d) = args.first() {
-                if let Ok(s) = serde_json::to_string_pretty(&d.to_json()) {
-                    return Deger::Metin(s);
-                }
-            }
-            Deger::Metin("null".to_string())
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [deger] => match deger.to_json_checked() {
+                Ok(json) => match json_serialize_limited(&json, true, "nesneden_metine") {
+                    Ok(text) => Deger::Metin(text),
+                    Err(error) => Deger::Hata(error),
+                },
+                Err(error) => Deger::Hata(format!("nesneden_metine: {error}")),
+            },
+            _ => Deger::Hata(format!(
+                "nesneden_metine: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
     globals.insert(
         "metinden_nesneye".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Metin(s)) = args.first() {
-                if let Ok(v) = serde_json::from_str::<serde_json::Value>(s) {
-                    return Deger::from_json(&v);
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(metin)] if metin.len() <= EN_FAZLA_DOSYA_BYTES => {
+                match serde_json::from_str::<serde_json::Value>(metin) {
+                    Ok(json) => Deger::from_json_checked(&json)
+                        .unwrap_or_else(|error| Deger::Hata(format!("metinden_nesneye: {error}"))),
+                    Err(error) => Deger::Hata(format!("metinden_nesneye: geçersiz JSON: {error}")),
                 }
             }
-            Deger::Bos
+            [Deger::Metin(_)] => Deger::Hata(format!(
+                "metinden_nesneye: girdi {} bayt sınırını aşıyor",
+                EN_FAZLA_DOSYA_BYTES
+            )),
+            [other] => Deger::Hata(format!(
+                "metinden_nesneye: metin bekleniyordu; {} geldi",
+                other
+            )),
+            _ => Deger::Hata(format!(
+                "metinden_nesneye: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
-    globals.insert(
-        "tipi".to_string(),
-        Deger::DahiliFonksiyon(|args| match args.first() {
-            Some(Deger::Sayi(_)) => Deger::Metin("Sayı".to_string()),
-            Some(Deger::Metin(_)) => Deger::Metin("Metin".to_string()),
-            Some(Deger::Liste(_)) => Deger::Metin("Liste".to_string()),
-            Some(Deger::Fonksiyon { .. }) => Deger::Metin("Fonksiyon".to_string()),
-            Some(Deger::Sinif { .. }) => Deger::Metin("Sınıf".to_string()),
-            Some(Deger::Nesne { .. }) => Deger::Metin("Nesne".to_string()),
-            _ => Deger::Metin("Boş".to_string()),
-        }),
-    );
-
     globals.insert(
         "ortam_değişkeni".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Metin(anahtar)) = args.first() {
-                if let Ok(val) = std::env::var(anahtar) {
-                    return Deger::Metin(val);
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(anahtar)] => {
+                if let Some(error) =
+                    yetenek_hatasi(crate::capability::Capability::Process, "ortam_değişkeni")
+                {
+                    return error;
+                }
+                match std::env::var(anahtar) {
+                    Ok(value) => Deger::Metin(value),
+                    Err(std::env::VarError::NotPresent) => Deger::Bos,
+                    Err(error) => Deger::Hata(format!(
+                        "ortam_değişkeni: '{}' okunamadı: {}",
+                        anahtar, error
+                    )),
                 }
             }
-            Deger::Bos
+            [other] => Deger::Hata(format!(
+                "ortam_değişkeni: metin anahtar bekleniyordu; {} geldi",
+                other
+            )),
+            _ => Deger::Hata(format!(
+                "ortam_değişkeni: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
@@ -1086,70 +2513,94 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     // küçük_harf(metin) → Türkçe-farkında küçük harf dönüşümü
     globals.insert(
         "küçük_harf".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Metin(s)) = args.first() {
-                let sonuc: String = s
-                    .chars()
-                    .map(|c| match c {
-                        'I' => 'ı',
-                        'İ' => 'i',
-                        'Ğ' => 'ğ',
-                        'Ş' => 'ş',
-                        'Ç' => 'ç',
-                        'Ö' => 'ö',
-                        'Ü' => 'ü',
-                        _ => c.to_lowercase().next().unwrap_or(c),
-                    })
-                    .collect();
-                Deger::Metin(sonuc)
-            } else {
-                Deger::Bos
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(s)] => {
+                let mut output = LimitedText::new(EN_FAZLA_DOSYA_BYTES);
+                for character in s.chars() {
+                    let result = match character {
+                        'I' => output.write_str("ı"),
+                        'İ' => output.write_str("i"),
+                        _ => character
+                            .to_lowercase()
+                            .try_for_each(|lower| output.write_char(lower)),
+                    };
+                    if result.is_err() {
+                        return Deger::Hata(format!(
+                            "küçük_harf: çıktı {} bayt sınırını aşıyor",
+                            EN_FAZLA_DOSYA_BYTES
+                        ));
+                    }
+                }
+                Deger::Metin(output.text)
             }
+            [other] => Deger::Hata(format!("küçük_harf: metin bekleniyordu; {} geldi", other)),
+            _ => Deger::Hata(format!(
+                "küçük_harf: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     // büyük_harf(metin) → Türkçe-farkında büyük harf dönüşümü
     globals.insert(
         "büyük_harf".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Metin(s)) = args.first() {
-                let sonuc: String = s
-                    .chars()
-                    .map(|c| match c {
-                        'ı' => 'I',
-                        'i' => 'İ',
-                        'ğ' => 'Ğ',
-                        'ş' => 'Ş',
-                        'ç' => 'Ç',
-                        'ö' => 'Ö',
-                        'ü' => 'Ü',
-                        _ => c.to_uppercase().next().unwrap_or(c),
-                    })
-                    .collect();
-                Deger::Metin(sonuc)
-            } else {
-                Deger::Bos
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(s)] => {
+                let mut output = LimitedText::new(EN_FAZLA_DOSYA_BYTES);
+                for character in s.chars() {
+                    let result = match character {
+                        'ı' => output.write_str("I"),
+                        'i' => output.write_str("İ"),
+                        _ => character
+                            .to_uppercase()
+                            .try_for_each(|upper| output.write_char(upper)),
+                    };
+                    if result.is_err() {
+                        return Deger::Hata(format!(
+                            "büyük_harf: çıktı {} bayt sınırını aşıyor",
+                            EN_FAZLA_DOSYA_BYTES
+                        ));
+                    }
+                }
+                Deger::Metin(output.text)
             }
+            [other] => Deger::Hata(format!("büyük_harf: metin bekleniyordu; {} geldi", other)),
+            _ => Deger::Hata(format!(
+                "büyük_harf: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     // böl(metin, ayraç) → Liste döndürür
     globals.insert(
         "böl".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Metin(s), Deger::Metin(ayrac)) = (&args[0], &args[1]) {
-                    let parcalar: Vec<Deger> = if ayrac.is_empty() {
-                        s.chars().map(|c| Deger::Metin(c.to_string())).collect()
-                    } else {
-                        s.split(ayrac.as_str())
-                            .map(|p| Deger::Metin(p.to_string()))
-                            .collect()
-                    };
-                    return Deger::Liste(Rc::new(RefCell::new(parcalar)));
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(metin), Deger::Metin(ayrac)] => {
+                let parcalar: Vec<Deger> = if ayrac.is_empty() {
+                    metin
+                        .chars()
+                        .map(|character| Deger::Metin(character.to_string()))
+                        .collect()
+                } else {
+                    metin
+                        .split(ayrac.as_str())
+                        .map(|part| Deger::Metin(part.to_string()))
+                        .collect()
+                };
+                if parcalar.len() > EN_FAZLA_BUILTIN_OGE {
+                    return Deger::Hata(format!(
+                        "böl: parça sayısı {} öğelik güvenlik sınırını aşıyor",
+                        EN_FAZLA_BUILTIN_OGE
+                    ));
                 }
+                Deger::Liste(Rc::new(RefCell::new(parcalar)))
             }
-            Deger::Bos
+            [_, _] => Deger::Hata("böl: iki argüman da metin olmalıdır".to_string()),
+            _ => Deger::Hata(format!(
+                "böl: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
@@ -1157,439 +2608,488 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "birleştir".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Liste(l), Deger::Metin(ayrac)) = (&args[0], &args[1]) {
-                    let parcalar: Vec<String> = l.borrow().iter().map(|d| d.to_string()).collect();
-                    return Deger::Metin(parcalar.join(ayrac.as_str()));
+            let (list, separator) = match args.as_slice() {
+                [Deger::Liste(list)] => (list, ""),
+                [Deger::Liste(list), Deger::Metin(separator)] => (list, separator.as_str()),
+                [_, _] => {
+                    return Deger::Hata(
+                        "birleştir: liste ve isteğe bağlı metin ayıracı gerekir".to_string(),
+                    )
                 }
-            } else if let Some(Deger::Liste(l)) = args.first() {
-                let parcalar: Vec<String> = l.borrow().iter().map(|d| d.to_string()).collect();
-                return Deger::Metin(parcalar.join(""));
+                _ => {
+                    return Deger::Hata(format!(
+                        "birleştir: 1 veya 2 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                }
+            };
+            let borrowed = match list.try_borrow() {
+                Ok(values) => values,
+                Err(_) => return Deger::Hata("birleştir: liste kullanımda".to_string()),
+            };
+            if borrowed.len() > EN_FAZLA_BUILTIN_OGE {
+                return Deger::Hata(format!(
+                    "birleştir: liste {} öğelik güvenlik sınırını aşıyor",
+                    EN_FAZLA_BUILTIN_OGE
+                ));
             }
-            Deger::Bos
+            let mut output = LimitedText::new(EN_FAZLA_DOSYA_BYTES);
+            for (index, value) in borrowed.iter().enumerate() {
+                if index > 0 && output.write_str(separator).is_err() {
+                    return Deger::Hata(format!(
+                        "birleştir: çıktı {} bayt sınırını aşıyor",
+                        EN_FAZLA_DOSYA_BYTES
+                    ));
+                }
+                match value {
+                    Deger::Metin(text) => {
+                        if output.write_str(text).is_err() {
+                            return Deger::Hata(format!(
+                                "birleştir: çıktı {} bayt sınırını aşıyor",
+                                EN_FAZLA_DOSYA_BYTES
+                            ));
+                        }
+                    }
+                    other => {
+                        return Deger::Hata(format!(
+                            "birleştir: liste yalnızca metin içermelidir; {} geldi",
+                            other
+                        ))
+                    }
+                }
+            }
+            Deger::Metin(output.text)
         }),
     );
 
     // değiştir(metin, aranan, yeni) → yeni metin
     globals.insert(
         "değiştir".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 3 {
-                if let (Deger::Metin(s), Deger::Metin(aranan), Deger::Metin(yeni)) =
-                    (&args[0], &args[1], &args[2])
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(text), Deger::Metin(pattern), Deger::Metin(replacement)] => {
+                let match_count = if pattern.is_empty() {
+                    text.chars().count().saturating_add(1)
+                } else {
+                    text.matches(pattern.as_str()).count()
+                };
+                if let Err(error) =
+                    replacement_output_size(text, pattern, replacement, match_count, "değiştir")
                 {
-                    return Deger::Metin(s.replace(aranan.as_str(), yeni.as_str()));
+                    return Deger::Hata(error);
                 }
+                Deger::Metin(text.replace(pattern.as_str(), replacement.as_str()))
             }
-            Deger::Bos
+            [_, _, _] => Deger::Hata("değiştir: üç argüman da metin olmalıdır".to_string()),
+            _ => Deger::Hata(format!(
+                "değiştir: tam olarak 3 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     // kırp(metin) → baştaki ve sondaki boşlukları sil
     globals.insert(
         "kırp".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Metin(s)) = args.first() {
-                Deger::Metin(s.trim().to_string())
-            } else {
-                Deger::Bos
-            }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(text)] => Deger::Metin(text.trim().to_string()),
+            [other] => Deger::Hata(format!("kırp: metin bekleniyordu; {} geldi", other)),
+            _ => Deger::Hata(format!(
+                "kırp: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     // tekrar_sayısı(metin, aranan) → kaç kez geçiyor
     globals.insert(
         "tekrar_sayısı".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Metin(s), Deger::Metin(aranan)) = (&args[0], &args[1]) {
-                    if aranan.is_empty() {
-                        return Deger::Sayi(0.0);
-                    }
-                    return Deger::Sayi(s.matches(aranan.as_str()).count() as f64);
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(text), Deger::Metin(pattern)] => {
+                if pattern.is_empty() {
+                    Deger::Sayi(0.0)
+                } else {
+                    Deger::Sayi(text.matches(pattern.as_str()).count() as f64)
                 }
             }
-            Deger::Bos
+            [_, _] => Deger::Hata("tekrar_sayısı: iki metin argümanı gerekir".to_string()),
+            _ => Deger::Hata(format!(
+                "tekrar_sayısı: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     // sayıya_çevir(metin) → Sayı değerine dönüştür
     globals.insert(
         "sayıya_çevir".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Metin(s)) = args.first() {
-                if let Ok(n) = s.trim().parse::<f64>() {
-                    return Deger::Sayi(n);
-                }
-            } else if let Some(Deger::Sayi(n)) = args.first() {
-                return Deger::Sayi(*n);
-            }
-            Deger::Bos
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(text)] => match text.trim().parse::<f64>() {
+                Ok(number) if number.is_finite() => Deger::Sayi(number),
+                Ok(_) => Deger::Hata("sayıya_çevir: sonuç sonlu olmalıdır".to_string()),
+                Err(error) => Deger::Hata(format!(
+                    "sayıya_çevir: '{}' geçerli bir sayı değil: {}",
+                    text, error
+                )),
+            },
+            [Deger::Sayi(number)] if number.is_finite() => Deger::Sayi(*number),
+            [Deger::Sayi(_)] => Deger::Hata("sayıya_çevir: sayı sonlu olmalıdır".to_string()),
+            [other] => Deger::Hata(format!(
+                "sayıya_çevir: metin veya sayı bekleniyordu; {} geldi",
+                other
+            )),
+            _ => Deger::Hata(format!(
+                "sayıya_çevir: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     // metne_çevir(değer) → Metin değerine dönüştür
     globals.insert(
         "metne_çevir".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(d) = args.first() {
-                Deger::Metin(d.to_string())
-            } else {
-                Deger::Bos
-            }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [value] => match display_value_limited(value, "metne_çevir") {
+                Ok(text) => Deger::Metin(text),
+                Err(error) => Deger::Hata(error),
+            },
+            _ => Deger::Hata(format!(
+                "metne_çevir: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
-    // ascii_kodu(karakter) → Unicode kod noktası
+    // ascii_kodu(karakter) — geriye uyumlu ad; bir Unicode kod noktası döndürür.
     globals.insert(
         "ascii_kodu".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Metin(s)) = args.first() {
-                if let Some(c) = s.chars().next() {
-                    return Deger::Sayi(c as u32 as f64);
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(text)] => {
+                let mut characters = text.chars();
+                let Some(character) = characters.next() else {
+                    return Deger::Hata("ascii_kodu: metin boş olamaz".to_string());
+                };
+                if characters.next().is_some() {
+                    return Deger::Hata(
+                        "ascii_kodu: tam olarak bir Unicode karakteri gerekir".to_string(),
+                    );
                 }
+                Deger::Sayi(character as u32 as f64)
             }
-            Deger::Bos
+            [other] => Deger::Hata(format!("ascii_kodu: metin bekleniyordu; {} geldi", other)),
+            _ => Deger::Hata(format!(
+                "ascii_kodu: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     // karakterden(kod) → Unicode karakterini metin olarak döndür
     globals.insert(
         "karakterden".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(n)) = args.first() {
-                if let Some(c) = char::from_u32(*n as u32) {
-                    return Deger::Metin(c.to_string());
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Sayi(number)]
+                if number.is_finite()
+                    && *number >= 0.0
+                    && number.fract() == 0.0
+                    && *number <= char::MAX as u32 as f64 =>
+            {
+                match char::from_u32(*number as u32) {
+                    Some(character) => Deger::Metin(character.to_string()),
+                    None => Deger::Hata(format!(
+                        "karakterden: {} geçerli bir Unicode kod noktası değil",
+                        number
+                    )),
                 }
             }
-            Deger::Bos
+            [Deger::Sayi(_)] => Deger::Hata(
+                "karakterden: 0 ile 1114111 arasında sonlu bir tamsayı gerekir".to_string(),
+            ),
+            [other] => Deger::Hata(format!("karakterden: sayı bekleniyordu; {} geldi", other)),
+            _ => Deger::Hata(format!(
+                "karakterden: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     // içeriyor(metin_veya_liste_veya_nesne, aranan) → 1 veya 0
     globals.insert(
         "içeriyor".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                match (&args[0], &args[1]) {
-                    (Deger::Metin(s), Deger::Metin(sub)) => {
-                        return Deger::Sayi(if s.contains(sub.as_str()) { 1.0 } else { 0.0 });
-                    }
-                    (Deger::Liste(l), target) => {
-                        let has = l.borrow().iter().any(|item| item == target);
-                        return Deger::Sayi(if has { 1.0 } else { 0.0 });
-                    }
-                    _ => {}
-                }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(text), Deger::Metin(pattern)] => {
+                Deger::Sayi(if text.contains(pattern.as_str()) {
+                    1.0
+                } else {
+                    0.0
+                })
             }
-            Deger::Sayi(0.0)
-        }),
-    );
-    globals.insert(
-        "dahili_sunucu_baslat".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            let port = match args.first() {
-                Some(Deger::Sayi(n)) => *n as u16,
-                _ => 8080,
-            };
-            let sid = get_id();
-
-            let (tx, rx) = mpsc::unbounded_channel::<IncomingRequest>();
-            SUNUCULAR.lock().unwrap().insert(sid, tx);
-            SUNUCU_RX.blocking_lock().insert(sid, rx);
-
-            let addr = ([0, 0, 0, 0], port).into();
-            let make_svc = make_service_fn(move |_conn| {
-                let sid2 = sid;
-                async move {
-                    Ok::<_, hyper::Error>(service_fn(move |req: Request<Body>| {
-                        let sid3 = sid2;
-                        async move {
-                            let url = req.uri().to_string();
-                            let metot = req.method().to_string();
-                            let bytes = hyper::body::to_bytes(req.into_body())
-                                .await
-                                .unwrap_or_default();
-                            let govde = String::from_utf8_lossy(&bytes).to_string();
-
-                            let (resp_tx, resp_rx) = oneshot::channel::<Response<Body>>();
-                            let rid = get_id();
-                            let incoming = IncomingRequest {
-                                id: rid,
-                                url,
-                                metot,
-                                govde,
-                                respond_to: resp_tx,
-                            };
-                            if let Some(tx) = SUNUCULAR.lock().unwrap().get(&sid3) {
-                                let _ = tx.send(incoming);
-                            }
-
-                            if let Ok(resp) = resp_rx.await {
-                                Ok::<_, hyper::Error>(resp)
-                            } else {
-                                Ok::<_, hyper::Error>(
-                                    Response::builder()
-                                        .status(500)
-                                        .body(Body::from("İç Sunucu Hatası"))
-                                        .unwrap(),
-                                )
-                            }
-                        }
-                    }))
-                }
-            });
-
-            tokio::spawn(async move {
-                let server = Server::bind(&addr).serve(make_svc);
-                let _ = server.await;
-            });
-
-            Deger::Sayi(sid as f64)
-        }),
-    );
-
-    globals.insert(
-        "dahili_sunucu_bekle".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(sid)) = args.first() {
-                let sid = *sid as u64;
-                let mut guard = SUNUCU_RX.blocking_lock();
-                if let Some(rx) = guard.get_mut(&sid) {
-                    if let Some(req) = rx.blocking_recv() {
-                        let mut fields = HashMap::new();
-                        fields.insert("id".to_string(), Deger::Sayi(req.id as f64));
-                        fields.insert("url".to_string(), Deger::Metin(req.url));
-                        fields.insert("metot".to_string(), Deger::Metin(req.metot));
-                        fields.insert("gövde".to_string(), Deger::Metin(req.govde));
-
-                        let rid = req.id;
-                        YANITLAR.lock().unwrap().insert(rid, req.respond_to);
-
-                        return Deger::Nesne {
-                            sinif_adi: "İstek".to_string(),
-                            alanlar: Rc::new(RefCell::new(fields)),
-                        };
+            [Deger::Liste(list), target] => {
+                let values = match list.try_borrow() {
+                    Ok(values) => values,
+                    Err(_) => return Deger::Hata("içeriyor: liste kullanımda".to_string()),
+                };
+                for item in values.iter() {
+                    match crate::semantics::esit_mi(item, target) {
+                        Ok(true) => return Deger::Sayi(1.0),
+                        Ok(false) => {}
+                        Err(error) => return Deger::Hata(format!("içeriyor: {error}")),
                     }
                 }
+                Deger::Sayi(0.0)
             }
-            Deger::Bos
+            [Deger::Nesne { alanlar, .. }, Deger::Metin(key)] => match alanlar.try_borrow() {
+                Ok(fields) => Deger::Sayi(if fields.contains_key(key) { 1.0 } else { 0.0 }),
+                Err(_) => Deger::Hata("içeriyor: nesne kullanımda".to_string()),
+            },
+            [Deger::Sozluk(map), Deger::Metin(key)] => match map.try_borrow() {
+                Ok(values) => Deger::Sayi(if values.contains_key(key) { 1.0 } else { 0.0 }),
+                Err(_) => Deger::Hata("içeriyor: sözlük kullanımda".to_string()),
+            },
+            [container, _] => Deger::Hata(format!(
+                "içeriyor: metin, liste, nesne veya sözlük bekleniyordu; {} geldi",
+                container
+            )),
+            _ => Deger::Hata(format!(
+                "içeriyor: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
-
-    globals.insert(
-        "dahili_sunucu_yanıtla".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 3 {
-                if let (Deger::Sayi(rid), Deger::Sayi(durum), Deger::Metin(icerik)) =
-                    (&args[0], &args[1], &args[2])
-                {
-                    let rid = *rid as u64;
-                    let responder = YANITLAR.lock().unwrap().remove(&rid);
-                    if let Some(tx) = responder {
-                        let resp = Response::builder()
-                            .status(*durum as u16)
-                            .header("Content-Type", "text/html; charset=utf-8")
-                            .body(Body::from(icerik.clone()))
-                            .unwrap();
-                        let _ = tx.send(resp);
-                        return Deger::Sayi(1.0);
-                    }
-                }
-            }
-            Deger::Sayi(0.0)
-        }),
-    );
-
-    globals.insert(
-        "tekrar_sayısı".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Metin(metin), Deger::Metin(aranan)) = (&args[0], &args[1]) {
-                    return Deger::Sayi(metin.matches(aranan).count() as f64);
-                }
-            }
-            Deger::Sayi(0.0)
-        }),
-    );
-
-    globals.insert(
-        "ascii_kodu".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Metin(s)) = args.first() {
-                if let Some(c) = s.chars().next() {
-                    return Deger::Sayi(c as u32 as f64);
-                }
-            }
-            Deger::Sayi(0.0)
-        }),
-    );
-
-    globals.insert(
-        "karakterden".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(n)) = args.first() {
-                if let Some(c) = std::char::from_u32(*n as u32) {
-                    return Deger::Metin(c.to_string());
-                }
-            }
-            Deger::Bos
-        }),
-    );
-
     globals.insert(
         "değer_al".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let Deger::Nesne { alanlar, .. } = &args[0] {
-                    if let Deger::Metin(key) = &args[1] {
-                        if let Some(val) = alanlar.borrow().get(key) {
-                            return val.clone();
-                        }
-                    }
-                }
-            }
-            Deger::Bos
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Nesne { alanlar, .. }, Deger::Metin(key)] => match alanlar.try_borrow() {
+                Ok(fields) => fields.get(key).cloned().unwrap_or(Deger::Bos),
+                Err(_) => Deger::Hata("değer_al: nesne kullanımda".to_string()),
+            },
+            [Deger::Sozluk(map), Deger::Metin(key)] => match map.try_borrow() {
+                Ok(values) => values.get(key).cloned().unwrap_or(Deger::Bos),
+                Err(_) => Deger::Hata("değer_al: sözlük kullanımda".to_string()),
+            },
+            [container, Deger::Metin(_)] => Deger::Hata(format!(
+                "değer_al: ilk argüman nesne veya sözlük olmalıdır; {} geldi",
+                container
+            )),
+            [_, other] => Deger::Hata(format!(
+                "değer_al: anahtar metin olmalıdır; {} geldi",
+                other
+            )),
+            _ => Deger::Hata(format!(
+                "değer_al: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "değer_ata".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 3 {
-                if let Deger::Nesne { alanlar, .. } = &args[0] {
-                    if let Deger::Metin(key) = &args[1] {
-                        alanlar.borrow_mut().insert(key.clone(), args[2].clone());
-                        return Deger::Sayi(1.0);
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Nesne { alanlar, .. }, Deger::Metin(key), value] => {
+                match alanlar.try_borrow_mut() {
+                    Ok(mut fields) => {
+                        if !fields.contains_key(key) && fields.len() >= EN_FAZLA_BUILTIN_OGE {
+                            return Deger::Hata(
+                                "değer_ata: nesne alan güvenlik sınırına ulaştı".to_string(),
+                            );
+                        }
+                        fields.insert(key.clone(), value.clone());
+                        Deger::Sayi(1.0)
                     }
+                    Err(_) => Deger::Hata("değer_ata: nesne kullanımda".to_string()),
                 }
             }
-            Deger::Sayi(0.0)
+            [Deger::Sozluk(map), Deger::Metin(key), value] => match map.try_borrow_mut() {
+                Ok(mut values) => {
+                    if !values.contains_key(key) && values.len() >= EN_FAZLA_BUILTIN_OGE {
+                        return Deger::Hata(
+                            "değer_ata: sözlük öğe güvenlik sınırına ulaştı".to_string(),
+                        );
+                    }
+                    values.insert(key.clone(), value.clone());
+                    Deger::Sayi(1.0)
+                }
+                Err(_) => Deger::Hata("değer_ata: sözlük kullanımda".to_string()),
+            },
+            [container, Deger::Metin(_), _] => Deger::Hata(format!(
+                "değer_ata: ilk argüman nesne veya sözlük olmalıdır; {} geldi",
+                container
+            )),
+            [_, other, _] => Deger::Hata(format!(
+                "değer_ata: anahtar metin olmalıdır; {} geldi",
+                other
+            )),
+            _ => Deger::Hata(format!(
+                "değer_ata: tam olarak 3 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "hızlı_içeriyor".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let Deger::Liste(l) = &args[0] {
-                    let target = &args[1];
-                    let contains = l.borrow().iter().any(|x| x == target);
-                    return Deger::Sayi(if contains { 1.0 } else { 0.0 });
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Liste(list), target] => {
+                let values = match list.try_borrow() {
+                    Ok(values) => values,
+                    Err(_) => return Deger::Hata("hızlı_içeriyor: liste kullanımda".to_string()),
+                };
+                for value in values.iter() {
+                    match crate::semantics::esit_mi(value, target) {
+                        Ok(true) => return Deger::Sayi(1.0),
+                        Ok(false) => {}
+                        Err(error) => return Deger::Hata(format!("hızlı_içeriyor: {error}")),
+                    }
                 }
+                Deger::Sayi(0.0)
             }
-            Deger::Sayi(0.0)
+            [other, _] => Deger::Hata(format!(
+                "hızlı_içeriyor: ilk argüman liste olmalıdır; {} geldi",
+                other
+            )),
+            _ => Deger::Hata(format!(
+                "hızlı_içeriyor: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "tipi".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(v) = args.first() {
-                match v {
-                    Deger::Sayi(_) => Deger::Metin("sayı".to_string()),
-                    Deger::Metin(_) => Deger::Metin("metin".to_string()),
-                    Deger::Liste(_) => Deger::Metin("liste".to_string()),
-                    Deger::Sozluk(_) => Deger::Metin("sözlük".to_string()),
-                    Deger::Fonksiyon { .. } | Deger::DahiliFonksiyon(_) => {
-                        Deger::Metin("fonksiyon".to_string())
-                    }
-                    Deger::Nesne { sinif_adi, .. } => Deger::Metin(sinif_adi.clone()),
-                    Deger::Sinif { ad, .. } => Deger::Metin(format!("sınıf_{}", ad)),
-                    Deger::Bayt(_) => Deger::Metin("bayt".to_string()),
-                    Deger::GorevId(_) => Deger::Metin("görev".to_string()),
-                    Deger::Bos => Deger::Metin("boş".to_string()),
-                    Deger::Hata(_) => Deger::Metin("hata".to_string()),
-                    Deger::Vektor(v) => Deger::Metin(format!("vektör[{}]", v.borrow().len())),
-                    Deger::Matris {
-                        satirlar, sutunlar, ..
-                    } => Deger::Metin(format!("matris[{}×{}]", satirlar, sutunlar)),
-                    Deger::Tensor(t) => {
-                        Deger::Metin(format!("tensor[{}×{}]", t.satirlar, t.sutunlar))
-                    }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [value] => match value {
+                Deger::Sayi(_) => Deger::Metin("sayı".to_string()),
+                Deger::Metin(_) => Deger::Metin("metin".to_string()),
+                Deger::Liste(_) => Deger::Metin("liste".to_string()),
+                Deger::Sozluk(_) => Deger::Metin("sözlük".to_string()),
+                Deger::Fonksiyon { .. }
+                | Deger::BytecodeFonksiyon { .. }
+                | Deger::DahiliFonksiyon(_)
+                | Deger::BaglamliDahiliFonksiyon(_) => Deger::Metin("fonksiyon".to_string()),
+                Deger::Nesne { sinif_adi, .. } => Deger::Metin(sinif_adi.clone()),
+                Deger::Sinif { ad, .. } => Deger::Metin(format!("sınıf_{}", ad)),
+                Deger::Bayt(_) => Deger::Metin("bayt".to_string()),
+                Deger::GorevId(_) => Deger::Metin("görev".to_string()),
+                Deger::Bos => Deger::Metin("boş".to_string()),
+                Deger::Hata(_) => Deger::Metin("hata".to_string()),
+                Deger::Vektor(vector) => {
+                    let length = match vector.try_borrow() {
+                        Ok(values) => values.len(),
+                        Err(_) => return Deger::Hata("tipi: vektör kullanımda".to_string()),
+                    };
+                    Deger::Metin(format!("vektör[{}]", length))
                 }
-            } else {
-                Deger::Metin("bilinmeyen".to_string())
-            }
-        }),
-    );
-
-    globals.insert(
-        "içeriyor".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                match (&args[0], &args[1]) {
-                    (Deger::Metin(s), Deger::Metin(sub)) => {
-                        return Deger::Sayi(if s.contains(sub.as_str()) { 1.0 } else { 0.0 });
-                    }
-                    (Deger::Liste(l), target) => {
-                        let has = l.borrow().iter().any(|item| item == target);
-                        return Deger::Sayi(if has { 1.0 } else { 0.0 });
-                    }
-                    _ => {}
+                Deger::Matris {
+                    satirlar, sutunlar, ..
+                } => Deger::Metin(format!("matris[{}×{}]", satirlar, sutunlar)),
+                Deger::Tensor(tensor) => {
+                    Deger::Metin(format!("tensor[{}×{}]", tensor.satirlar, tensor.sutunlar))
                 }
-            }
-            Deger::Sayi(0.0)
+            },
+            _ => Deger::Hata(format!(
+                "tipi: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "başlıyor_mu".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Metin(s), Deger::Metin(onek)) = (&args[0], &args[1]) {
-                    return Deger::Sayi(if s.starts_with(onek.as_str()) {
-                        1.0
-                    } else {
-                        0.0
-                    });
-                }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(text), Deger::Metin(prefix)] => {
+                Deger::Sayi(if text.starts_with(prefix.as_str()) {
+                    1.0
+                } else {
+                    0.0
+                })
             }
-            Deger::Sayi(0.0)
+            [_, _] => Deger::Hata("başlıyor_mu: iki metin argümanı gerekir".to_string()),
+            _ => Deger::Hata(format!(
+                "başlıyor_mu: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "bitiyor_mu".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Metin(s), Deger::Metin(sonek)) = (&args[0], &args[1]) {
-                    return Deger::Sayi(if s.ends_with(sonek.as_str()) {
-                        1.0
-                    } else {
-                        0.0
-                    });
-                }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(text), Deger::Metin(suffix)] => {
+                Deger::Sayi(if text.ends_with(suffix.as_str()) {
+                    1.0
+                } else {
+                    0.0
+                })
             }
-            Deger::Sayi(0.0)
+            [_, _] => Deger::Hata("bitiyor_mu: iki metin argümanı gerekir".to_string()),
+            _ => Deger::Hata(format!(
+                "bitiyor_mu: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "dizi_dilim".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 3 {
-                if let (Deger::Metin(s), Deger::Sayi(bas), Deger::Sayi(son)) =
-                    (&args[0], &args[1], &args[2])
-                {
-                    let chars: Vec<char> = s.chars().collect();
-                    let b = *bas as usize;
-                    let e = (*son as usize).min(chars.len());
-                    if b <= e {
-                        return Deger::Metin(chars[b..e].iter().collect());
-                    }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(text), Deger::Sayi(start), Deger::Sayi(end)]
+                if start.is_finite()
+                    && end.is_finite()
+                    && *start >= 0.0
+                    && *end >= 0.0
+                    && start.fract() == 0.0
+                    && end.fract() == 0.0
+                    && *start <= usize::MAX as f64
+                    && *end <= usize::MAX as f64 =>
+            {
+                let characters = text.chars().collect::<Vec<_>>();
+                let start = *start as usize;
+                let end = *end as usize;
+                if start > end || end > characters.len() {
+                    Deger::Hata(format!(
+                        "dizi_dilim: geçerli aralık 0..{} iken {}..{} istendi",
+                        characters.len(),
+                        start,
+                        end
+                    ))
+                } else {
+                    Deger::Metin(characters[start..end].iter().collect())
                 }
             }
-            Deger::Bos
+            [Deger::Metin(_), Deger::Sayi(_), Deger::Sayi(_)] => Deger::Hata(
+                "dizi_dilim: başlangıç ve bitiş negatif olmayan sonlu tamsayılar olmalıdır"
+                    .to_string(),
+            ),
+            [_, _, _] => {
+                Deger::Hata("dizi_dilim: metin, başlangıç ve bitiş sayıları gerekir".to_string())
+            }
+            _ => Deger::Hata(format!(
+                "dizi_dilim: tam olarak 3 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "dahili_sql_bağlan".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            let Some(Deger::Metin(yol)) = args.first() else {
-                return Deger::Hata("dahili_sql_bağlan: dosya yolu gerekir".to_string());
+            let [Deger::Metin(yol)] = args.as_slice() else {
+                return if args.len() == 1 {
+                    Deger::Hata("dahili_sql_bağlan: dosya yolu metin olmalıdır".to_string())
+                } else {
+                    Deger::Hata(format!(
+                        "dahili_sql_bağlan: tam olarak 1 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
             };
+            if yol.len() > 4096 {
+                return Deger::Hata("dahili_sql_bağlan: dosya yolu çok uzun".to_string());
+            }
+            if let Some(error) =
+                yetenek_hatasi(crate::capability::Capability::Database, "dahili_sql_bağlan")
+            {
+                return error;
+            }
             let conn = match rusqlite::Connection::open(yol) {
                 Ok(conn) => conn,
                 Err(hata) => {
@@ -1604,30 +3104,103 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
                     "dahili_sql_bağlan: bağlantı tablosu kilitlenemedi".to_string(),
                 );
             };
-            let id = get_id();
+            if baglantilar.len() >= EN_FAZLA_SQL_BAGLANTI {
+                return Deger::Hata(format!(
+                    "dahili_sql_bağlan: en fazla {} bağlantı açık olabilir",
+                    EN_FAZLA_SQL_BAGLANTI
+                ));
+            }
+            let id = match get_id() {
+                Ok(id) => id,
+                Err(error) => {
+                    return Deger::Hata(format!("dahili_sql_bağlan: {error}"));
+                }
+            };
             baglantilar.insert(id, conn);
             Deger::Sayi(id as f64)
         }),
     );
 
     globals.insert(
+        "dahili_sql_kapat".to_string(),
+        Deger::DahiliFonksiyon(|args| {
+            let [Deger::Sayi(id)] = args.as_slice() else {
+                return if args.len() == 1 {
+                    Deger::Hata("dahili_sql_kapat: bağlantı kimliği sayı olmalıdır".to_string())
+                } else {
+                    Deger::Hata(format!(
+                        "dahili_sql_kapat: tam olarak 1 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            let id = match safe_numeric_id(*id, "dahili_sql_kapat") {
+                Ok(id) => id,
+                Err(error) => return Deger::Hata(error),
+            };
+            if let Some(error) =
+                yetenek_hatasi(crate::capability::Capability::Database, "dahili_sql_kapat")
+            {
+                return error;
+            }
+            let mut connections = match SQL_CONNECTIONS.lock() {
+                Ok(connections) => connections,
+                Err(_) => {
+                    return Deger::Hata(
+                        "dahili_sql_kapat: bağlantı tablosu kilitlenemedi".to_string(),
+                    )
+                }
+            };
+            match connections.remove(&id) {
+                Some(connection) => match connection.close() {
+                    Ok(()) => Deger::Sayi(1.0),
+                    Err((connection, error)) => {
+                        connections.insert(id, connection);
+                        Deger::Hata(format!("dahili_sql_kapat: {error}"))
+                    }
+                },
+                None => Deger::Hata(format!(
+                    "dahili_sql_kapat: {} kimlikli bağlantı bulunamadı",
+                    id
+                )),
+            }
+        }),
+    );
+
+    globals.insert(
         "dahili_sql_yürüt".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            let (Some(Deger::Sayi(id)), Some(Deger::Metin(sql))) = (args.first(), args.get(1))
-            else {
-                return Deger::Hata(
-                    "dahili_sql_yürüt: bağlantı kimliği ve SQL metni gerekir".to_string(),
-                );
+            let [Deger::Sayi(id), Deger::Metin(sql)] = args.as_slice() else {
+                return if args.len() == 2 {
+                    Deger::Hata(
+                        "dahili_sql_yürüt: bağlantı kimliği ve SQL metni gerekir".to_string(),
+                    )
+                } else {
+                    Deger::Hata(format!(
+                        "dahili_sql_yürüt: tam olarak 2 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
             };
-            if !id.is_finite() || *id < 0.0 || id.fract() != 0.0 {
-                return Deger::Hata(
-                    "dahili_sql_yürüt: bağlantı kimliği negatif olmayan tamsayı olmalı".to_string(),
-                );
+            let id = match safe_numeric_id(*id, "dahili_sql_yürüt") {
+                Ok(id) => id,
+                Err(error) => return Deger::Hata(error),
+            };
+            if sql.len() > EN_FAZLA_SQL_METIN_BYTES {
+                return Deger::Hata(format!(
+                    "dahili_sql_yürüt: SQL metni {} bayt sınırını aşıyor",
+                    EN_FAZLA_SQL_METIN_BYTES
+                ));
+            }
+            if let Some(error) =
+                yetenek_hatasi(crate::capability::Capability::Database, "dahili_sql_yürüt")
+            {
+                return error;
             }
             let Ok(baglantilar) = SQL_CONNECTIONS.lock() else {
                 return Deger::Hata("dahili_sql_yürüt: bağlantı tablosu kilitlenemedi".to_string());
             };
-            let Some(conn) = baglantilar.get(&(*id as u64)) else {
+            let Some(conn) = baglantilar.get(&id) else {
                 return Deger::Hata(format!(
                     "dahili_sql_yürüt: {} kimlikli bağlantı bulunamadı",
                     id
@@ -1643,24 +3216,40 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "dahili_sql_sorgula".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            let (Some(Deger::Sayi(id)), Some(Deger::Metin(sql))) = (args.first(), args.get(1))
-            else {
-                return Deger::Hata(
-                    "dahili_sql_sorgula: bağlantı kimliği ve SQL metni gerekir".to_string(),
-                );
+            let [Deger::Sayi(id), Deger::Metin(sql)] = args.as_slice() else {
+                return if args.len() == 2 {
+                    Deger::Hata(
+                        "dahili_sql_sorgula: bağlantı kimliği ve SQL metni gerekir".to_string(),
+                    )
+                } else {
+                    Deger::Hata(format!(
+                        "dahili_sql_sorgula: tam olarak 2 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
             };
-            if !id.is_finite() || *id < 0.0 || id.fract() != 0.0 {
-                return Deger::Hata(
-                    "dahili_sql_sorgula: bağlantı kimliği negatif olmayan tamsayı olmalı"
-                        .to_string(),
-                );
+            let id = match safe_numeric_id(*id, "dahili_sql_sorgula") {
+                Ok(id) => id,
+                Err(error) => return Deger::Hata(error),
+            };
+            if sql.len() > EN_FAZLA_SQL_METIN_BYTES {
+                return Deger::Hata(format!(
+                    "dahili_sql_sorgula: SQL metni {} bayt sınırını aşıyor",
+                    EN_FAZLA_SQL_METIN_BYTES
+                ));
+            }
+            if let Some(error) = yetenek_hatasi(
+                crate::capability::Capability::Database,
+                "dahili_sql_sorgula",
+            ) {
+                return error;
             }
             let Ok(baglantilar) = SQL_CONNECTIONS.lock() else {
                 return Deger::Hata(
                     "dahili_sql_sorgula: bağlantı tablosu kilitlenemedi".to_string(),
                 );
             };
-            let Some(conn) = baglantilar.get(&(*id as u64)) else {
+            let Some(conn) = baglantilar.get(&id) else {
                 return Deger::Hata(format!(
                     "dahili_sql_sorgula: {} kimlikli bağlantı bulunamadı",
                     id
@@ -1673,43 +3262,124 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
             let sutun_adlari = stmt
                 .column_names()
                 .iter()
-                .map(|ad| ad.to_lowercase().trim().to_string())
+                .map(|ad| ad.trim().to_string())
                 .collect::<Vec<_>>();
-            let sorgu = stmt.query_map([], |satir| {
+            if sutun_adlari.len() > EN_FAZLA_SQL_SUTUN {
+                return Deger::Hata(format!(
+                    "dahili_sql_sorgula: en fazla {} sütun desteklenir",
+                    EN_FAZLA_SQL_SUTUN
+                ));
+            }
+            if sutun_adlari.iter().any(String::is_empty) {
+                return Deger::Hata(
+                    "dahili_sql_sorgula: sonuç sütunlarının adı boş olamaz".to_string(),
+                );
+            }
+            let unique_columns = sutun_adlari.iter().collect::<HashSet<_>>();
+            if unique_columns.len() != sutun_adlari.len() {
+                return Deger::Hata(
+                    "dahili_sql_sorgula: sonuç sütun adları benzersiz olmalıdır; AS kullanın"
+                        .to_string(),
+                );
+            }
+            let mut rows = match stmt.query([]) {
+                Ok(rows) => rows,
+                Err(error) => return Deger::Hata(format!("dahili_sql_sorgula: {error}")),
+            };
+            let mut result = Vec::new();
+            let mut cell_count = 0usize;
+            let mut payload_bytes = 0usize;
+            loop {
+                let row = match rows.next() {
+                    Ok(Some(row)) => row,
+                    Ok(None) => break,
+                    Err(error) => {
+                        return Deger::Hata(format!(
+                            "dahili_sql_sorgula: satır okunamadı: {error}"
+                        ))
+                    }
+                };
+                if result.len() >= EN_FAZLA_BUILTIN_OGE {
+                    return Deger::Hata(format!(
+                        "dahili_sql_sorgula: satır sayısı {} öğelik güvenlik sınırını aşıyor",
+                        EN_FAZLA_BUILTIN_OGE
+                    ));
+                }
+                cell_count = match cell_count.checked_add(sutun_adlari.len()) {
+                    Some(count) if count <= EN_FAZLA_BUILTIN_OGE => count,
+                    _ => {
+                        return Deger::Hata(format!(
+                            "dahili_sql_sorgula: hücre sayısı {} öğelik güvenlik sınırını aşıyor",
+                            EN_FAZLA_BUILTIN_OGE
+                        ))
+                    }
+                };
                 let mut alanlar = HashMap::new();
                 for (i, sutun_adi) in sutun_adlari.iter().enumerate() {
-                    let deger: rusqlite::types::Value = satir.get(i)?;
+                    let deger: rusqlite::types::Value = match row.get(i) {
+                        Ok(value) => value,
+                        Err(error) => {
+                            return Deger::Hata(format!(
+                                "dahili_sql_sorgula: {}. sütun okunamadı: {}",
+                                i + 1,
+                                error
+                            ))
+                        }
+                    };
                     let huma_degeri = match deger {
                         rusqlite::types::Value::Null => Deger::Bos,
-                        rusqlite::types::Value::Integer(sayi) => Deger::Sayi(sayi as f64),
-                        rusqlite::types::Value::Real(sayi) => Deger::Sayi(sayi),
-                        rusqlite::types::Value::Text(metin) => Deger::Metin(metin),
-                        rusqlite::types::Value::Blob(baytlar) => Deger::Bayt(baytlar),
+                        rusqlite::types::Value::Integer(sayi)
+                            if sayi.unsigned_abs() <= EN_BUYUK_GUVENLI_SAYISAL_KIMLIK =>
+                        {
+                            Deger::Sayi(sayi as f64)
+                        }
+                        rusqlite::types::Value::Integer(sayi) => {
+                            return Deger::Hata(format!(
+                                "dahili_sql_sorgula: {sayi} tamsayısı Hüma sayı türünde tam temsil edilemez"
+                            ))
+                        }
+                        rusqlite::types::Value::Real(sayi) if sayi.is_finite() => {
+                            Deger::Sayi(sayi)
+                        }
+                        rusqlite::types::Value::Real(_) => {
+                            return Deger::Hata(
+                                "dahili_sql_sorgula: sonlu olmayan gerçek sayı döndü".to_string(),
+                            )
+                        }
+                        rusqlite::types::Value::Text(metin) => {
+                            payload_bytes = match payload_bytes.checked_add(metin.len()) {
+                                Some(size) if size <= EN_FAZLA_DOSYA_BYTES => size,
+                                _ => {
+                                    return Deger::Hata(format!(
+                                        "dahili_sql_sorgula: metin/bayt çıktısı {} bayt sınırını aşıyor",
+                                        EN_FAZLA_DOSYA_BYTES
+                                    ))
+                                }
+                            };
+                            Deger::Metin(metin)
+                        }
+                        rusqlite::types::Value::Blob(baytlar) => {
+                            payload_bytes = match payload_bytes.checked_add(baytlar.len()) {
+                                Some(size) if size <= EN_FAZLA_DOSYA_BYTES => size,
+                                _ => {
+                                    return Deger::Hata(format!(
+                                        "dahili_sql_sorgula: metin/bayt çıktısı {} bayt sınırını aşıyor",
+                                        EN_FAZLA_DOSYA_BYTES
+                                    ))
+                                }
+                            };
+                            Deger::Bayt(baytlar)
+                        }
                     };
                     alanlar.insert(sutun_adi.clone(), huma_degeri);
                 }
-                Ok(Deger::Nesne {
+                result.push(Deger::Nesne {
                     sinif_adi: "Satır".to_string(),
                     alanlar: Rc::new(RefCell::new(alanlar)),
-                })
-            });
-            let satirlar = match sorgu {
-                Ok(satirlar) => satirlar,
-                Err(hata) => return Deger::Hata(format!("dahili_sql_sorgula: {}", hata)),
-            };
-            let mut sonuc = Vec::new();
-            for satir in satirlar {
-                match satir {
-                    Ok(satir) => sonuc.push(satir),
-                    Err(hata) => {
-                        return Deger::Hata(format!(
-                            "dahili_sql_sorgula: satır okunamadı: {}",
-                            hata
-                        ));
-                    }
-                }
+                    module_kimligi: None,
+                });
             }
-            Deger::Liste(Rc::new(RefCell::new(sonuc)))
+            Deger::Liste(Rc::new(RefCell::new(result)))
         }),
     );
 
@@ -1725,156 +3395,114 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
 
     globals.insert(
         "üs".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Sayi(taban), Deger::Sayi(kuvvet)) = (&args[0], &args[1]) {
-                    return Deger::Sayi(taban.powf(*kuvvet));
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Sayi(base), Deger::Sayi(exponent)]
+                if base.is_finite() && exponent.is_finite() =>
+            {
+                let result = base.powf(*exponent);
+                if result.is_finite() {
+                    Deger::Sayi(result)
+                } else {
+                    Deger::Hata("üs: işlem sonlu olmayan sonuç üretti".to_string())
                 }
             }
-            Deger::Bos
+            [Deger::Sayi(_), Deger::Sayi(_)] => {
+                Deger::Hata("üs: iki sayı da sonlu olmalıdır".to_string())
+            }
+            [_, _] => Deger::Hata("üs: iki sayı argümanı gerekir".to_string()),
+            _ => Deger::Hata(format!(
+                "üs: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "ln".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(x)) = args.first() {
-                return Deger::Sayi(x.ln());
-            }
-            Deger::Bos
-        }),
+        Deger::DahiliFonksiyon(|args| positive_unary_numeric_builtin(args, "ln", f64::ln)),
     );
 
     globals.insert(
         "log2".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(x)) = args.first() {
-                return Deger::Sayi(x.log2());
-            }
-            Deger::Bos
-        }),
+        Deger::DahiliFonksiyon(|args| positive_unary_numeric_builtin(args, "log2", f64::log2)),
     );
 
     globals.insert(
         "log10".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(x)) = args.first() {
-                return Deger::Sayi(x.log10());
-            }
-            Deger::Bos
-        }),
+        Deger::DahiliFonksiyon(|args| positive_unary_numeric_builtin(args, "log10", f64::log10)),
     );
 
     globals.insert(
         "sin".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(x)) = args.first() {
-                Deger::Sayi(x.sin())
-            } else {
-                Deger::Bos
-            }
-        }),
+        Deger::DahiliFonksiyon(|args| unary_numeric_builtin(args, "sin", f64::sin)),
     );
 
     globals.insert(
         "cos".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(x)) = args.first() {
-                Deger::Sayi(x.cos())
-            } else {
-                Deger::Bos
-            }
-        }),
+        Deger::DahiliFonksiyon(|args| unary_numeric_builtin(args, "cos", f64::cos)),
     );
 
     globals.insert(
         "tan".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(x)) = args.first() {
-                Deger::Sayi(x.tan())
-            } else {
-                Deger::Bos
-            }
-        }),
+        Deger::DahiliFonksiyon(|args| unary_numeric_builtin(args, "tan", f64::tan)),
     );
 
     globals.insert(
         "exp".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(x)) = args.first() {
-                Deger::Sayi(x.exp())
-            } else {
-                Deger::Bos
-            }
-        }),
+        Deger::DahiliFonksiyon(|args| unary_numeric_builtin(args, "exp", f64::exp)),
     );
 
     globals.insert(
         "tavan".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(x)) = args.first() {
-                Deger::Sayi(x.ceil())
-            } else {
-                Deger::Bos
-            }
-        }),
+        Deger::DahiliFonksiyon(|args| unary_numeric_builtin(args, "tavan", f64::ceil)),
     );
 
     globals.insert(
         "taban_sayı".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(x)) = args.first() {
-                Deger::Sayi(x.floor())
-            } else {
-                Deger::Bos
-            }
-        }),
+        Deger::DahiliFonksiyon(|args| unary_numeric_builtin(args, "taban_sayı", f64::floor)),
     );
 
     globals.insert(
         "mutlak_sayı".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(x)) = args.first() {
-                Deger::Sayi(x.abs())
-            } else {
-                Deger::Bos
-            }
-        }),
+        Deger::DahiliFonksiyon(|args| unary_numeric_builtin(args, "mutlak_sayı", f64::abs)),
     );
 
     globals.insert(
         "işaret".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(x)) = args.first() {
-                Deger::Sayi(x.signum())
-            } else {
-                Deger::Bos
-            }
-        }),
+        Deger::DahiliFonksiyon(|args| unary_numeric_builtin(args, "işaret", f64::signum)),
     );
 
     globals.insert(
         "sonlu_mu".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(x)) = args.first() {
-                Deger::Sayi(if x.is_finite() { 1.0 } else { 0.0 })
-            } else {
-                Deger::Bos
-            }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Sayi(value)] => Deger::Sayi(if value.is_finite() { 1.0 } else { 0.0 }),
+            [other] => Deger::Hata(format!("sonlu_mu: sayı bekleniyordu; {} geldi", other)),
+            _ => Deger::Hata(format!(
+                "sonlu_mu: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "klamp".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 3 {
-                if let (Deger::Sayi(x), Deger::Sayi(min), Deger::Sayi(max)) =
-                    (&args[0], &args[1], &args[2])
-                {
-                    return Deger::Sayi(x.clamp(*min, *max));
-                }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Sayi(value), Deger::Sayi(minimum), Deger::Sayi(maximum)]
+                if value.is_finite()
+                    && minimum.is_finite()
+                    && maximum.is_finite()
+                    && minimum <= maximum =>
+            {
+                Deger::Sayi(value.clamp(*minimum, *maximum))
             }
-            Deger::Bos
+            [Deger::Sayi(_), Deger::Sayi(_), Deger::Sayi(_)] => Deger::Hata(
+                "klamp: sayılar sonlu ve alt sınır üst sınırdan küçük/eşit olmalıdır".to_string(),
+            ),
+            [_, _, _] => Deger::Hata("klamp: üç sayı argümanı gerekir".to_string()),
+            _ => Deger::Hata(format!(
+                "klamp: tam olarak 3 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
@@ -1885,48 +3513,36 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "sigmoid".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(x)) = args.first() {
-                Deger::Sayi(1.0 / (1.0 + (-x).exp()))
-            } else {
-                Deger::Bos
-            }
+            unary_numeric_builtin(args, "sigmoid", |value| {
+                if value >= 0.0 {
+                    1.0 / (1.0 + (-value).exp())
+                } else {
+                    let exponential = value.exp();
+                    exponential / (1.0 + exponential)
+                }
+            })
         }),
     );
 
     globals.insert(
         "relu".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(x)) = args.first() {
-                Deger::Sayi(x.max(0.0))
-            } else {
-                Deger::Bos
-            }
-        }),
+        Deger::DahiliFonksiyon(|args| unary_numeric_builtin(args, "relu", |value| value.max(0.0))),
     );
 
     globals.insert(
         "tanh_aktivasyon".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(x)) = args.first() {
-                Deger::Sayi(x.tanh())
-            } else {
-                Deger::Bos
-            }
-        }),
+        Deger::DahiliFonksiyon(|args| unary_numeric_builtin(args, "tanh_aktivasyon", f64::tanh)),
     );
 
     // GELU — Gaussian Error Linear Unit (tanh approximation)
     globals.insert(
         "gelu".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(x)) = args.first() {
-                let x = *x;
-                let val =
-                    0.5 * x * (1.0 + (0.7978845608028654 * (x + 0.044715 * x * x * x)).tanh());
-                Deger::Sayi(val)
-            } else {
-                Deger::Bos
-            }
+            unary_numeric_builtin(args, "gelu", |value| {
+                0.5 * value
+                    * (1.0
+                        + (0.7978845608028654 * (value + 0.044715 * value * value * value)).tanh())
+            })
         }),
     );
 
@@ -1934,34 +3550,32 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "softmax".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            let vals: Option<Vec<f64>> = match args.first() {
-                Some(Deger::Vektor(v)) => Some(v.borrow().clone()),
-                Some(Deger::Liste(l)) => Some(
-                    l.borrow()
-                        .iter()
-                        .filter_map(|d| {
-                            if let Deger::Sayi(n) = d {
-                                Some(*n)
-                            } else {
-                                None
-                            }
-                        })
-                        .collect(),
-                ),
-                _ => None,
+            let [value] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "softmax: tam olarak 1 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
             };
-            if let Some(v) = vals {
-                let max_val = v.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-                let exps: Vec<f64> = v.iter().map(|x| (x - max_val).exp()).collect();
-                let toplam: f64 = exps.iter().sum();
-                if toplam == 0.0 {
-                    return Deger::Bos;
-                }
-                let sonuc: Vec<f64> = exps.iter().map(|e| e / toplam).collect();
-                Deger::Vektor(Rc::new(RefCell::new(sonuc)))
-            } else {
-                Deger::Bos
+            let values = match value_to_finite_vector(value, "softmax") {
+                Ok(values) => values,
+                Err(error) => return Deger::Hata(error),
+            };
+            let Some(maximum) = values.iter().copied().reduce(f64::max) else {
+                return Deger::Hata("softmax: boş vektör kabul edilmez".to_string());
+            };
+            let exponentials = values
+                .iter()
+                .map(|value| (value - maximum).exp())
+                .collect::<Vec<_>>();
+            let sum = exponentials.iter().sum::<f64>();
+            if !sum.is_finite() || sum <= 0.0 {
+                return Deger::Hata("softmax: geçersiz normalizasyon toplamı".to_string());
             }
+            let result = exponentials
+                .iter()
+                .map(|value| value / sum)
+                .collect::<Vec<_>>();
+            Deger::Vektor(Rc::new(RefCell::new(result)))
         }),
     );
 
@@ -1969,30 +3583,35 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "log_softmax".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            let vals: Option<Vec<f64>> = match args.first() {
-                Some(Deger::Vektor(v)) => Some(v.borrow().clone()),
-                Some(Deger::Liste(l)) => Some(
-                    l.borrow()
-                        .iter()
-                        .filter_map(|d| {
-                            if let Deger::Sayi(n) = d {
-                                Some(*n)
-                            } else {
-                                None
-                            }
-                        })
-                        .collect(),
-                ),
-                _ => None,
+            let [value] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "log_softmax: tam olarak 1 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
             };
-            if let Some(v) = vals {
-                let max_val = v.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-                let log_sum_exp = v.iter().map(|x| (x - max_val).exp()).sum::<f64>().ln() + max_val;
-                let sonuc: Vec<f64> = v.iter().map(|x| x - log_sum_exp).collect();
-                Deger::Vektor(Rc::new(RefCell::new(sonuc)))
-            } else {
-                Deger::Bos
+            let values = match value_to_finite_vector(value, "log_softmax") {
+                Ok(values) => values,
+                Err(error) => return Deger::Hata(error),
+            };
+            let Some(maximum) = values.iter().copied().reduce(f64::max) else {
+                return Deger::Hata("log_softmax: boş vektör kabul edilmez".to_string());
+            };
+            let shifted_sum = values
+                .iter()
+                .map(|value| (value - maximum).exp())
+                .sum::<f64>();
+            if !shifted_sum.is_finite() || shifted_sum <= 0.0 {
+                return Deger::Hata("log_softmax: geçersiz normalizasyon toplamı".to_string());
             }
+            let log_sum_exp = shifted_sum.ln() + maximum;
+            let result = values
+                .iter()
+                .map(|value| value - log_sum_exp)
+                .collect::<Vec<_>>();
+            if result.iter().any(|value| !value.is_finite()) {
+                return Deger::Hata("log_softmax: sonlu olmayan sonuç".to_string());
+            }
+            Deger::Vektor(Rc::new(RefCell::new(result)))
         }),
     );
 
@@ -2003,11 +3622,17 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "vektor_olustur".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            let (Some(Deger::Sayi(n)), Some(Deger::Sayi(deger))) = (args.first(), args.get(1))
-            else {
-                return Deger::Hata(
-                    "vektor_olustur: boyut ve başlangıç değeri gerekir".to_string(),
-                );
+            let [Deger::Sayi(n), Deger::Sayi(deger)] = args.as_slice() else {
+                return if args.len() == 2 {
+                    Deger::Hata(
+                        "vektor_olustur: boyut ve başlangıç değeri sayı olmalıdır".to_string(),
+                    )
+                } else {
+                    Deger::Hata(format!(
+                        "vektor_olustur: tam olarak 2 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
             };
             let boyut = match boyut_dogrula(*n, "vektor_olustur", true) {
                 Ok(deger) => deger,
@@ -2022,145 +3647,142 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
 
     globals.insert(
         "vektor_uzunluk".to_string(),
-        Deger::DahiliFonksiyon(|args| match args.first() {
-            Some(Deger::Vektor(v)) => Deger::Sayi(v.borrow().len() as f64),
-            Some(Deger::Liste(l)) => Deger::Sayi(l.borrow().len() as f64),
-            _ => Deger::Bos,
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Vektor(vector)] => match vector.try_borrow() {
+                Ok(values) => Deger::Sayi(values.len() as f64),
+                Err(_) => Deger::Hata("vektor_uzunluk: vektör kullanımda".to_string()),
+            },
+            [Deger::Liste(list)] => match list.try_borrow() {
+                Ok(values) => Deger::Sayi(values.len() as f64),
+                Err(_) => Deger::Hata("vektor_uzunluk: liste kullanımda".to_string()),
+            },
+            [other] => Deger::Hata(format!(
+                "vektor_uzunluk: vektör veya liste bekleniyordu; {} geldi",
+                other
+            )),
+            _ => Deger::Hata(format!(
+                "vektor_uzunluk: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "ic_carpim".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
+            let [left, right] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "ic_carpim: tam olarak 2 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            };
+            let left = match value_to_finite_vector(left, "ic_carpim") {
+                Ok(values) => values,
+                Err(error) => return Deger::Hata(error),
+            };
+            let right = match value_to_finite_vector(right, "ic_carpim") {
+                Ok(values) => values,
+                Err(error) => return Deger::Hata(error),
+            };
+            if left.len() != right.len() {
+                return Deger::Hata("ic_carpim: vektör boyutları eşit olmalı".to_string());
             }
-            let a: Option<Vec<f64>> = match &args[0] {
-                Deger::Vektor(v) => Some(v.borrow().clone()),
-                Deger::Liste(l) => Some(
-                    l.borrow()
-                        .iter()
-                        .filter_map(|d| {
-                            if let Deger::Sayi(n) = d {
-                                Some(*n)
-                            } else {
-                                None
-                            }
-                        })
-                        .collect(),
-                ),
-                _ => None,
-            };
-            let b: Option<Vec<f64>> = match &args[1] {
-                Deger::Vektor(v) => Some(v.borrow().clone()),
-                Deger::Liste(l) => Some(
-                    l.borrow()
-                        .iter()
-                        .filter_map(|d| {
-                            if let Deger::Sayi(n) = d {
-                                Some(*n)
-                            } else {
-                                None
-                            }
-                        })
-                        .collect(),
-                ),
-                _ => None,
-            };
-            if let (Some(va), Some(vb)) = (a, b) {
-                if va.len() != vb.len() {
-                    return Deger::Hata("ic_carpim: vektör boyutları eşit olmalı".to_string());
-                }
-                let sonuc: f64 = va.iter().zip(vb.iter()).map(|(x, y)| x * y).sum();
-                Deger::Sayi(sonuc)
+            let result = left
+                .iter()
+                .zip(right.iter())
+                .map(|(left, right)| left * right)
+                .sum::<f64>();
+            if result.is_finite() {
+                Deger::Sayi(result)
             } else {
-                Deger::Bos
+                Deger::Hata("ic_carpim: sonlu olmayan sonuç".to_string())
             }
         }),
     );
 
     globals.insert(
         "vektor_norm".to_string(),
-        Deger::DahiliFonksiyon(|args| match args.first() {
-            Some(Deger::Vektor(v)) => {
-                let n: f64 = v.borrow().iter().map(|x| x * x).sum::<f64>().sqrt();
-                Deger::Sayi(n)
+        Deger::DahiliFonksiyon(|args| {
+            let [value] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "vektor_norm: tam olarak 1 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            };
+            let values = match value_to_finite_vector(value, "vektor_norm") {
+                Ok(values) => values,
+                Err(error) => return Deger::Hata(error),
+            };
+            let result = values.iter().map(|value| value * value).sum::<f64>().sqrt();
+            if result.is_finite() {
+                Deger::Sayi(result)
+            } else {
+                Deger::Hata("vektor_norm: sonlu olmayan sonuç".to_string())
             }
-            Some(Deger::Liste(l)) => {
-                let n: f64 = l
-                    .borrow()
-                    .iter()
-                    .filter_map(|d| {
-                        if let Deger::Sayi(x) = d {
-                            Some(x * x)
-                        } else {
-                            None
-                        }
-                    })
-                    .sum::<f64>()
-                    .sqrt();
-                Deger::Sayi(n)
-            }
-            _ => Deger::Bos,
         }),
     );
 
     globals.insert(
         "vektor_birim".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Vektor(v)) = args.first() {
-                let b = v.borrow();
-                let norm: f64 = b.iter().map(|x| x * x).sum::<f64>().sqrt();
-                if norm == 0.0 {
-                    return Deger::Hata(
-                        "vektor_birim: sıfır vektörü normalize edilemez".to_string(),
-                    );
-                }
-                let sonuc: Vec<f64> = b.iter().map(|x| x / norm).collect();
-                Deger::Vektor(Rc::new(RefCell::new(sonuc)))
-            } else {
-                Deger::Bos
+            let [value] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "vektor_birim: tam olarak 1 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            };
+            let values = match value_to_finite_vector(value, "vektor_birim") {
+                Ok(values) => values,
+                Err(error) => return Deger::Hata(error),
+            };
+            let norm = values.iter().map(|value| value * value).sum::<f64>().sqrt();
+            if !norm.is_finite() || norm == 0.0 {
+                return Deger::Hata(
+                    "vektor_birim: sıfır veya sonlu olmayan vektör normalize edilemez".to_string(),
+                );
             }
+            let result = values.iter().map(|value| value / norm).collect();
+            Deger::Vektor(Rc::new(RefCell::new(result)))
         }),
     );
 
     globals.insert(
         "kosinus_benzerligi".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
-            }
-            let get_vec = |d: &Deger| -> Option<Vec<f64>> {
-                match d {
-                    Deger::Vektor(v) => Some(v.borrow().clone()),
-                    Deger::Liste(l) => Some(
-                        l.borrow()
-                            .iter()
-                            .filter_map(|x| {
-                                if let Deger::Sayi(n) = x {
-                                    Some(*n)
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect(),
-                    ),
-                    _ => None,
-                }
+            let [left, right] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "kosinus_benzerligi: tam olarak 2 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
             };
-            if let (Some(va), Some(vb)) = (get_vec(&args[0]), get_vec(&args[1])) {
-                if va.len() != vb.len() {
-                    return Deger::Hata("kosinus_benzerligi: boyutlar eşit olmalı".to_string());
-                }
-                let dot: f64 = va.iter().zip(vb.iter()).map(|(a, b)| a * b).sum();
-                let na: f64 = va.iter().map(|x| x * x).sum::<f64>().sqrt();
-                let nb: f64 = vb.iter().map(|x| x * x).sum::<f64>().sqrt();
-                if na == 0.0 || nb == 0.0 {
-                    return Deger::Sayi(0.0);
-                }
-                Deger::Sayi(dot / (na * nb))
+            let left = match value_to_finite_vector(left, "kosinus_benzerligi") {
+                Ok(values) => values,
+                Err(error) => return Deger::Hata(error),
+            };
+            let right = match value_to_finite_vector(right, "kosinus_benzerligi") {
+                Ok(values) => values,
+                Err(error) => return Deger::Hata(error),
+            };
+            if left.len() != right.len() {
+                return Deger::Hata("kosinus_benzerligi: boyutlar eşit olmalı".to_string());
+            }
+            let dot = left
+                .iter()
+                .zip(right.iter())
+                .map(|(left, right)| left * right)
+                .sum::<f64>();
+            let left_norm = left.iter().map(|value| value * value).sum::<f64>().sqrt();
+            let right_norm = right.iter().map(|value| value * value).sum::<f64>().sqrt();
+            if left_norm == 0.0 || right_norm == 0.0 {
+                return Deger::Hata(
+                    "kosinus_benzerligi: sıfır vektör için tanımsızdır".to_string(),
+                );
+            }
+            let result = dot / (left_norm * right_norm);
+            if result.is_finite() {
+                Deger::Sayi(result.clamp(-1.0, 1.0))
             } else {
-                Deger::Bos
+                Deger::Hata("kosinus_benzerligi: sonlu olmayan sonuç".to_string())
             }
         }),
     );
@@ -2168,160 +3790,213 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "vektor_topla".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
-            }
-            let get_vec = |d: &Deger| -> Option<Vec<f64>> {
-                match d {
-                    Deger::Vektor(v) => Some(v.borrow().clone()),
-                    Deger::Liste(l) => Some(
-                        l.borrow()
-                            .iter()
-                            .filter_map(|x| {
-                                if let Deger::Sayi(n) = x {
-                                    Some(*n)
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect(),
-                    ),
-                    _ => None,
-                }
+            let [left, right] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "vektor_topla: tam olarak 2 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
             };
-            if let (Some(va), Some(vb)) = (get_vec(&args[0]), get_vec(&args[1])) {
-                if va.len() != vb.len() {
-                    return Deger::Hata("vektor_topla: boyutlar eşit olmalı".to_string());
-                }
-                let sonuc: Vec<f64> = va.iter().zip(vb.iter()).map(|(a, b)| a + b).collect();
-                Deger::Vektor(Rc::new(RefCell::new(sonuc)))
-            } else {
-                Deger::Bos
+            let left = match value_to_finite_vector(left, "vektor_topla") {
+                Ok(values) => values,
+                Err(error) => return Deger::Hata(error),
+            };
+            let right = match value_to_finite_vector(right, "vektor_topla") {
+                Ok(values) => values,
+                Err(error) => return Deger::Hata(error),
+            };
+            if left.len() != right.len() {
+                return Deger::Hata("vektor_topla: boyutlar eşit olmalı".to_string());
             }
+            let result = left
+                .iter()
+                .zip(right.iter())
+                .map(|(left, right)| left + right)
+                .collect::<Vec<_>>();
+            if result.iter().any(|value| !value.is_finite()) {
+                return Deger::Hata("vektor_topla: sonlu olmayan sonuç".to_string());
+            }
+            Deger::Vektor(Rc::new(RefCell::new(result)))
         }),
     );
 
     globals.insert(
         "vektor_carpi".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
-            }
-            let get_vec = |d: &Deger| -> Option<Vec<f64>> {
-                match d {
-                    Deger::Vektor(v) => Some(v.borrow().clone()),
-                    Deger::Liste(l) => Some(
-                        l.borrow()
-                            .iter()
-                            .filter_map(|x| {
-                                if let Deger::Sayi(n) = x {
-                                    Some(*n)
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect(),
-                    ),
-                    _ => None,
-                }
+            let [left, right] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "vektor_carpi: tam olarak 2 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
             };
-            if let (Some(va), Some(vb)) = (get_vec(&args[0]), get_vec(&args[1])) {
-                if va.len() != vb.len() {
-                    return Deger::Hata("vektor_carpi: boyutlar eşit olmalı".to_string());
-                }
-                let sonuc: Vec<f64> = va.iter().zip(vb.iter()).map(|(a, b)| a * b).collect();
-                Deger::Vektor(Rc::new(RefCell::new(sonuc)))
-            } else {
-                Deger::Bos
+            let left = match value_to_finite_vector(left, "vektor_carpi") {
+                Ok(values) => values,
+                Err(error) => return Deger::Hata(error),
+            };
+            let right = match value_to_finite_vector(right, "vektor_carpi") {
+                Ok(values) => values,
+                Err(error) => return Deger::Hata(error),
+            };
+            if left.len() != right.len() {
+                return Deger::Hata("vektor_carpi: boyutlar eşit olmalı".to_string());
             }
+            let result = left
+                .iter()
+                .zip(right.iter())
+                .map(|(left, right)| left * right)
+                .collect::<Vec<_>>();
+            if result.iter().any(|value| !value.is_finite()) {
+                return Deger::Hata("vektor_carpi: sonlu olmayan sonuç".to_string());
+            }
+            Deger::Vektor(Rc::new(RefCell::new(result)))
         }),
     );
 
     globals.insert(
         "vektor_skalar_carp".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
-            }
-            let skalar = match &args[1] {
-                Deger::Sayi(n) => *n,
-                _ => return Deger::Bos,
-            };
-            match &args[0] {
-                Deger::Vektor(v) => {
-                    let sonuc: Vec<f64> = v.borrow().iter().map(|x| x * skalar).collect();
-                    Deger::Vektor(Rc::new(RefCell::new(sonuc)))
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Vektor(vector), Deger::Sayi(scalar)] if scalar.is_finite() => {
+                let values = match vector.try_borrow() {
+                    Ok(values) => values,
+                    Err(_) => {
+                        return Deger::Hata("vektor_skalar_carp: vektör kullanımda".to_string())
+                    }
+                };
+                let result = values
+                    .iter()
+                    .map(|value| value * scalar)
+                    .collect::<Vec<_>>();
+                if result.iter().any(|value| !value.is_finite()) {
+                    Deger::Hata("vektor_skalar_carp: sonlu olmayan sonuç".to_string())
+                } else {
+                    Deger::Vektor(Rc::new(RefCell::new(result)))
                 }
-                _ => Deger::Bos,
             }
+            [Deger::Vektor(_), Deger::Sayi(_)] => {
+                Deger::Hata("vektor_skalar_carp: skaler sonlu olmalıdır".to_string())
+            }
+            [_, _] => Deger::Hata("vektor_skalar_carp: vektör ve sayı gerekir".to_string()),
+            _ => Deger::Hata(format!(
+                "vektor_skalar_carp: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "listeye_vektor".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Liste(l)) = args.first() {
-                let v: Vec<f64> = l
-                    .borrow()
-                    .iter()
-                    .filter_map(|d| {
-                        if let Deger::Sayi(n) = d {
-                            Some(*n)
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                Deger::Vektor(Rc::new(RefCell::new(v)))
-            } else {
-                Deger::Bos
+            let [value @ Deger::Liste(_)] = args.as_slice() else {
+                return if args.len() == 1 {
+                    Deger::Hata(format!(
+                        "listeye_vektor: liste bekleniyordu; {} geldi",
+                        args[0]
+                    ))
+                } else {
+                    Deger::Hata(format!(
+                        "listeye_vektor: tam olarak 1 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            match value_to_finite_vector(value, "listeye_vektor") {
+                Ok(values) => Deger::Vektor(Rc::new(RefCell::new(values))),
+                Err(error) => Deger::Hata(error),
             }
         }),
     );
 
     globals.insert(
         "vektore_liste".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Vektor(v)) = args.first() {
-                let l: Vec<Deger> = v.borrow().iter().map(|x| Deger::Sayi(*x)).collect();
-                Deger::Liste(Rc::new(RefCell::new(l)))
-            } else {
-                Deger::Bos
-            }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Vektor(vector)] => match vector.try_borrow() {
+                Ok(values) => Deger::Liste(Rc::new(RefCell::new(
+                    values.iter().copied().map(Deger::Sayi).collect(),
+                ))),
+                Err(_) => Deger::Hata("vektore_liste: vektör kullanımda".to_string()),
+            },
+            [other] => Deger::Hata(format!(
+                "vektore_liste: vektör bekleniyordu; {} geldi",
+                other
+            )),
+            _ => Deger::Hata(format!(
+                "vektore_liste: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "vektor_dilim".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 3 {
-                if let (Deger::Vektor(v), Deger::Sayi(bas), Deger::Sayi(son)) =
-                    (&args[0], &args[1], &args[2])
-                {
-                    let b = v.borrow();
-                    let start = *bas as usize;
-                    let end = (*son as usize).min(b.len());
-                    if start <= end {
-                        let dilim: Vec<f64> = b[start..end].to_vec();
-                        return Deger::Vektor(Rc::new(RefCell::new(dilim)));
-                    }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Vektor(vector), Deger::Sayi(start), Deger::Sayi(end)]
+                if start.is_finite()
+                    && end.is_finite()
+                    && *start >= 0.0
+                    && *end >= 0.0
+                    && start.fract() == 0.0
+                    && end.fract() == 0.0
+                    && *start <= usize::MAX as f64
+                    && *end <= usize::MAX as f64 =>
+            {
+                let values = match vector.try_borrow() {
+                    Ok(values) => values,
+                    Err(_) => return Deger::Hata("vektor_dilim: vektör kullanımda".to_string()),
+                };
+                let start = *start as usize;
+                let end = *end as usize;
+                if start > end || end > values.len() {
+                    Deger::Hata(format!(
+                        "vektor_dilim: geçerli aralık 0..{} iken {}..{} istendi",
+                        values.len(),
+                        start,
+                        end
+                    ))
+                } else {
+                    Deger::Vektor(Rc::new(RefCell::new(values[start..end].to_vec())))
                 }
             }
-            Deger::Bos
+            [Deger::Vektor(_), Deger::Sayi(_), Deger::Sayi(_)] => Deger::Hata(
+                "vektor_dilim: başlangıç ve bitiş negatif olmayan sonlu tamsayılar olmalıdır"
+                    .to_string(),
+            ),
+            [_, _, _] => {
+                Deger::Hata("vektor_dilim: vektör, başlangıç ve bitiş sayıları gerekir".to_string())
+            }
+            _ => Deger::Hata(format!(
+                "vektor_dilim: tam olarak 3 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     // vektor_ekle — vektöre eleman ekle
     globals.insert(
         "vektor_ekle".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Vektor(v), Deger::Sayi(val)) = (&args[0], &args[1]) {
-                    v.borrow_mut().push(*val);
-                    return Deger::Vektor(Rc::clone(v));
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Vektor(vector), Deger::Sayi(value)] if value.is_finite() => {
+                match vector.try_borrow_mut() {
+                    Ok(mut values) => {
+                        if values.len() >= EN_FAZLA_TENSOR_ELEMANI {
+                            Deger::Hata(
+                                "vektor_ekle: vektör eleman güvenlik sınırına ulaştı".to_string(),
+                            )
+                        } else {
+                            values.push(*value);
+                            drop(values);
+                            Deger::Vektor(Rc::clone(vector))
+                        }
+                    }
+                    Err(_) => Deger::Hata("vektor_ekle: vektör kullanımda".to_string()),
                 }
             }
-            Deger::Bos
+            [Deger::Vektor(_), Deger::Sayi(_)] => {
+                Deger::Hata("vektor_ekle: eklenecek sayı sonlu olmalıdır".to_string())
+            }
+            [_, _] => Deger::Hata("vektor_ekle: vektör ve sayı gerekir".to_string()),
+            _ => Deger::Hata(format!(
+                "vektor_ekle: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
@@ -2329,12 +4004,20 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "vektor_al".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            let (Some(Deger::Vektor(vektor)), Some(Deger::Sayi(indeks))) =
-                (args.first(), args.get(1))
-            else {
-                return Deger::Hata("vektor_al: vektör ve indeks gerekir".to_string());
+            let [Deger::Vektor(vektor), Deger::Sayi(indeks)] = args.as_slice() else {
+                return if args.len() == 2 {
+                    Deger::Hata("vektor_al: vektör ve sayı indeks gerekir".to_string())
+                } else {
+                    Deger::Hata(format!(
+                        "vektor_al: tam olarak 2 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
             };
-            let vektor = vektor.borrow();
+            let vektor = match vektor.try_borrow() {
+                Ok(vektor) => vektor,
+                Err(_) => return Deger::Hata("vektor_al: vektör kullanımda".to_string()),
+            };
             let indeks = match indeks_dogrula(*indeks, vektor.len(), "vektor_al") {
                 Ok(deger) => deger,
                 Err(hata) => return Deger::Hata(hata),
@@ -2347,15 +4030,24 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "vektor_ata".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            let (Some(Deger::Vektor(vektor)), Some(Deger::Sayi(indeks)), Some(Deger::Sayi(deger))) =
-                (args.first(), args.get(1), args.get(2))
+            let [Deger::Vektor(vektor), Deger::Sayi(indeks), Deger::Sayi(deger)] = args.as_slice()
             else {
-                return Deger::Hata("vektor_ata: vektör, indeks ve sayı gerekir".to_string());
+                return if args.len() == 3 {
+                    Deger::Hata("vektor_ata: vektör, indeks ve sayı gerekir".to_string())
+                } else {
+                    Deger::Hata(format!(
+                        "vektor_ata: tam olarak 3 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
             };
             if !deger.is_finite() {
                 return Deger::Hata("vektor_ata: atanacak değer sonlu olmalı".to_string());
             }
-            let mut vektor = vektor.borrow_mut();
+            let mut vektor = match vektor.try_borrow_mut() {
+                Ok(vektor) => vektor,
+                Err(_) => return Deger::Hata("vektor_ata: vektör kullanımda".to_string()),
+            };
             let indeks = match indeks_dogrula(*indeks, vektor.len(), "vektor_ata") {
                 Ok(deger) => deger,
                 Err(hata) => return Deger::Hata(hata),
@@ -2372,10 +4064,14 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "matris_olustur".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            let (Some(Deger::Sayi(satirlar)), Some(Deger::Sayi(sutunlar))) =
-                (args.first(), args.get(1))
-            else {
-                return Deger::Hata("matris_olustur: satır ve sütun sayısı gerekir".to_string());
+            if !(2..=3).contains(&args.len()) {
+                return Deger::Hata(format!(
+                    "matris_olustur: 2 veya 3 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            }
+            let (Deger::Sayi(satirlar), Deger::Sayi(sutunlar)) = (&args[0], &args[1]) else {
+                return Deger::Hata("matris_olustur: satır ve sütun sayıları gerekir".to_string());
             };
             let satirlar = match boyut_dogrula(*satirlar, "matris_olustur", true) {
                 Ok(deger) => deger,
@@ -2408,60 +4104,86 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
 
     globals.insert(
         "matris_al".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            let (
-                Some(Deger::Matris {
-                    satirlar,
-                    sutunlar,
-                    veri,
-                }),
-                Some(Deger::Sayi(satir)),
-                Some(Deger::Sayi(sutun)),
-            ) = (args.first(), args.get(1), args.get(2))
-            else {
-                return Deger::Hata("matris_al: matris, satır ve sütun gerekir".to_string());
-            };
-            let satir = match indeks_dogrula(*satir, *satirlar, "matris_al satır") {
-                Ok(deger) => deger,
-                Err(hata) => return Deger::Hata(hata),
-            };
-            let sutun = match indeks_dogrula(*sutun, *sutunlar, "matris_al sütun") {
-                Ok(deger) => deger,
-                Err(hata) => return Deger::Hata(hata),
-            };
-            Deger::Sayi(veri.borrow()[satir * sutunlar + sutun])
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Matris {
+                satirlar,
+                sutunlar,
+                veri,
+            }, Deger::Sayi(satir), Deger::Sayi(sutun)] => {
+                let expected = match eleman_sayisi_dogrula(*satirlar, *sutunlar, "matris_al") {
+                    Ok(value) => value,
+                    Err(error) => return Deger::Hata(error),
+                };
+                let values = match veri.try_borrow() {
+                    Ok(values) => values,
+                    Err(_) => return Deger::Hata("matris_al: matris kullanımda".to_string()),
+                };
+                if values.len() != expected {
+                    return Deger::Hata("matris_al: bozuk matris veri boyutu".to_string());
+                }
+                let satir = match indeks_dogrula(*satir, *satirlar, "matris_al satır") {
+                    Ok(deger) => deger,
+                    Err(hata) => return Deger::Hata(hata),
+                };
+                let sutun = match indeks_dogrula(*sutun, *sutunlar, "matris_al sütun") {
+                    Ok(deger) => deger,
+                    Err(hata) => return Deger::Hata(hata),
+                };
+                let value = values[satir * sutunlar + sutun];
+                if value.is_finite() {
+                    Deger::Sayi(value)
+                } else {
+                    Deger::Hata("matris_al: matris sonlu olmayan değer içeriyor".to_string())
+                }
+            }
+            [_, _, _] => Deger::Hata("matris_al: matris, satır ve sütun gerekir".to_string()),
+            _ => Deger::Hata(format!(
+                "matris_al: tam olarak 3 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "matris_ata".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            let (
-                Some(Deger::Matris {
-                    satirlar,
-                    sutunlar,
-                    veri,
-                }),
-                Some(Deger::Sayi(satir)),
-                Some(Deger::Sayi(sutun)),
-                Some(Deger::Sayi(deger)),
-            ) = (args.first(), args.get(1), args.get(2), args.get(3))
-            else {
-                return Deger::Hata("matris_ata: matris, satır, sütun ve sayı gerekir".to_string());
-            };
-            if !deger.is_finite() {
-                return Deger::Hata("matris_ata: atanacak değer sonlu olmalı".to_string());
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Matris {
+                satirlar,
+                sutunlar,
+                veri,
+            }, Deger::Sayi(satir), Deger::Sayi(sutun), Deger::Sayi(deger)] => {
+                if !deger.is_finite() {
+                    return Deger::Hata("matris_ata: atanacak değer sonlu olmalı".to_string());
+                }
+                let expected = match eleman_sayisi_dogrula(*satirlar, *sutunlar, "matris_ata") {
+                    Ok(value) => value,
+                    Err(error) => return Deger::Hata(error),
+                };
+                let satir = match indeks_dogrula(*satir, *satirlar, "matris_ata satır") {
+                    Ok(deger) => deger,
+                    Err(hata) => return Deger::Hata(hata),
+                };
+                let sutun = match indeks_dogrula(*sutun, *sutunlar, "matris_ata sütun") {
+                    Ok(deger) => deger,
+                    Err(hata) => return Deger::Hata(hata),
+                };
+                let mut values = match veri.try_borrow_mut() {
+                    Ok(values) => values,
+                    Err(_) => return Deger::Hata("matris_ata: matris kullanımda".to_string()),
+                };
+                if values.len() != expected {
+                    return Deger::Hata("matris_ata: bozuk matris veri boyutu".to_string());
+                }
+                values[satir * sutunlar + sutun] = *deger;
+                Deger::Sayi(1.0)
             }
-            let satir = match indeks_dogrula(*satir, *satirlar, "matris_ata satır") {
-                Ok(deger) => deger,
-                Err(hata) => return Deger::Hata(hata),
-            };
-            let sutun = match indeks_dogrula(*sutun, *sutunlar, "matris_ata sütun") {
-                Ok(deger) => deger,
-                Err(hata) => return Deger::Hata(hata),
-            };
-            veri.borrow_mut()[satir * sutunlar + sutun] = *deger;
-            Deger::Sayi(1.0)
+            [_, _, _, _] => {
+                Deger::Hata("matris_ata: matris, satır, sütun ve sayı gerekir".to_string())
+            }
+            _ => Deger::Hata(format!(
+                "matris_ata: tam olarak 4 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
@@ -2469,169 +4191,227 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "matris_carp".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
+            let [Deger::Matris {
+                satirlar: ra,
+                sutunlar: ca,
+                veri: va,
+            }, Deger::Matris {
+                satirlar: rb,
+                sutunlar: cb,
+                veri: vb,
+            }] = args.as_slice()
+            else {
+                return if args.len() == 2 {
+                    Deger::Hata("matris_carp: iki matris argümanı gerekir".to_string())
+                } else {
+                    Deger::Hata(format!(
+                        "matris_carp: tam olarak 2 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            if ca != rb {
+                return Deger::Hata(format!(
+                    "matris_carp: boyut uyumsuzluğu {}x{} * {}x{}",
+                    ra, ca, rb, cb
+                ));
             }
-            if let (
-                Deger::Matris {
-                    satirlar: ra,
-                    sutunlar: ca,
-                    veri: va,
-                },
-                Deger::Matris {
-                    satirlar: rb,
-                    sutunlar: cb,
-                    veri: vb,
-                },
-            ) = (&args[0], &args[1])
-            {
-                if ca != rb {
+            let (m, n, k) = (*ra, *cb, *ca);
+            let element_count = match eleman_sayisi_dogrula(m, n, "matris_carp") {
+                Ok(value) => value,
+                Err(error) => return Deger::Hata(error),
+            };
+            let _operation_count = match element_count.checked_mul(k) {
+                Some(count) if count <= EN_FAZLA_SAYISAL_ISLEM => count,
+                _ => {
                     return Deger::Hata(format!(
-                        "matris_carp: boyut uyumsuzluğu {}x{} * {}x{}",
-                        ra, ca, rb, cb
-                    ));
+                        "matris_carp: işlem sayısı {} sınırını aşıyor",
+                        EN_FAZLA_SAYISAL_ISLEM
+                    ))
                 }
-                let (m, n, k) = (*ra, *cb, *ca);
-                let a = va.borrow();
-                let b = vb.borrow();
-                let mut c = vec![0.0f64; m * n];
-                for i in 0..m {
-                    for j in 0..n {
-                        let mut s = 0.0f64;
-                        for p in 0..k {
-                            s += a[i * k + p] * b[p * n + j];
-                        }
-                        c[i * n + j] = s;
+            };
+            let a = match va.try_borrow() {
+                Ok(values) => values,
+                Err(_) => return Deger::Hata("matris_carp: sol matris kullanımda".to_string()),
+            };
+            let b = match vb.try_borrow() {
+                Ok(values) => values,
+                Err(_) => return Deger::Hata("matris_carp: sağ matris kullanımda".to_string()),
+            };
+            if a.len() != m.saturating_mul(k) || b.len() != k.saturating_mul(n) {
+                return Deger::Hata("matris_carp: bozuk matris veri boyutu".to_string());
+            }
+            let mut result = vec![0.0f64; element_count];
+            for row in 0..m {
+                for column in 0..n {
+                    let mut sum = 0.0f64;
+                    for inner in 0..k {
+                        sum += a[row * k + inner] * b[inner * n + column];
                     }
+                    if !sum.is_finite() {
+                        return Deger::Hata(
+                            "matris_carp: işlem sonlu olmayan sonuç üretti".to_string(),
+                        );
+                    }
+                    result[row * n + column] = sum;
                 }
-                Deger::Matris {
-                    satirlar: m,
-                    sutunlar: n,
-                    veri: Rc::new(RefCell::new(c)),
-                }
-            } else {
-                Deger::Bos
+            }
+            Deger::Matris {
+                satirlar: m,
+                sutunlar: n,
+                veri: Rc::new(RefCell::new(result)),
             }
         }),
     );
 
     globals.insert(
         "matris_transpoz".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Matris {
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Matris {
                 satirlar,
                 sutunlar,
                 veri,
-            }) = args.first()
-            {
-                let b = veri.borrow();
-                let mut c = vec![0.0f64; satirlar * sutunlar];
-                for i in 0..*satirlar {
-                    for j in 0..*sutunlar {
-                        c[j * satirlar + i] = b[i * sutunlar + j];
+            }] => {
+                let values = match veri.try_borrow() {
+                    Ok(values) => values,
+                    Err(_) => return Deger::Hata("matris_transpoz: matris kullanımda".to_string()),
+                };
+                let element_count =
+                    match eleman_sayisi_dogrula(*satirlar, *sutunlar, "matris_transpoz") {
+                        Ok(value) => value,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                if values.len() != element_count {
+                    return Deger::Hata("matris_transpoz: bozuk matris veri boyutu".to_string());
+                }
+                let mut result = vec![0.0f64; element_count];
+                for row in 0..*satirlar {
+                    for column in 0..*sutunlar {
+                        result[column * satirlar + row] = values[row * sutunlar + column];
                     }
                 }
                 Deger::Matris {
                     satirlar: *sutunlar,
                     sutunlar: *satirlar,
-                    veri: Rc::new(RefCell::new(c)),
+                    veri: Rc::new(RefCell::new(result)),
                 }
-            } else {
-                Deger::Bos
             }
+            [other] => Deger::Hata(format!(
+                "matris_transpoz: matris bekleniyordu; {} geldi",
+                other
+            )),
+            _ => Deger::Hata(format!(
+                "matris_transpoz: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "matris_satir_al".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            let (
-                Some(Deger::Matris {
-                    satirlar,
-                    sutunlar,
-                    veri,
-                }),
-                Some(Deger::Sayi(satir)),
-            ) = (args.first(), args.get(1))
-            else {
-                return Deger::Hata("matris_satir_al: matris ve satır gerekir".to_string());
-            };
-            let satir = match indeks_dogrula(*satir, *satirlar, "matris_satir_al") {
-                Ok(deger) => deger,
-                Err(hata) => return Deger::Hata(hata),
-            };
-            let baslangic = satir * sutunlar;
-            let bitis = baslangic + sutunlar;
-            Deger::Vektor(Rc::new(RefCell::new(
-                veri.borrow()[baslangic..bitis].to_vec(),
-            )))
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [matrix @ Deger::Matris { .. }, Deger::Sayi(row)] => {
+                let (rows, columns, values) =
+                    match value_to_finite_matrix(matrix, "matris_satir_al") {
+                        Ok(matrix) => matrix,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                let row = match indeks_dogrula(*row, rows, "matris_satir_al") {
+                    Ok(value) => value,
+                    Err(error) => return Deger::Hata(error),
+                };
+                Deger::Vektor(Rc::new(RefCell::new(
+                    values[row * columns..(row + 1) * columns].to_vec(),
+                )))
+            }
+            [_, _] => Deger::Hata("matris_satir_al: matris ve satır gerekir".to_string()),
+            _ => Deger::Hata(format!(
+                "matris_satir_al: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "matris_sutun_al".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            let (
-                Some(Deger::Matris {
-                    satirlar,
-                    sutunlar,
-                    veri,
-                }),
-                Some(Deger::Sayi(sutun)),
-            ) = (args.first(), args.get(1))
-            else {
-                return Deger::Hata("matris_sutun_al: matris ve sütun gerekir".to_string());
-            };
-            let sutun = match indeks_dogrula(*sutun, *sutunlar, "matris_sutun_al") {
-                Ok(deger) => deger,
-                Err(hata) => return Deger::Hata(hata),
-            };
-            let veri = veri.borrow();
-            let sonuc = (0..*satirlar)
-                .map(|satir| veri[satir * sutunlar + sutun])
-                .collect();
-            Deger::Vektor(Rc::new(RefCell::new(sonuc)))
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [matrix @ Deger::Matris { .. }, Deger::Sayi(column)] => {
+                let (rows, columns, values) =
+                    match value_to_finite_matrix(matrix, "matris_sutun_al") {
+                        Ok(matrix) => matrix,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                let column = match indeks_dogrula(*column, columns, "matris_sutun_al") {
+                    Ok(value) => value,
+                    Err(error) => return Deger::Hata(error),
+                };
+                let result = (0..rows)
+                    .map(|row| values[row * columns + column])
+                    .collect();
+                Deger::Vektor(Rc::new(RefCell::new(result)))
+            }
+            [_, _] => Deger::Hata("matris_sutun_al: matris ve sütun gerekir".to_string()),
+            _ => Deger::Hata(format!(
+                "matris_sutun_al: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "matris_satir_ata".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            let (
-                Some(Deger::Matris {
-                    satirlar,
-                    sutunlar,
-                    veri,
-                }),
-                Some(Deger::Sayi(satir)),
-                Some(Deger::Vektor(yeni_satir)),
-            ) = (args.first(), args.get(1), args.get(2))
-            else {
-                return Deger::Hata(
-                    "matris_satir_ata: matris, satır ve vektör gerekir".to_string(),
-                );
-            };
-            let satir = match indeks_dogrula(*satir, *satirlar, "matris_satir_ata") {
-                Ok(deger) => deger,
-                Err(hata) => return Deger::Hata(hata),
-            };
-            let yeni_satir = yeni_satir.borrow();
-            if yeni_satir.len() != *sutunlar {
-                return Deger::Hata(format!(
-                    "matris_satir_ata: vektör uzunluğu {} olmalı",
-                    sutunlar
-                ));
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Matris {
+                satirlar,
+                sutunlar,
+                veri,
+            }, Deger::Sayi(row), new_row @ Deger::Vektor(_)] => {
+                let new_row = match value_to_finite_vector(new_row, "matris_satir_ata") {
+                    Ok(values) => values,
+                    Err(error) => return Deger::Hata(error),
+                };
+                if new_row.len() != *sutunlar {
+                    return Deger::Hata(format!(
+                        "matris_satir_ata: vektör uzunluğu {} olmalı",
+                        sutunlar
+                    ));
+                }
+                let expected = match eleman_sayisi_dogrula(*satirlar, *sutunlar, "matris_satir_ata")
+                {
+                    Ok(value) => value,
+                    Err(error) => return Deger::Hata(error),
+                };
+                let row = match indeks_dogrula(*row, *satirlar, "matris_satir_ata") {
+                    Ok(value) => value,
+                    Err(error) => return Deger::Hata(error),
+                };
+                let mut values = match veri.try_borrow_mut() {
+                    Ok(values) => values,
+                    Err(_) => {
+                        return Deger::Hata("matris_satir_ata: matris kullanımda".to_string())
+                    }
+                };
+                if values.len() != expected {
+                    return Deger::Hata("matris_satir_ata: bozuk matris veri boyutu".to_string());
+                }
+                let start = row * sutunlar;
+                values[start..start + sutunlar].copy_from_slice(&new_row);
+                Deger::Sayi(1.0)
             }
-            let baslangic = satir * sutunlar;
-            veri.borrow_mut()[baslangic..baslangic + sutunlar].copy_from_slice(&yeni_satir);
-            Deger::Sayi(1.0)
+            [_, _, _] => {
+                Deger::Hata("matris_satir_ata: matris, satır ve vektör gerekir".to_string())
+            }
+            _ => Deger::Hata(format!(
+                "matris_satir_ata: tam olarak 3 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "kimlik_matrisi".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(n)) = args.first() {
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Sayi(n)] => {
                 let n = match boyut_dogrula(*n, "kimlik_matrisi", true) {
                     Ok(deger) => deger,
                     Err(hata) => return Deger::Hata(hata),
@@ -2649,26 +4429,35 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
                     sutunlar: n,
                     veri: Rc::new(RefCell::new(v)),
                 }
-            } else {
-                Deger::Bos
             }
+            [other] => Deger::Hata(format!(
+                "kimlik_matrisi: sayı boyutu bekleniyordu; {} geldi",
+                other
+            )),
+            _ => Deger::Hata(format!(
+                "kimlik_matrisi: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "matris_boyutu".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Matris {
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Matris {
                 satirlar, sutunlar, ..
-            }) = args.first()
-            {
-                Deger::Liste(Rc::new(RefCell::new(vec![
-                    Deger::Sayi(*satirlar as f64),
-                    Deger::Sayi(*sutunlar as f64),
-                ])))
-            } else {
-                Deger::Bos
-            }
+            }] => Deger::Liste(Rc::new(RefCell::new(vec![
+                Deger::Sayi(*satirlar as f64),
+                Deger::Sayi(*sutunlar as f64),
+            ]))),
+            [other] => Deger::Hata(format!(
+                "matris_boyutu: matris bekleniyordu; {} geldi",
+                other
+            )),
+            _ => Deger::Hata(format!(
+                "matris_boyutu: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
@@ -2676,34 +4465,50 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "matris_vektor_carp".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
-            }
-            if let (
-                Deger::Matris {
-                    satirlar,
+            let [Deger::Matris {
+                satirlar,
+                sutunlar,
+                veri,
+            }, Deger::Vektor(vector)] = args.as_slice()
+            else {
+                return if args.len() == 2 {
+                    Deger::Hata("matris_vektor_carp: matris ve vektör argümanı gerekir".to_string())
+                } else {
+                    Deger::Hata(format!(
+                        "matris_vektor_carp: tam olarak 2 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            let matrix_values = match veri.try_borrow() {
+                Ok(values) => values,
+                Err(_) => return Deger::Hata("matris_vektor_carp: matris kullanımda".to_string()),
+            };
+            let vector_values = match vector.try_borrow() {
+                Ok(values) => values,
+                Err(_) => return Deger::Hata("matris_vektor_carp: vektör kullanımda".to_string()),
+            };
+            if *sutunlar != vector_values.len() {
+                return Deger::Hata(format!(
+                    "matris_vektor_carp: matris sütun {} ≠ vektör boyutu {}",
                     sutunlar,
-                    veri,
-                },
-                Deger::Vektor(v),
-            ) = (&args[0], &args[1])
-            {
-                let mb = veri.borrow();
-                let vb = v.borrow();
-                if *sutunlar != vb.len() {
-                    return Deger::Hata(format!(
-                        "matris_vektor_carp: matris sütun {} ≠ vektör boyutu {}",
-                        sutunlar,
-                        vb.len()
-                    ));
-                }
-                let sonuc: Vec<f64> = (0..*satirlar)
-                    .map(|i| (0..*sutunlar).map(|j| mb[i * sutunlar + j] * vb[j]).sum())
-                    .collect();
-                Deger::Vektor(Rc::new(RefCell::new(sonuc)))
-            } else {
-                Deger::Bos
+                    vector_values.len()
+                ));
             }
+            if matrix_values.len() != satirlar.saturating_mul(*sutunlar) {
+                return Deger::Hata("matris_vektor_carp: bozuk matris veri boyutu".to_string());
+            }
+            let mut result = Vec::with_capacity(*satirlar);
+            for row in 0..*satirlar {
+                let sum = (0..*sutunlar)
+                    .map(|column| matrix_values[row * sutunlar + column] * vector_values[column])
+                    .sum::<f64>();
+                if !sum.is_finite() {
+                    return Deger::Hata("matris_vektor_carp: sonlu olmayan sonuç".to_string());
+                }
+                result.push(sum);
+            }
+            Deger::Vektor(Rc::new(RefCell::new(result)))
         }),
     );
 
@@ -2713,103 +4518,151 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
 
     globals.insert(
         "regex_eslestir".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Metin(metin), Deger::Metin(desen)) = (&args[0], &args[1]) {
-                    match Regex::new(desen) {
-                        Ok(re) => return Deger::Sayi(if re.is_match(metin) { 1.0 } else { 0.0 }),
-                        Err(e) => {
-                            return Deger::Hata(format!("regex_eslestir: geçersiz desen — {}", e))
-                        }
-                    }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(metin), Deger::Metin(desen)] => {
+                if let Err(error) = validate_regex_text(metin, "regex_eslestir") {
+                    return Deger::Hata(error);
+                }
+                match compile_regex(desen, "regex_eslestir") {
+                    Ok(regex) => Deger::Sayi(if regex.is_match(metin) { 1.0 } else { 0.0 }),
+                    Err(error) => Deger::Hata(error),
                 }
             }
-            Deger::Bos
+            [_, _] => Deger::Hata("regex_eslestir: metin ve desen gerekir".to_string()),
+            _ => Deger::Hata(format!(
+                "regex_eslestir: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "regex_bul".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Metin(metin), Deger::Metin(desen)) = (&args[0], &args[1]) {
-                    match Regex::new(desen) {
-                        Ok(re) => {
-                            if let Some(m) = re.find(metin) {
-                                return Deger::Metin(m.as_str().to_string());
-                            }
-                            return Deger::Bos;
-                        }
-                        Err(e) => return Deger::Hata(format!("regex_bul: geçersiz desen — {}", e)),
-                    }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(metin), Deger::Metin(desen)] => {
+                if let Err(error) = validate_regex_text(metin, "regex_bul") {
+                    return Deger::Hata(error);
+                }
+                match compile_regex(desen, "regex_bul") {
+                    Ok(regex) => regex
+                        .find(metin)
+                        .map(|found| Deger::Metin(found.as_str().to_string()))
+                        .unwrap_or(Deger::Bos),
+                    Err(error) => Deger::Hata(error),
                 }
             }
-            Deger::Bos
+            [_, _] => Deger::Hata("regex_bul: metin ve desen gerekir".to_string()),
+            _ => Deger::Hata(format!(
+                "regex_bul: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "regex_bul_tum".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Metin(metin), Deger::Metin(desen)) = (&args[0], &args[1]) {
-                    match Regex::new(desen) {
-                        Ok(re) => {
-                            let eslesme: Vec<Deger> = re
-                                .find_iter(metin)
-                                .map(|m| Deger::Metin(m.as_str().to_string()))
-                                .collect();
-                            return Deger::Liste(Rc::new(RefCell::new(eslesme)));
-                        }
-                        Err(e) => {
-                            return Deger::Hata(format!("regex_bul_tum: geçersiz desen — {}", e))
-                        }
-                    }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(metin), Deger::Metin(desen)] => {
+                if let Err(error) = validate_regex_text(metin, "regex_bul_tum") {
+                    return Deger::Hata(error);
                 }
+                let regex = match compile_regex(desen, "regex_bul_tum") {
+                    Ok(regex) => regex,
+                    Err(error) => return Deger::Hata(error),
+                };
+                let mut results = Vec::new();
+                for found in regex.find_iter(metin) {
+                    if results.len() >= EN_FAZLA_BUILTIN_OGE {
+                        return Deger::Hata(format!(
+                            "regex_bul_tum: eşleşme sayısı {} öğelik güvenlik sınırını aşıyor",
+                            EN_FAZLA_BUILTIN_OGE
+                        ));
+                    }
+                    results.push(Deger::Metin(found.as_str().to_string()));
+                }
+                Deger::Liste(Rc::new(RefCell::new(results)))
             }
-            Deger::Bos
+            [_, _] => Deger::Hata("regex_bul_tum: metin ve desen gerekir".to_string()),
+            _ => Deger::Hata(format!(
+                "regex_bul_tum: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "regex_degistir".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 3 {
-                if let (Deger::Metin(metin), Deger::Metin(desen), Deger::Metin(yeni)) =
-                    (&args[0], &args[1], &args[2])
-                {
-                    match Regex::new(desen) {
-                        Ok(re) => {
-                            return Deger::Metin(re.replace_all(metin, yeni.as_str()).into_owned())
-                        }
-                        Err(e) => {
-                            return Deger::Hata(format!("regex_degistir: geçersiz desen — {}", e))
-                        }
-                    }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(metin), Deger::Metin(desen), Deger::Metin(yeni)] => {
+                if let Err(error) = validate_regex_text(metin, "regex_degistir") {
+                    return Deger::Hata(error);
                 }
+                if let Err(error) = validate_regex_text(yeni, "regex_degistir yeni metin") {
+                    return Deger::Hata(error);
+                }
+                let regex = match compile_regex(desen, "regex_degistir") {
+                    Ok(regex) => regex,
+                    Err(error) => return Deger::Hata(error),
+                };
+                let mut output = LimitedText::new(EN_FAZLA_DOSYA_BYTES);
+                let mut last_end = 0usize;
+                for found in regex.find_iter(metin) {
+                    if output.write_str(&metin[last_end..found.start()]).is_err()
+                        || output.write_str(yeni).is_err()
+                    {
+                        return Deger::Hata(format!(
+                            "regex_degistir: çıktı {} bayt sınırını aşıyor",
+                            EN_FAZLA_DOSYA_BYTES
+                        ));
+                    }
+                    last_end = found.end();
+                }
+                if output.write_str(&metin[last_end..]).is_err() {
+                    return Deger::Hata(format!(
+                        "regex_degistir: çıktı {} bayt sınırını aşıyor",
+                        EN_FAZLA_DOSYA_BYTES
+                    ));
+                }
+                Deger::Metin(output.text)
             }
-            Deger::Bos
+            [_, _, _] => {
+                Deger::Hata("regex_degistir: metin, desen ve yeni metin gerekir".to_string())
+            }
+            _ => Deger::Hata(format!(
+                "regex_degistir: tam olarak 3 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "regex_bol".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Metin(metin), Deger::Metin(desen)) = (&args[0], &args[1]) {
-                    match Regex::new(desen) {
-                        Ok(re) => {
-                            let parcalar: Vec<Deger> = re
-                                .split(metin)
-                                .map(|p| Deger::Metin(p.to_string()))
-                                .collect();
-                            return Deger::Liste(Rc::new(RefCell::new(parcalar)));
-                        }
-                        Err(e) => return Deger::Hata(format!("regex_bol: geçersiz desen — {}", e)),
-                    }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(metin), Deger::Metin(desen)] => {
+                if let Err(error) = validate_regex_text(metin, "regex_bol") {
+                    return Deger::Hata(error);
                 }
+                let regex = match compile_regex(desen, "regex_bol") {
+                    Ok(regex) => regex,
+                    Err(error) => return Deger::Hata(error),
+                };
+                let mut parts = Vec::new();
+                for part in regex.split(metin) {
+                    if parts.len() >= EN_FAZLA_BUILTIN_OGE {
+                        return Deger::Hata(format!(
+                            "regex_bol: parça sayısı {} öğelik güvenlik sınırını aşıyor",
+                            EN_FAZLA_BUILTIN_OGE
+                        ));
+                    }
+                    parts.push(Deger::Metin(part.to_string()));
+                }
+                Deger::Liste(Rc::new(RefCell::new(parts)))
             }
-            Deger::Bos
+            [_, _] => Deger::Hata("regex_bol: metin ve desen gerekir".to_string()),
+            _ => Deger::Hata(format!(
+                "regex_bol: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
@@ -2826,95 +4679,196 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "normal_rastgele".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            let ortalama = match args.first() {
-                Some(Deger::Sayi(n)) => *n,
-                _ => 0.0,
+            let [Deger::Sayi(mean), Deger::Sayi(deviation)] = args.as_slice() else {
+                return if args.len() == 2 {
+                    Deger::Hata("normal_rastgele: ortalama ve sapma sayı olmalıdır".to_string())
+                } else {
+                    Deger::Hata(format!(
+                        "normal_rastgele: tam olarak 2 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
             };
-            let sapma = match args.get(1) {
-                Some(Deger::Sayi(n)) => *n,
-                _ => 1.0,
+            if !mean.is_finite() || !deviation.is_finite() || *deviation < 0.0 {
+                return Deger::Hata(
+                    "normal_rastgele: ortalama sonlu, sapma sonlu ve negatif olmayan sayı olmalıdır"
+                        .to_string(),
+                );
+            }
+            let (u1, u2) = match RNG.with(|rng| {
+                rng.try_borrow_mut()
+                    .map(|mut rng| (rng.gen::<f64>(), rng.gen::<f64>()))
+            }) {
+                Ok(values) => values,
+                Err(_) => {
+                    return Deger::Hata(
+                        "normal_rastgele: rastgele sayı üreteci kullanımda".to_string(),
+                    )
+                }
             };
-            let (u1, u2) = RNG.with(|rng| {
-                let mut r = rng.borrow_mut();
-                (r.gen::<f64>(), r.gen::<f64>())
-            });
             let u1 = u1.max(1e-10);
             let z = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos();
-            Deger::Sayi(ortalama + sapma * z)
+            let result = mean + deviation * z;
+            if result.is_finite() {
+                Deger::Sayi(result)
+            } else {
+                Deger::Hata("normal_rastgele: sonlu olmayan sonuç".to_string())
+            }
         }),
     );
 
     globals.insert(
         "uniform_rastgele".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            let min = match args.first() {
-                Some(Deger::Sayi(n)) => *n,
-                _ => 0.0,
+            let [Deger::Sayi(minimum), Deger::Sayi(maximum)] = args.as_slice() else {
+                return if args.len() == 2 {
+                    Deger::Hata("uniform_rastgele: alt ve üst sınır sayı olmalıdır".to_string())
+                } else {
+                    Deger::Hata(format!(
+                        "uniform_rastgele: tam olarak 2 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
             };
-            let max = match args.get(1) {
-                Some(Deger::Sayi(n)) => *n,
-                _ => 1.0,
+            if !minimum.is_finite() || !maximum.is_finite() || minimum >= maximum {
+                return Deger::Hata(
+                    "uniform_rastgele: sonlu alt sınır üst sınırdan küçük olmalıdır".to_string(),
+                );
+            }
+            let unit = match RNG.with(|rng| rng.try_borrow_mut().map(|mut rng| rng.gen::<f64>())) {
+                Ok(value) => value,
+                Err(_) => {
+                    return Deger::Hata(
+                        "uniform_rastgele: rastgele sayı üreteci kullanımda".to_string(),
+                    )
+                }
             };
-            let val = RNG.with(|rng| rng.borrow_mut().gen::<f64>());
-            Deger::Sayi(min + val * (max - min))
+            let result = minimum + unit * (maximum - minimum);
+            if result.is_finite() {
+                Deger::Sayi(result)
+            } else {
+                Deger::Hata("uniform_rastgele: sonlu olmayan sonuç".to_string())
+            }
         }),
     );
 
     globals.insert(
         "rastgele_tohum_ata".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(seed)) = args.first() {
-                RNG.with(|rng| {
-                    *rng.borrow_mut() = SmallRng::seed_from_u64(*seed as u64);
-                });
-                Deger::Sayi(1.0)
-            } else {
-                Deger::Bos
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Sayi(seed)]
+                if seed.is_finite()
+                    && *seed >= 0.0
+                    && seed.fract() == 0.0
+                    && *seed <= EN_BUYUK_GUVENLI_SAYISAL_KIMLIK as f64 =>
+            {
+                match RNG.with(|rng| {
+                    rng.try_borrow_mut()
+                        .map(|mut rng| *rng = SmallRng::seed_from_u64(*seed as u64))
+                }) {
+                    Ok(()) => Deger::Sayi(1.0),
+                    Err(_) => Deger::Hata(
+                        "rastgele_tohum_ata: rastgele sayı üreteci kullanımda".to_string(),
+                    ),
+                }
             }
+            [Deger::Sayi(_)] => Deger::Hata(
+                "rastgele_tohum_ata: tohum güvenli aralıkta negatif olmayan tamsayı olmalıdır"
+                    .to_string(),
+            ),
+            [other] => Deger::Hata(format!(
+                "rastgele_tohum_ata: sayı bekleniyordu; {} geldi",
+                other
+            )),
+            _ => Deger::Hata(format!(
+                "rastgele_tohum_ata: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "rastgele_tamsayi".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            let min = match args.first() {
-                Some(Deger::Sayi(n)) => *n as i64,
-                _ => 0,
+            let [Deger::Sayi(minimum), Deger::Sayi(maximum)] = args.as_slice() else {
+                return if args.len() == 2 {
+                    Deger::Hata("rastgele_tamsayi: alt ve üst sınır sayı olmalıdır".to_string())
+                } else {
+                    Deger::Hata(format!(
+                        "rastgele_tamsayi: tam olarak 2 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
             };
-            let max = match args.get(1) {
-                Some(Deger::Sayi(n)) => *n as i64,
-                _ => 100,
-            };
-            if min >= max {
-                return Deger::Sayi(min as f64);
+            if !minimum.is_finite()
+                || !maximum.is_finite()
+                || minimum.fract() != 0.0
+                || maximum.fract() != 0.0
+                || minimum > maximum
+                || minimum.abs() > EN_BUYUK_GUVENLI_SAYISAL_KIMLIK as f64
+                || maximum.abs() > EN_BUYUK_GUVENLI_SAYISAL_KIMLIK as f64
+            {
+                return Deger::Hata(
+                    "rastgele_tamsayi: güvenli aralıkta sonlu tamsayı sınırlar ve alt <= üst gerekir"
+                        .to_string(),
+                );
             }
-            let val = RNG.with(|rng| rng.borrow_mut().gen_range(min..=max));
-            Deger::Sayi(val as f64)
+            match RNG.with(|rng| {
+                rng.try_borrow_mut()
+                    .map(|mut rng| rng.gen_range((*minimum as i64)..=(*maximum as i64)))
+            }) {
+                Ok(value) => Deger::Sayi(value as f64),
+                Err(_) => Deger::Hata(
+                    "rastgele_tamsayi: rastgele sayı üreteci kullanımda".to_string(),
+                ),
+            }
         }),
     );
 
     globals.insert(
         "vektor_karistir".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Vektor(v)) = args.first() {
-                let mut b = v.borrow_mut();
-                let n = b.len();
-                for i in (1..n).rev() {
-                    let j = RNG.with(|rng| rng.borrow_mut().gen_range(0..=i));
-                    b.swap(i, j);
-                }
-                Deger::Sayi(1.0)
-            } else if let Some(Deger::Liste(l)) = args.first() {
-                let mut b = l.borrow_mut();
-                let n = b.len();
-                for i in (1..n).rev() {
-                    let j = RNG.with(|rng| rng.borrow_mut().gen_range(0..=i));
-                    b.swap(i, j);
-                }
-                Deger::Sayi(1.0)
-            } else {
-                Deger::Bos
-            }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Vektor(vector)] => match vector.try_borrow_mut() {
+                Ok(mut b) => match RNG.with(|rng| {
+                    rng.try_borrow_mut().map(|mut rng| {
+                        let n = b.len();
+                        for i in (1..n).rev() {
+                            let j = rng.gen_range(0..=i);
+                            b.swap(i, j);
+                        }
+                    })
+                }) {
+                    Ok(()) => Deger::Sayi(1.0),
+                    Err(_) => {
+                        Deger::Hata("vektor_karistir: rastgele sayı üreteci kullanımda".to_string())
+                    }
+                },
+                Err(_) => Deger::Hata("vektor_karistir: vektör kullanımda".to_string()),
+            },
+            [Deger::Liste(list)] => match list.try_borrow_mut() {
+                Ok(mut b) => match RNG.with(|rng| {
+                    rng.try_borrow_mut().map(|mut rng| {
+                        let n = b.len();
+                        for i in (1..n).rev() {
+                            let j = rng.gen_range(0..=i);
+                            b.swap(i, j);
+                        }
+                    })
+                }) {
+                    Ok(()) => Deger::Sayi(1.0),
+                    Err(_) => {
+                        Deger::Hata("vektor_karistir: rastgele sayı üreteci kullanımda".to_string())
+                    }
+                },
+                Err(_) => Deger::Hata("vektor_karistir: liste kullanımda".to_string()),
+            },
+            [other] => Deger::Hata(format!(
+                "vektor_karistir: vektör veya liste bekleniyordu; {} geldi",
+                other
+            )),
+            _ => Deger::Hata(format!(
+                "vektor_karistir: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
@@ -2924,66 +4878,115 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
 
     globals.insert(
         "unicode_normalize".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Metin(s)) = args.first() {
-                let normalized: String = s.nfc().collect();
-                Deger::Metin(normalized)
-            } else {
-                Deger::Bos
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(text)] => {
+                let mut output = LimitedText::new(EN_FAZLA_DOSYA_BYTES);
+                for character in text.nfc() {
+                    if output.write_char(character).is_err() {
+                        return Deger::Hata(format!(
+                            "unicode_normalize: çıktı {} bayt sınırını aşıyor",
+                            EN_FAZLA_DOSYA_BYTES
+                        ));
+                    }
+                }
+                Deger::Metin(output.text)
             }
+            [other] => Deger::Hata(format!(
+                "unicode_normalize: metin bekleniyordu; {} geldi",
+                other
+            )),
+            _ => Deger::Hata(format!(
+                "unicode_normalize: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     // FNV-1a hash — hızlı, non-kriptografik; lookup table indekslemesi için
     globals.insert(
         "metin_hash".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Metin(s)) = args.first() {
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(text)] => {
                 let mut hash: u64 = 0xcbf29ce484222325u64;
-                for byte in s.bytes() {
+                for byte in text.bytes() {
                     hash ^= byte as u64;
                     hash = hash.wrapping_mul(0x100000001b3u64);
                 }
-                Deger::Sayi(hash as f64)
-            } else {
-                Deger::Bos
+                // Hüma'nın tek sayı türünde tam temsil edilebilen 53 bit.
+                Deger::Sayi((hash & EN_BUYUK_GUVENLI_SAYISAL_KIMLIK) as f64)
             }
+            [other] => Deger::Hata(format!("metin_hash: metin bekleniyordu; {} geldi", other)),
+            _ => Deger::Hata(format!(
+                "metin_hash: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "bayt_metin".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Metin(s)) = args.first() {
-                let bytes: Vec<Deger> = s.bytes().map(|b| Deger::Sayi(b as f64)).collect();
-                Deger::Liste(Rc::new(RefCell::new(bytes)))
-            } else {
-                Deger::Bos
-            }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(text)] if text.len() <= EN_FAZLA_BUILTIN_OGE => Deger::Liste(Rc::new(
+                RefCell::new(text.bytes().map(|byte| Deger::Sayi(byte as f64)).collect()),
+            )),
+            [Deger::Metin(_)] => Deger::Hata(format!(
+                "bayt_metin: çıktı {} öğelik güvenlik sınırını aşıyor",
+                EN_FAZLA_BUILTIN_OGE
+            )),
+            [other] => Deger::Hata(format!("bayt_metin: metin bekleniyordu; {} geldi", other)),
+            _ => Deger::Hata(format!(
+                "bayt_metin: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     globals.insert(
         "metin_bayt".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Liste(l)) = args.first() {
-                let bytes: Vec<u8> = l
-                    .borrow()
-                    .iter()
-                    .filter_map(|d| {
-                        if let Deger::Sayi(n) = d {
-                            Some(*n as u8)
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                match String::from_utf8(bytes) {
-                    Ok(s) => Deger::Metin(s),
-                    Err(_) => Deger::Hata("metin_bayt: geçersiz UTF-8 bayt dizisi".to_string()),
+            let [Deger::Liste(list)] = args.as_slice() else {
+                return if args.len() == 1 {
+                    Deger::Hata(format!("metin_bayt: liste bekleniyordu; {} geldi", args[0]))
+                } else {
+                    Deger::Hata(format!(
+                        "metin_bayt: tam olarak 1 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            let values = match list.try_borrow() {
+                Ok(values) => values,
+                Err(_) => return Deger::Hata("metin_bayt: liste kullanımda".to_string()),
+            };
+            if values.len() > EN_FAZLA_BUILTIN_OGE {
+                return Deger::Hata(format!(
+                    "metin_bayt: liste {} öğelik güvenlik sınırını aşıyor",
+                    EN_FAZLA_BUILTIN_OGE
+                ));
+            }
+            let mut bytes = Vec::with_capacity(values.len());
+            for (index, value) in values.iter().enumerate() {
+                match value {
+                    Deger::Sayi(number)
+                        if number.is_finite()
+                            && *number >= 0.0
+                            && *number <= u8::MAX as f64
+                            && number.fract() == 0.0 =>
+                    {
+                        bytes.push(*number as u8)
+                    }
+                    _ => {
+                        return Deger::Hata(format!(
+                            "metin_bayt: {index}. eleman 0..255 aralığında tamsayı olmalıdır"
+                        ))
+                    }
                 }
-            } else {
-                Deger::Bos
+            }
+            match String::from_utf8(bytes) {
+                Ok(text) => Deger::Metin(text),
+                Err(error) => {
+                    Deger::Hata(format!("metin_bayt: geçersiz UTF-8 bayt dizisi: {}", error))
+                }
             }
         }),
     );
@@ -2992,39 +4995,40 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "metin_benzerlik".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Metin(s1), Deger::Metin(s2)) = (&args[0], &args[1]) {
-                    let a: Vec<char> = s1.chars().collect();
-                    let b: Vec<char> = s2.chars().collect();
-                    let la = a.len();
-                    let lb = b.len();
-                    if la == 0 && lb == 0 {
-                        return Deger::Sayi(1.0);
-                    }
-                    let max_len = la.max(lb);
-                    let mut dp = vec![vec![0usize; lb + 1]; la + 1];
-                    for (i, row) in dp.iter_mut().enumerate() {
-                        row[0] = i;
-                    }
-                    for (j, cell) in dp[0].iter_mut().enumerate() {
-                        *cell = j;
-                    }
-                    for i in 1..=la {
-                        for j in 1..=lb {
-                            let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
-                            dp[i][j] = (dp[i - 1][j] + 1)
-                                .min(dp[i][j - 1] + 1)
-                                .min(dp[i - 1][j - 1] + cost);
-                        }
-                    }
-                    let dist = dp[la][lb];
-                    Deger::Sayi(1.0 - (dist as f64 / max_len as f64))
+            let [Deger::Metin(left), Deger::Metin(right)] = args.as_slice() else {
+                return if args.len() == 2 {
+                    Deger::Hata("metin_benzerlik: iki metin argümanı gerekir".to_string())
                 } else {
-                    Deger::Bos
-                }
-            } else {
-                Deger::Bos
+                    Deger::Hata(format!(
+                        "metin_benzerlik: tam olarak 2 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            let left = left.chars().collect::<Vec<_>>();
+            let right = right.chars().collect::<Vec<_>>();
+            if left.len() > 4096 || right.len() > 4096 {
+                return Deger::Hata(
+                    "metin_benzerlik: metinler en fazla 4096 karakter olabilir".to_string(),
+                );
             }
+            if left.is_empty() && right.is_empty() {
+                return Deger::Sayi(1.0);
+            }
+            let mut previous = (0..=right.len()).collect::<Vec<_>>();
+            let mut current = vec![0usize; right.len() + 1];
+            for (left_index, left_character) in left.iter().enumerate() {
+                current[0] = left_index + 1;
+                for (right_index, right_character) in right.iter().enumerate() {
+                    let replacement_cost = usize::from(left_character != right_character);
+                    current[right_index + 1] = (previous[right_index + 1] + 1)
+                        .min(current[right_index] + 1)
+                        .min(previous[right_index] + replacement_cost);
+                }
+                std::mem::swap(&mut previous, &mut current);
+            }
+            let distance = previous[right.len()];
+            Deger::Sayi(1.0 - distance as f64 / left.len().max(right.len()) as f64)
         }),
     );
 
@@ -3032,29 +5036,108 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "metin_sablon".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
-            }
-            let sablon = match &args[0] {
-                Deger::Metin(s) => s.clone(),
-                _ => return Deger::Bos,
+            let [Deger::Metin(template), values] = args.as_slice() else {
+                return if args.len() == 2 {
+                    Deger::Hata(
+                        "metin_sablon: ilk argüman metin, ikinci argüman sözlük veya nesne olmalıdır"
+                            .to_string(),
+                    )
+                } else {
+                    Deger::Hata(format!(
+                        "metin_sablon: tam olarak 2 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
             };
-            let mut sonuc = sablon;
-            let ikinci = &args[1];
-            match ikinci {
-                Deger::Sozluk(m) => {
-                    for (k, v) in m.borrow().iter() {
-                        sonuc = sonuc.replace(&format!("{{{}}}", k), &v.to_string());
+            let mut result = template.clone();
+            if result.len() > EN_FAZLA_DOSYA_BYTES {
+                return Deger::Hata(format!(
+                    "metin_sablon: şablon {} bayt sınırını aşıyor",
+                    EN_FAZLA_DOSYA_BYTES
+                ));
+            }
+            let mut work = 0usize;
+            match values {
+                Deger::Sozluk(map) => {
+                    let values = match map.try_borrow() {
+                        Ok(values) => values,
+                        Err(_) => return Deger::Hata("metin_sablon: sözlük kullanımda".to_string()),
+                    };
+                    if values.len() > EN_FAZLA_BUILTIN_OGE {
+                        return Deger::Hata("metin_sablon: sözlük çok büyük".to_string());
+                    }
+                    for (key, value) in values.iter() {
+                        work = match work.checked_add(result.len()) {
+                            Some(work) if work <= EN_FAZLA_SAYISAL_ISLEM => work,
+                            _ => {
+                                return Deger::Hata(format!(
+                                    "metin_sablon: iş yükü {} sınırını aşıyor",
+                                    EN_FAZLA_SAYISAL_ISLEM
+                                ))
+                            }
+                        };
+                        let placeholder = format!("{{{key}}}");
+                        let replacement = match display_value_limited(value, "metin_sablon") {
+                            Ok(replacement) => replacement,
+                            Err(error) => return Deger::Hata(error),
+                        };
+                        let count = result.matches(&placeholder).count();
+                        if let Err(error) = replacement_output_size(
+                            &result,
+                            &placeholder,
+                            &replacement,
+                            count,
+                            "metin_sablon",
+                        ) {
+                            return Deger::Hata(error);
+                        }
+                        result = result.replace(&placeholder, &replacement);
                     }
                 }
                 Deger::Nesne { alanlar, .. } => {
-                    for (k, v) in alanlar.borrow().iter() {
-                        sonuc = sonuc.replace(&format!("{{{}}}", k), &v.to_string());
+                    let fields = match alanlar.try_borrow() {
+                        Ok(fields) => fields,
+                        Err(_) => return Deger::Hata("metin_sablon: nesne kullanımda".to_string()),
+                    };
+                    if fields.len() > EN_FAZLA_BUILTIN_OGE {
+                        return Deger::Hata("metin_sablon: nesne çok büyük".to_string());
+                    }
+                    for (key, value) in fields.iter() {
+                        work = match work.checked_add(result.len()) {
+                            Some(work) if work <= EN_FAZLA_SAYISAL_ISLEM => work,
+                            _ => {
+                                return Deger::Hata(format!(
+                                    "metin_sablon: iş yükü {} sınırını aşıyor",
+                                    EN_FAZLA_SAYISAL_ISLEM
+                                ))
+                            }
+                        };
+                        let placeholder = format!("{{{key}}}");
+                        let replacement = match display_value_limited(value, "metin_sablon") {
+                            Ok(replacement) => replacement,
+                            Err(error) => return Deger::Hata(error),
+                        };
+                        let count = result.matches(&placeholder).count();
+                        if let Err(error) = replacement_output_size(
+                            &result,
+                            &placeholder,
+                            &replacement,
+                            count,
+                            "metin_sablon",
+                        ) {
+                            return Deger::Hata(error);
+                        }
+                        result = result.replace(&placeholder, &replacement);
                     }
                 }
-                _ => return Deger::Bos,
+                other => {
+                    return Deger::Hata(format!(
+                        "metin_sablon: sözlük veya nesne bekleniyordu; {} geldi",
+                        other
+                    ))
+                }
             }
-            Deger::Metin(sonuc)
+            Deger::Metin(result)
         }),
     );
 
@@ -3067,39 +5150,40 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "matris_satirlara_ekle".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
+            let [matrix, vector] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "matris_satirlara_ekle: tam olarak 2 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            };
+            let (rows, columns, mut matrix_values) =
+                match value_to_finite_matrix(matrix, "matris_satirlara_ekle") {
+                    Ok(matrix) => matrix,
+                    Err(error) => return Deger::Hata(error),
+                };
+            let vector_values = match value_to_finite_vector(vector, "matris_satirlara_ekle") {
+                Ok(values) => values,
+                Err(error) => return Deger::Hata(error),
+            };
+            if columns != vector_values.len() {
+                return Deger::Hata(format!(
+                    "matris_satirlara_ekle: matris sütun {} ≠ vektör boyutu {}",
+                    columns,
+                    vector_values.len()
+                ));
             }
-            if let (
-                Deger::Matris {
-                    satirlar,
-                    sutunlar,
-                    veri,
-                },
-                Deger::Vektor(v),
-            ) = (&args[0], &args[1])
-            {
-                let vb = v.borrow();
-                if *sutunlar != vb.len() {
-                    return Deger::Hata(format!(
-                        "matris_satirlara_ekle: matris sütun {} ≠ vektör boyutu {}",
-                        sutunlar,
-                        vb.len()
-                    ));
+            for row in 0..rows {
+                for column in 0..columns {
+                    matrix_values[row * columns + column] += vector_values[column];
                 }
-                let mut mb = veri.borrow().clone();
-                for i in 0..*satirlar {
-                    for j in 0..*sutunlar {
-                        mb[i * sutunlar + j] += vb[j];
-                    }
-                }
-                Deger::Matris {
-                    satirlar: *satirlar,
-                    sutunlar: *sutunlar,
-                    veri: Rc::new(RefCell::new(mb)),
-                }
-            } else {
-                Deger::Bos
+            }
+            if matrix_values.iter().any(|value| !value.is_finite()) {
+                return Deger::Hata("matris_satirlara_ekle: sonlu olmayan sonuç".to_string());
+            }
+            Deger::Matris {
+                satirlar: rows,
+                sutunlar: columns,
+                veri: Rc::new(RefCell::new(matrix_values)),
             }
         }),
     );
@@ -3108,39 +5192,40 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "matris_sutunlara_ekle".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
+            let [matrix, vector] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "matris_sutunlara_ekle: tam olarak 2 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            };
+            let (rows, columns, mut matrix_values) =
+                match value_to_finite_matrix(matrix, "matris_sutunlara_ekle") {
+                    Ok(matrix) => matrix,
+                    Err(error) => return Deger::Hata(error),
+                };
+            let vector_values = match value_to_finite_vector(vector, "matris_sutunlara_ekle") {
+                Ok(values) => values,
+                Err(error) => return Deger::Hata(error),
+            };
+            if rows != vector_values.len() {
+                return Deger::Hata(format!(
+                    "matris_sutunlara_ekle: matris satır {} ≠ vektör boyutu {}",
+                    rows,
+                    vector_values.len()
+                ));
             }
-            if let (
-                Deger::Matris {
-                    satirlar,
-                    sutunlar,
-                    veri,
-                },
-                Deger::Vektor(v),
-            ) = (&args[0], &args[1])
-            {
-                let vb = v.borrow();
-                if *satirlar != vb.len() {
-                    return Deger::Hata(format!(
-                        "matris_sutunlara_ekle: matris satır {} ≠ vektör boyutu {}",
-                        satirlar,
-                        vb.len()
-                    ));
+            for row in 0..rows {
+                for column in 0..columns {
+                    matrix_values[row * columns + column] += vector_values[row];
                 }
-                let mut mb = veri.borrow().clone();
-                for i in 0..*satirlar {
-                    for j in 0..*sutunlar {
-                        mb[i * sutunlar + j] += vb[i];
-                    }
-                }
-                Deger::Matris {
-                    satirlar: *satirlar,
-                    sutunlar: *sutunlar,
-                    veri: Rc::new(RefCell::new(mb)),
-                }
-            } else {
-                Deger::Bos
+            }
+            if matrix_values.iter().any(|value| !value.is_finite()) {
+                return Deger::Hata("matris_sutunlara_ekle: sonlu olmayan sonuç".to_string());
+            }
+            Deger::Matris {
+                satirlar: rows,
+                sutunlar: columns,
+                veri: Rc::new(RefCell::new(matrix_values)),
             }
         }),
     );
@@ -3149,26 +5234,35 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "matris_skalar_carp".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
+            let [matrix, Deger::Sayi(scalar)] = args.as_slice() else {
+                return if args.len() == 2 {
+                    Deger::Hata("matris_skalar_carp: matris ve sayı gerekir".to_string())
+                } else {
+                    Deger::Hata(format!(
+                        "matris_skalar_carp: tam olarak 2 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            if !scalar.is_finite() {
+                return Deger::Hata("matris_skalar_carp: skaler sonlu olmalıdır".to_string());
             }
-            if let (
-                Deger::Matris {
-                    satirlar,
-                    sutunlar,
-                    veri,
-                },
-                Deger::Sayi(s),
-            ) = (&args[0], &args[1])
+            let (rows, columns, values) = match value_to_finite_matrix(matrix, "matris_skalar_carp")
             {
-                let sonuc: Vec<f64> = veri.borrow().iter().map(|x| x * s).collect();
-                Deger::Matris {
-                    satirlar: *satirlar,
-                    sutunlar: *sutunlar,
-                    veri: Rc::new(RefCell::new(sonuc)),
-                }
-            } else {
-                Deger::Bos
+                Ok(matrix) => matrix,
+                Err(error) => return Deger::Hata(error),
+            };
+            let result = values
+                .into_iter()
+                .map(|value| value * scalar)
+                .collect::<Vec<_>>();
+            if result.iter().any(|value| !value.is_finite()) {
+                return Deger::Hata("matris_skalar_carp: sonlu olmayan sonuç".to_string());
+            }
+            Deger::Matris {
+                satirlar: rows,
+                sutunlar: columns,
+                veri: Rc::new(RefCell::new(result)),
             }
         }),
     );
@@ -3177,10 +5271,21 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "matris_elemanlari_topla".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Matris { veri, .. }) = args.first() {
-                Deger::Sayi(veri.borrow().iter().sum())
+            let [matrix] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "matris_elemanlari_topla: tam olarak 1 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            };
+            let (_, _, values) = match value_to_finite_matrix(matrix, "matris_elemanlari_topla") {
+                Ok(matrix) => matrix,
+                Err(error) => return Deger::Hata(error),
+            };
+            let sum = values.iter().sum::<f64>();
+            if sum.is_finite() {
+                Deger::Sayi(sum)
             } else {
-                Deger::Bos
+                Deger::Hata("matris_elemanlari_topla: sonlu olmayan sonuç".to_string())
             }
         }),
     );
@@ -3189,20 +5294,24 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "matris_satir_toplamları".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Matris {
-                satirlar,
-                sutunlar,
-                veri,
-            }) = args.first()
-            {
-                let b = veri.borrow();
-                let sonuc: Vec<f64> = (0..*satirlar)
-                    .map(|i| b[i * sutunlar..(i + 1) * sutunlar].iter().sum())
-                    .collect();
-                Deger::Vektor(Rc::new(RefCell::new(sonuc)))
-            } else {
-                Deger::Bos
+            let [matrix] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "matris_satir_toplamları: tam olarak 1 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            };
+            let (rows, columns, values) =
+                match value_to_finite_matrix(matrix, "matris_satir_toplamları") {
+                    Ok(matrix) => matrix,
+                    Err(error) => return Deger::Hata(error),
+                };
+            let result = (0..rows)
+                .map(|row| values[row * columns..(row + 1) * columns].iter().sum())
+                .collect::<Vec<f64>>();
+            if result.iter().any(|value| !value.is_finite()) {
+                return Deger::Hata("matris_satir_toplamları: sonlu olmayan sonuç".to_string());
             }
+            Deger::Vektor(Rc::new(RefCell::new(result)))
         }),
     );
 
@@ -3210,23 +5319,27 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "matris_sutun_toplamları".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Matris {
-                satirlar,
-                sutunlar,
-                veri,
-            }) = args.first()
-            {
-                let b = veri.borrow();
-                let mut sonuc = vec![0.0f64; *sutunlar];
-                for i in 0..*satirlar {
-                    for j in 0..*sutunlar {
-                        sonuc[j] += b[i * sutunlar + j];
-                    }
+            let [matrix] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "matris_sutun_toplamları: tam olarak 1 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            };
+            let (rows, columns, values) =
+                match value_to_finite_matrix(matrix, "matris_sutun_toplamları") {
+                    Ok(matrix) => matrix,
+                    Err(error) => return Deger::Hata(error),
+                };
+            let mut result = vec![0.0f64; columns];
+            for row in 0..rows {
+                for column in 0..columns {
+                    result[column] += values[row * columns + column];
                 }
-                Deger::Vektor(Rc::new(RefCell::new(sonuc)))
-            } else {
-                Deger::Bos
             }
+            if result.iter().any(|value| !value.is_finite()) {
+                return Deger::Hata("matris_sutun_toplamları: sonlu olmayan sonuç".to_string());
+            }
+            Deger::Vektor(Rc::new(RefCell::new(result)))
         }),
     );
 
@@ -3234,34 +5347,45 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "batch_softmax".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Matris {
-                satirlar,
-                sutunlar,
-                veri,
-            }) = args.first()
-            {
-                let b = veri.borrow();
-                let mut sonuc = vec![0.0f64; satirlar * sutunlar];
-                for i in 0..*satirlar {
-                    let satir = &b[i * sutunlar..(i + 1) * sutunlar];
-                    let max_val = satir.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-                    let exps: Vec<f64> = satir.iter().map(|x| (x - max_val).exp()).collect();
-                    let toplam: f64 = exps.iter().sum();
-                    for (j, e) in exps.iter().enumerate() {
-                        sonuc[i * sutunlar + j] = if toplam > 0.0 {
-                            e / toplam
-                        } else {
-                            1.0 / *sutunlar as f64
-                        };
-                    }
+            let [matrix] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "batch_softmax: tam olarak 1 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            };
+            let (rows, columns, values) = match value_to_finite_matrix(matrix, "batch_softmax") {
+                Ok(matrix) => matrix,
+                Err(error) => return Deger::Hata(error),
+            };
+            if columns == 0 && rows > 0 {
+                return Deger::Hata(
+                    "batch_softmax: satırlar en az bir sütun içermelidir".to_string(),
+                );
+            }
+            let mut result = vec![0.0f64; values.len()];
+            for row in 0..rows {
+                let row_values = &values[row * columns..(row + 1) * columns];
+                let Some(maximum) = row_values.iter().copied().reduce(f64::max) else {
+                    continue;
+                };
+                let exponentials = row_values
+                    .iter()
+                    .map(|value| (value - maximum).exp())
+                    .collect::<Vec<_>>();
+                let sum = exponentials.iter().sum::<f64>();
+                if !sum.is_finite() || sum <= 0.0 {
+                    return Deger::Hata(
+                        "batch_softmax: geçersiz normalizasyon toplamı".to_string(),
+                    );
                 }
-                Deger::Matris {
-                    satirlar: *satirlar,
-                    sutunlar: *sutunlar,
-                    veri: Rc::new(RefCell::new(sonuc)),
+                for (column, exponential) in exponentials.iter().enumerate() {
+                    result[row * columns + column] = exponential / sum;
                 }
-            } else {
-                Deger::Bos
+            }
+            Deger::Matris {
+                satirlar: rows,
+                sutunlar: columns,
+                veri: Rc::new(RefCell::new(result)),
             }
         }),
     );
@@ -3270,26 +5394,30 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "matris_satir_normlari".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Matris {
-                satirlar,
-                sutunlar,
-                veri,
-            }) = args.first()
-            {
-                let b = veri.borrow();
-                let sonuc: Vec<f64> = (0..*satirlar)
-                    .map(|i| {
-                        b[i * sutunlar..(i + 1) * sutunlar]
-                            .iter()
-                            .map(|x| x * x)
-                            .sum::<f64>()
-                            .sqrt()
-                    })
-                    .collect();
-                Deger::Vektor(Rc::new(RefCell::new(sonuc)))
-            } else {
-                Deger::Bos
+            let [matrix] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "matris_satir_normlari: tam olarak 1 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            };
+            let (rows, columns, values) =
+                match value_to_finite_matrix(matrix, "matris_satir_normlari") {
+                    Ok(matrix) => matrix,
+                    Err(error) => return Deger::Hata(error),
+                };
+            let result = (0..rows)
+                .map(|row| {
+                    values[row * columns..(row + 1) * columns]
+                        .iter()
+                        .map(|value| value * value)
+                        .sum::<f64>()
+                        .sqrt()
+                })
+                .collect::<Vec<_>>();
+            if result.iter().any(|value| !value.is_finite()) {
+                return Deger::Hata("matris_satir_normlari: sonlu olmayan sonuç".to_string());
             }
+            Deger::Vektor(Rc::new(RefCell::new(result)))
         }),
     );
 
@@ -3297,27 +5425,39 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "vektor_dis_carpim".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
-            }
-            if let (Deger::Vektor(v1), Deger::Vektor(v2)) = (&args[0], &args[1]) {
-                let b1 = v1.borrow();
-                let b2 = v2.borrow();
-                let n1 = b1.len();
-                let n2 = b2.len();
-                let mut sonuc = Vec::with_capacity(n1 * n2);
-                for i in 0..n1 {
-                    for j in 0..n2 {
-                        sonuc.push(b1[i] * b2[j]);
+            let [left, right] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "vektor_dis_carpim: tam olarak 2 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            };
+            let left = match value_to_finite_vector(left, "vektor_dis_carpim") {
+                Ok(values) => values,
+                Err(error) => return Deger::Hata(error),
+            };
+            let right = match value_to_finite_vector(right, "vektor_dis_carpim") {
+                Ok(values) => values,
+                Err(error) => return Deger::Hata(error),
+            };
+            let element_count =
+                match eleman_sayisi_dogrula(left.len(), right.len(), "vektor_dis_carpim") {
+                    Ok(value) => value,
+                    Err(error) => return Deger::Hata(error),
+                };
+            let mut result = Vec::with_capacity(element_count);
+            for left_value in &left {
+                for right_value in &right {
+                    let value = left_value * right_value;
+                    if !value.is_finite() {
+                        return Deger::Hata("vektor_dis_carpim: sonlu olmayan sonuç".to_string());
                     }
+                    result.push(value);
                 }
-                Deger::Matris {
-                    satirlar: n1,
-                    sutunlar: n2,
-                    veri: Rc::new(RefCell::new(sonuc)),
-                }
-            } else {
-                Deger::Bos
+            }
+            Deger::Matris {
+                satirlar: left.len(),
+                sutunlar: right.len(),
+                veri: Rc::new(RefCell::new(result)),
             }
         }),
     );
@@ -3326,94 +5466,37 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "matris_relu".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Matris {
-                satirlar,
-                sutunlar,
-                veri,
-            }) = args.first()
-            {
-                let sonuc: Vec<f64> = veri.borrow().iter().map(|x| x.max(0.0)).collect();
-                Deger::Matris {
-                    satirlar: *satirlar,
-                    sutunlar: *sutunlar,
-                    veri: Rc::new(RefCell::new(sonuc)),
-                }
-            } else {
-                Deger::Bos
-            }
+            unary_matrix_builtin(args, "matris_relu", |value| value.max(0.0))
         }),
     );
 
     globals.insert(
         "matris_sigmoid".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Matris {
-                satirlar,
-                sutunlar,
-                veri,
-            }) = args.first()
-            {
-                let sonuc: Vec<f64> = veri
-                    .borrow()
-                    .iter()
-                    .map(|x| 1.0 / (1.0 + (-x).exp()))
-                    .collect();
-                Deger::Matris {
-                    satirlar: *satirlar,
-                    sutunlar: *sutunlar,
-                    veri: Rc::new(RefCell::new(sonuc)),
+            unary_matrix_builtin(args, "matris_sigmoid", |value| {
+                if value >= 0.0 {
+                    1.0 / (1.0 + (-value).exp())
+                } else {
+                    let exponential = value.exp();
+                    exponential / (1.0 + exponential)
                 }
-            } else {
-                Deger::Bos
-            }
+            })
         }),
     );
 
     globals.insert(
         "matris_tanh_akt".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Matris {
-                satirlar,
-                sutunlar,
-                veri,
-            }) = args.first()
-            {
-                let sonuc: Vec<f64> = veri.borrow().iter().map(|x| x.tanh()).collect();
-                Deger::Matris {
-                    satirlar: *satirlar,
-                    sutunlar: *sutunlar,
-                    veri: Rc::new(RefCell::new(sonuc)),
-                }
-            } else {
-                Deger::Bos
-            }
-        }),
+        Deger::DahiliFonksiyon(|args| unary_matrix_builtin(args, "matris_tanh_akt", f64::tanh)),
     );
 
     globals.insert(
         "matris_gelu".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Matris {
-                satirlar,
-                sutunlar,
-                veri,
-            }) = args.first()
-            {
-                let sonuc: Vec<f64> = veri
-                    .borrow()
-                    .iter()
-                    .map(|x| {
-                        0.5 * x * (1.0 + (0.7978845608028654 * (x + 0.044715 * x * x * x)).tanh())
-                    })
-                    .collect();
-                Deger::Matris {
-                    satirlar: *satirlar,
-                    sutunlar: *sutunlar,
-                    veri: Rc::new(RefCell::new(sonuc)),
-                }
-            } else {
-                Deger::Bos
-            }
+            unary_matrix_builtin(args, "matris_gelu", |value| {
+                0.5 * value
+                    * (1.0
+                        + (0.7978845608028654 * (value + 0.044715 * value * value * value)).tanh())
+            })
         }),
     );
 
@@ -3421,27 +5504,34 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "matris_klamp".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 3 {
-                if let (
-                    Deger::Matris {
-                        satirlar,
-                        sutunlar,
-                        veri,
-                    },
-                    Deger::Sayi(min),
-                    Deger::Sayi(max),
-                ) = (&args[0], &args[1], &args[2])
-                {
-                    let sonuc: Vec<f64> =
-                        veri.borrow().iter().map(|x| x.clamp(*min, *max)).collect();
-                    return Deger::Matris {
-                        satirlar: *satirlar,
-                        sutunlar: *sutunlar,
-                        veri: Rc::new(RefCell::new(sonuc)),
-                    };
-                }
+            let [matrix, Deger::Sayi(minimum), Deger::Sayi(maximum)] = args.as_slice() else {
+                return if args.len() == 3 {
+                    Deger::Hata("matris_klamp: matris, alt ve üst sınır gerekir".to_string())
+                } else {
+                    Deger::Hata(format!(
+                        "matris_klamp: tam olarak 3 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            if !minimum.is_finite() || !maximum.is_finite() || minimum > maximum {
+                return Deger::Hata(
+                    "matris_klamp: sonlu alt sınır üst sınırdan küçük/eşit olmalıdır".to_string(),
+                );
             }
-            Deger::Bos
+            let (rows, columns, values) = match value_to_finite_matrix(matrix, "matris_klamp") {
+                Ok(matrix) => matrix,
+                Err(error) => return Deger::Hata(error),
+            };
+            let result = values
+                .into_iter()
+                .map(|value| value.clamp(*minimum, *maximum))
+                .collect();
+            Deger::Matris {
+                satirlar: rows,
+                sutunlar: columns,
+                veri: Rc::new(RefCell::new(result)),
+            }
         }),
     );
 
@@ -3449,39 +5539,7 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "matris_topla".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
-            }
-            if let (
-                Deger::Matris {
-                    satirlar: r1,
-                    sutunlar: c1,
-                    veri: v1,
-                },
-                Deger::Matris {
-                    satirlar: r2,
-                    sutunlar: c2,
-                    veri: v2,
-                },
-            ) = (&args[0], &args[1])
-            {
-                if r1 != r2 || c1 != c2 {
-                    return Deger::Hata("matris_topla: boyutlar eşit olmalı".to_string());
-                }
-                let sonuc: Vec<f64> = v1
-                    .borrow()
-                    .iter()
-                    .zip(v2.borrow().iter())
-                    .map(|(a, b)| a + b)
-                    .collect();
-                Deger::Matris {
-                    satirlar: *r1,
-                    sutunlar: *c1,
-                    veri: Rc::new(RefCell::new(sonuc)),
-                }
-            } else {
-                Deger::Bos
-            }
+            binary_matrix_builtin(args, "matris_topla", |left, right| left + right)
         }),
     );
 
@@ -3489,39 +5547,7 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "matris_cikart".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
-            }
-            if let (
-                Deger::Matris {
-                    satirlar: r1,
-                    sutunlar: c1,
-                    veri: v1,
-                },
-                Deger::Matris {
-                    satirlar: r2,
-                    sutunlar: c2,
-                    veri: v2,
-                },
-            ) = (&args[0], &args[1])
-            {
-                if r1 != r2 || c1 != c2 {
-                    return Deger::Hata("matris_cikart: boyutlar eşit olmalı".to_string());
-                }
-                let sonuc: Vec<f64> = v1
-                    .borrow()
-                    .iter()
-                    .zip(v2.borrow().iter())
-                    .map(|(a, b)| a - b)
-                    .collect();
-                Deger::Matris {
-                    satirlar: *r1,
-                    sutunlar: *c1,
-                    veri: Rc::new(RefCell::new(sonuc)),
-                }
-            } else {
-                Deger::Bos
-            }
+            binary_matrix_builtin(args, "matris_cikart", |left, right| left - right)
         }),
     );
 
@@ -3529,41 +5555,7 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "matris_carpi_elemanlari".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
-            }
-            if let (
-                Deger::Matris {
-                    satirlar: r1,
-                    sutunlar: c1,
-                    veri: v1,
-                },
-                Deger::Matris {
-                    satirlar: r2,
-                    sutunlar: c2,
-                    veri: v2,
-                },
-            ) = (&args[0], &args[1])
-            {
-                if r1 != r2 || c1 != c2 {
-                    return Deger::Hata(
-                        "matris_carpi_elemanlari: boyutlar eşit olmalı".to_string(),
-                    );
-                }
-                let sonuc: Vec<f64> = v1
-                    .borrow()
-                    .iter()
-                    .zip(v2.borrow().iter())
-                    .map(|(a, b)| a * b)
-                    .collect();
-                Deger::Matris {
-                    satirlar: *r1,
-                    sutunlar: *c1,
-                    veri: Rc::new(RefCell::new(sonuc)),
-                }
-            } else {
-                Deger::Bos
-            }
+            binary_matrix_builtin(args, "matris_carpi_elemanlari", |left, right| left * right)
         }),
     );
 
@@ -3571,45 +5563,68 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "gradyan_kirp".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
-            }
-            let maks_norm = match &args[1] {
-                Deger::Sayi(n) => *n,
-                _ => return Deger::Bos,
+            let [value, Deger::Sayi(maximum_norm)] = args.as_slice() else {
+                return if args.len() == 2 {
+                    Deger::Hata(
+                        "gradyan_kirp: vektör/matris ve azami norm sayısı gerekir".to_string(),
+                    )
+                } else {
+                    Deger::Hata(format!(
+                        "gradyan_kirp: tam olarak 2 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
             };
-            match &args[0] {
-                Deger::Vektor(v) => {
-                    let b = v.borrow();
-                    let norm: f64 = b.iter().map(|x| x * x).sum::<f64>().sqrt();
-                    if norm > maks_norm {
-                        let olcek = maks_norm / norm;
-                        let kirpilmis: Vec<f64> = b.iter().map(|x| x * olcek).collect();
-                        Deger::Vektor(Rc::new(RefCell::new(kirpilmis)))
+            if !maximum_norm.is_finite() || *maximum_norm <= 0.0 {
+                return Deger::Hata(
+                    "gradyan_kirp: azami norm pozitif ve sonlu olmalıdır".to_string(),
+                );
+            }
+            match value {
+                Deger::Vektor(_) | Deger::Liste(_) => {
+                    let values = match value_to_finite_vector(value, "gradyan_kirp") {
+                        Ok(values) => values,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                    let norm = values.iter().map(|value| value * value).sum::<f64>().sqrt();
+                    if !norm.is_finite() {
+                        return Deger::Hata("gradyan_kirp: sonlu olmayan norm".to_string());
+                    }
+                    if norm > *maximum_norm {
+                        let scale = maximum_norm / norm;
+                        Deger::Vektor(Rc::new(RefCell::new(
+                            values.into_iter().map(|value| value * scale).collect(),
+                        )))
                     } else {
-                        Deger::Vektor(Rc::clone(v))
+                        Deger::Vektor(Rc::new(RefCell::new(values)))
                     }
                 }
-                Deger::Matris {
-                    satirlar,
-                    sutunlar,
-                    veri,
-                } => {
-                    let b = veri.borrow();
-                    let norm: f64 = b.iter().map(|x| x * x).sum::<f64>().sqrt();
-                    if norm > maks_norm {
-                        let olcek = maks_norm / norm;
-                        let kirpilmis: Vec<f64> = b.iter().map(|x| x * olcek).collect();
-                        Deger::Matris {
-                            satirlar: *satirlar,
-                            sutunlar: *sutunlar,
-                            veri: Rc::new(RefCell::new(kirpilmis)),
-                        }
+                Deger::Matris { .. } => {
+                    let (rows, columns, values) =
+                        match value_to_finite_matrix(value, "gradyan_kirp") {
+                            Ok(matrix) => matrix,
+                            Err(error) => return Deger::Hata(error),
+                        };
+                    let norm = values.iter().map(|value| value * value).sum::<f64>().sqrt();
+                    if !norm.is_finite() {
+                        return Deger::Hata("gradyan_kirp: sonlu olmayan norm".to_string());
+                    }
+                    let result = if norm > *maximum_norm {
+                        let scale = maximum_norm / norm;
+                        values.into_iter().map(|value| value * scale).collect()
                     } else {
-                        args[0].clone()
+                        values
+                    };
+                    Deger::Matris {
+                        satirlar: rows,
+                        sutunlar: columns,
+                        veri: Rc::new(RefCell::new(result)),
                     }
                 }
-                _ => Deger::Bos,
+                other => Deger::Hata(format!(
+                    "gradyan_kirp: vektör, liste veya matris bekleniyordu; {} geldi",
+                    other
+                )),
             }
         }),
     );
@@ -3621,107 +5636,218 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     // dosya_satir_oku(yol) → tüm satırları liste olarak döndür (lazy-reader tarzı)
     globals.insert(
         "dosya_satir_oku".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Metin(yol)) = args.first() {
-                match std::fs::read_to_string(yol) {
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(yol)] => {
+                if let Some(error) =
+                    yetenek_hatasi(crate::capability::Capability::FileRead, "dosya_satir_oku")
+                {
+                    return error;
+                }
+                match read_utf8_file_limited(yol, "dosya_satir_oku") {
                     Ok(icerik) => {
-                        let satirlar: Vec<Deger> = icerik
-                            .lines()
-                            .map(|s| Deger::Metin(s.to_string()))
-                            .collect();
+                        let mut satirlar = Vec::new();
+                        for satir in icerik.lines() {
+                            if satirlar.len() >= EN_FAZLA_BUILTIN_OGE {
+                                return Deger::Hata(format!(
+                                    "dosya_satir_oku: satır sayısı {} öğelik güvenlik sınırını aşıyor",
+                                    EN_FAZLA_BUILTIN_OGE
+                                ));
+                            }
+                            satirlar.push(Deger::Metin(satir.to_string()));
+                        }
                         Deger::Liste(Rc::new(RefCell::new(satirlar)))
                     }
-                    Err(e) => Deger::Hata(format!("dosya_satir_oku: {}", e)),
+                    Err(error) => Deger::Hata(error),
                 }
-            } else {
-                Deger::Bos
             }
+            [other] => Deger::Hata(format!(
+                "dosya_satir_oku: dosya yolu bekleniyordu; {} geldi",
+                other
+            )),
+            _ => Deger::Hata(format!(
+                "dosya_satir_oku: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     // dosya_satir_ekle(yol, satir) → dosyaya yeni satır ekle (append mode)
     globals.insert(
         "dosya_satir_ekle".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Metin(yol), Deger::Metin(satir)) = (&args[0], &args[1]) {
-                    use std::io::Write;
-                    match std::fs::OpenOptions::new()
-                        .create(true)
-                        .append(true)
-                        .open(yol)
-                    {
-                        Ok(mut f) => {
-                            let _ = writeln!(f, "{}", satir);
-                            return Deger::Sayi(1.0);
-                        }
-                        Err(e) => return Deger::Hata(format!("dosya_satir_ekle: {}", e)),
-                    }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(yol), Deger::Metin(satir)] => {
+                if let Some(error) =
+                    yetenek_hatasi(crate::capability::Capability::FileWrite, "dosya_satir_ekle")
+                {
+                    return error;
+                }
+                match append_utf8_line_limited(yol, satir, "dosya_satir_ekle") {
+                    Ok(()) => Deger::Sayi(1.0),
+                    Err(error) => Deger::Hata(error),
                 }
             }
-            Deger::Bos
+            [_, _] => {
+                Deger::Hata("dosya_satir_ekle: dosya yolu ve satır metni gerekir".to_string())
+            }
+            _ => Deger::Hata(format!(
+                "dosya_satir_ekle: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
-    // csv_oku(yol) → [[satır elemanları]] listesi — basit CSV (virgülle ayrılmış)
+    // csv_oku(yol, ayraç?) → RFC 4180 uyumlu alan listeleri
     globals.insert(
         "csv_oku".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            let ayrac = match args.get(1) {
-                Some(Deger::Metin(s)) => s.chars().next().unwrap_or(','),
-                _ => ',',
-            };
-            if let Some(Deger::Metin(yol)) = args.first() {
-                match std::fs::read_to_string(yol) {
-                    Ok(icerik) => {
-                        let satirlar: Vec<Deger> = icerik
-                            .lines()
-                            .map(|satir| {
-                                let parcalar: Vec<Deger> = satir
-                                    .split(ayrac)
-                                    .map(|p| Deger::Metin(p.trim().to_string()))
-                                    .collect();
-                                Deger::Liste(Rc::new(RefCell::new(parcalar)))
-                            })
-                            .collect();
-                        Deger::Liste(Rc::new(RefCell::new(satirlar)))
-                    }
-                    Err(e) => Deger::Hata(format!("csv_oku: {}", e)),
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(yol)] | [Deger::Metin(yol), _] if args.len() <= 2 => {
+                let delimiter = match csv_delimiter(args.get(1), "csv_oku") {
+                    Ok(delimiter) => delimiter,
+                    Err(error) => return Deger::Hata(error),
+                };
+                if let Some(error) =
+                    yetenek_hatasi(crate::capability::Capability::FileRead, "csv_oku")
+                {
+                    return error;
                 }
-            } else {
-                Deger::Bos
+                let content = match read_utf8_file_limited(yol, "csv_oku") {
+                    Ok(content) => content,
+                    Err(error) => return Deger::Hata(error),
+                };
+                let mut reader = csv::ReaderBuilder::new()
+                    .has_headers(false)
+                    .flexible(true)
+                    .delimiter(delimiter)
+                    .from_reader(content.as_bytes());
+                let mut rows = Vec::new();
+                let mut field_count = 0usize;
+                for (row_index, record) in reader.records().enumerate() {
+                    if rows.len() >= EN_FAZLA_BUILTIN_OGE {
+                        return Deger::Hata(format!(
+                            "csv_oku: kayıt sayısı {} öğelik güvenlik sınırını aşıyor",
+                            EN_FAZLA_BUILTIN_OGE
+                        ));
+                    }
+                    let record = match record {
+                        Ok(record) => record,
+                        Err(error) => {
+                            return Deger::Hata(format!(
+                                "csv_oku: {}. kayıt ayrıştırılamadı: {}",
+                                row_index + 1,
+                                error
+                            ))
+                        }
+                    };
+                    field_count = match field_count.checked_add(record.len()) {
+                        Some(count) if count <= EN_FAZLA_BUILTIN_OGE => count,
+                        _ => {
+                            return Deger::Hata(format!(
+                                "csv_oku: alan sayısı {} öğelik güvenlik sınırını aşıyor",
+                                EN_FAZLA_BUILTIN_OGE
+                            ))
+                        }
+                    };
+                    let fields = record
+                        .iter()
+                        .map(|field| Deger::Metin(field.to_string()))
+                        .collect();
+                    rows.push(Deger::Liste(Rc::new(RefCell::new(fields))));
+                }
+                Deger::Liste(Rc::new(RefCell::new(rows)))
             }
+            [other] | [other, _] => {
+                Deger::Hata(format!("csv_oku: dosya yolu bekleniyordu; {} geldi", other))
+            }
+            _ => Deger::Hata(format!(
+                "csv_oku: 1 veya 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
-    // csv_yaz(yol, veri_listesi) → [[satır]] → CSV dosyası
+    // csv_yaz(yol, veri_listesi, ayraç?) → RFC 4180 uyumlu CSV dosyası
     globals.insert(
         "csv_yaz".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
+            if !(args.len() == 2 || args.len() == 3) {
+                return Deger::Hata(format!(
+                    "csv_yaz: 2 veya 3 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
             }
-            let ayrac = match args.get(2) {
-                Some(Deger::Metin(s)) => s.clone(),
-                _ => ",".to_string(),
+            let delimiter = match csv_delimiter(args.get(2), "csv_yaz") {
+                Ok(delimiter) => delimiter,
+                Err(error) => return Deger::Hata(error),
             };
-            if let (Deger::Metin(yol), Deger::Liste(satirlar)) = (&args[0], &args[1]) {
-                let mut icerik = String::new();
-                for satir in satirlar.borrow().iter() {
-                    if let Deger::Liste(parcalar) = satir {
-                        let parcalar_b = parcalar.borrow();
-                        let satir_str: Vec<String> =
-                            parcalar_b.iter().map(|p| p.to_string()).collect();
-                        icerik.push_str(&satir_str.join(&ayrac));
-                        icerik.push('\n');
+            let (Deger::Metin(yol), Deger::Liste(rows)) = (&args[0], &args[1]) else {
+                return Deger::Hata(
+                    "csv_yaz: dosya yolu ve satır listelerinden oluşan liste gerekir".to_string(),
+                );
+            };
+            if let Some(error) = yetenek_hatasi(crate::capability::Capability::FileWrite, "csv_yaz")
+            {
+                return error;
+            }
+            let rows = match rows.try_borrow() {
+                Ok(rows) => rows,
+                Err(_) => return Deger::Hata("csv_yaz: satır listesi kullanımda".to_string()),
+            };
+            if rows.len() > EN_FAZLA_BUILTIN_OGE {
+                return Deger::Hata(format!(
+                    "csv_yaz: kayıt sayısı {} öğelik güvenlik sınırını aşıyor",
+                    EN_FAZLA_BUILTIN_OGE
+                ));
+            }
+            let output = LimitedBuffer::new(EN_FAZLA_DOSYA_BYTES);
+            let mut writer = csv::WriterBuilder::new()
+                .has_headers(false)
+                .delimiter(delimiter)
+                .from_writer(output);
+            let mut field_count = 0usize;
+            for (row_index, row) in rows.iter().enumerate() {
+                let Deger::Liste(fields) = row else {
+                    return Deger::Hata(format!(
+                        "csv_yaz: {}. öğe satır listesi olmalıdır; {} geldi",
+                        row_index + 1,
+                        row
+                    ));
+                };
+                let fields = match fields.try_borrow() {
+                    Ok(fields) => fields,
+                    Err(_) => {
+                        return Deger::Hata(format!("csv_yaz: {}. satır kullanımda", row_index + 1))
                     }
+                };
+                field_count = match field_count.checked_add(fields.len()) {
+                    Some(count) if count <= EN_FAZLA_BUILTIN_OGE => count,
+                    _ => {
+                        return Deger::Hata(format!(
+                            "csv_yaz: alan sayısı {} öğelik güvenlik sınırını aşıyor",
+                            EN_FAZLA_BUILTIN_OGE
+                        ))
+                    }
+                };
+                let mut record = Vec::with_capacity(fields.len());
+                for (column_index, value) in fields.iter().enumerate() {
+                    let field = match csv_field(value, "csv_yaz", row_index, column_index) {
+                        Ok(field) => field,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                    record.push(field);
                 }
-                match std::fs::write(yol, icerik) {
-                    Ok(_) => Deger::Sayi(1.0),
-                    Err(e) => Deger::Hata(format!("csv_yaz: {}", e)),
+                if let Err(error) = writer.write_record(record) {
+                    return Deger::Hata(format!("csv_yaz: çıktı üretilemedi: {error}"));
                 }
-            } else {
-                Deger::Bos
+            }
+            let output = match writer.into_inner() {
+                Ok(output) => output,
+                Err(error) => {
+                    return Deger::Hata(format!("csv_yaz: çıktı tamamlanamadı: {}", error.error()))
+                }
+            };
+            match std::fs::write(yol, output.bytes) {
+                Ok(()) => Deger::Sayi(1.0),
+                Err(error) => Deger::Hata(format!("csv_yaz: '{}': {}", yol, error)),
             }
         }),
     );
@@ -3730,25 +5856,57 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "jsonl_oku".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Metin(yol)) = args.first() {
-                match std::fs::read_to_string(yol) {
+            if let Some(error) =
+                yetenek_hatasi(crate::capability::Capability::FileRead, "jsonl_oku")
+            {
+                return error;
+            }
+            match args.as_slice() {
+                [Deger::Metin(yol)] => match read_utf8_file_limited(yol, "jsonl_oku") {
                     Ok(icerik) => {
-                        let nesneler: Vec<Deger> = icerik
-                            .lines()
-                            .filter(|s| !s.trim().is_empty())
-                            .map(
-                                |satir| match serde_json::from_str::<serde_json::Value>(satir) {
-                                    Ok(v) => Deger::from_json(&v),
-                                    Err(_) => Deger::Metin(satir.to_string()),
-                                },
-                            )
-                            .collect();
+                        let mut nesneler = Vec::new();
+                        for (index, satir) in icerik.lines().enumerate() {
+                            if satir.trim().is_empty() {
+                                continue;
+                            }
+                            if nesneler.len() >= EN_FAZLA_BUILTIN_OGE {
+                                return Deger::Hata(format!(
+                                    "jsonl_oku: kayıt sayısı {} öğelik güvenlik sınırını aşıyor",
+                                    EN_FAZLA_BUILTIN_OGE
+                                ));
+                            }
+                            let json = match serde_json::from_str::<serde_json::Value>(satir) {
+                                Ok(json) => json,
+                                Err(error) => {
+                                    return Deger::Hata(format!(
+                                        "jsonl_oku: satır {} geçersiz JSON: {}",
+                                        index + 1,
+                                        error
+                                    ))
+                                }
+                            };
+                            match Deger::from_json_checked(&json) {
+                                Ok(deger) => nesneler.push(deger),
+                                Err(error) => {
+                                    return Deger::Hata(format!(
+                                        "jsonl_oku: satır {} dönüştürülemedi: {}",
+                                        index + 1,
+                                        error
+                                    ))
+                                }
+                            }
+                        }
                         Deger::Liste(Rc::new(RefCell::new(nesneler)))
                     }
-                    Err(e) => Deger::Hata(format!("jsonl_oku: {}", e)),
+                    Err(error) => Deger::Hata(format!("jsonl_oku: {error}")),
+                },
+                [other] => {
+                    Deger::Hata(format!("jsonl_oku: dosya yolu bekleniyordu; {other} geldi"))
                 }
-            } else {
-                Deger::Bos
+                _ => Deger::Hata(format!(
+                    "jsonl_oku: tam olarak 1 argüman bekleniyordu; {} geldi",
+                    args.len()
+                )),
             }
         }),
     );
@@ -3757,25 +5915,34 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "jsonl_yaz".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
+            if let Some(error) =
+                yetenek_hatasi(crate::capability::Capability::FileWrite, "jsonl_yaz")
+            {
+                return error;
             }
-            if let Deger::Metin(yol) = &args[0] {
-                use std::io::Write;
-                let json_str = serde_json::to_string(&args[1].to_json()).unwrap_or_default();
-                match std::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(yol)
-                {
-                    Ok(mut f) => {
-                        let _ = writeln!(f, "{}", json_str);
-                        return Deger::Sayi(1.0);
+            match args.as_slice() {
+                [Deger::Metin(yol), deger] => {
+                    let json = match deger.to_json_checked() {
+                        Ok(json) => json,
+                        Err(error) => return Deger::Hata(format!("jsonl_yaz: {error}")),
+                    };
+                    let json_str = match json_serialize_limited(&json, false, "jsonl_yaz") {
+                        Ok(json) => json,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                    match append_utf8_line_limited(yol, &json_str, "jsonl_yaz") {
+                        Ok(()) => Deger::Sayi(1.0),
+                        Err(error) => Deger::Hata(error),
                     }
-                    Err(e) => return Deger::Hata(format!("jsonl_yaz: {}", e)),
                 }
+                [other, _] => {
+                    Deger::Hata(format!("jsonl_yaz: dosya yolu bekleniyordu; {other} geldi"))
+                }
+                _ => Deger::Hata(format!(
+                    "jsonl_yaz: tam olarak 2 argüman bekleniyordu; {} geldi",
+                    args.len()
+                )),
             }
-            Deger::Bos
         }),
     );
 
@@ -3786,74 +5953,113 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     // matris_dogrula(M, beklenen_satir, beklenen_sutun) → 1 ya da Hata
     globals.insert(
         "matris_dogrula".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() < 3 {
-                return Deger::Bos;
-            }
-            if let (
-                Deger::Matris {
-                    satirlar, sutunlar, ..
-                },
-                Deger::Sayi(br),
-                Deger::Sayi(bs),
-            ) = (&args[0], &args[1], &args[2])
-            {
-                if *satirlar != *br as usize || *sutunlar != *bs as usize {
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [matrix @ Deger::Matris { .. }, Deger::Sayi(expected_rows), Deger::Sayi(expected_columns)] => {
+                let expected_rows =
+                    match boyut_dogrula(*expected_rows, "matris_dogrula", true) {
+                        Ok(value) => value,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                let expected_columns =
+                    match boyut_dogrula(*expected_columns, "matris_dogrula", true) {
+                        Ok(value) => value,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                let (actual_rows, actual_columns, _) =
+                    match value_to_finite_matrix(matrix, "matris_dogrula") {
+                        Ok(matrix) => matrix,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                if actual_rows != expected_rows || actual_columns != expected_columns {
                     return Deger::Hata(format!(
                         "matris_dogrula: beklenen {}×{}, bulunan {}×{}",
-                        br, bs, satirlar, sutunlar
+                        expected_rows, expected_columns, actual_rows, actual_columns
                     ));
                 }
                 Deger::Sayi(1.0)
-            } else {
-                Deger::Hata("matris_dogrula: geçersiz argümanlar".to_string())
             }
+            [_, _, _] => Deger::Hata(
+                "matris_dogrula: matris ile iki negatif olmayan tamsayı boyut gerekir".to_string(),
+            ),
+            _ => Deger::Hata(format!(
+                "matris_dogrula: tam olarak 3 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     // vektor_dogrula(v, beklenen_boyut) → 1 ya da Hata
     globals.insert(
         "vektor_dogrula".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
-            }
-            if let (Deger::Vektor(v), Deger::Sayi(b)) = (&args[0], &args[1]) {
-                let n = v.borrow().len();
-                if n != *b as usize {
-                    return Deger::Hata(format!("vektor_dogrula: beklenen {}, bulunan {}", b, n));
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [vector @ Deger::Vektor(_), Deger::Sayi(expected)] => {
+                let expected = match boyut_dogrula(*expected, "vektor_dogrula", true) {
+                    Ok(value) => value,
+                    Err(error) => return Deger::Hata(error),
+                };
+                let actual = match value_to_finite_vector(vector, "vektor_dogrula") {
+                    Ok(values) => values.len(),
+                    Err(error) => return Deger::Hata(error),
+                };
+                if actual != expected {
+                    return Deger::Hata(format!(
+                        "vektor_dogrula: beklenen {}, bulunan {}",
+                        expected, actual
+                    ));
                 }
                 Deger::Sayi(1.0)
-            } else {
-                Deger::Hata("vektor_dogrula: geçersiz argümanlar".to_string())
             }
+            [_, _] => Deger::Hata(
+                "vektor_dogrula: vektör ve negatif olmayan tamsayı boyut gerekir".to_string(),
+            ),
+            _ => Deger::Hata(format!(
+                "vektor_dogrula: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     // boyut_esit_mi(a, b) → 1 ya da 0 — iki vektör/matrisin boyutu eşit mi?
     globals.insert(
         "boyut_esit_mi".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [left @ Deger::Vektor(_), right @ Deger::Vektor(_)] => {
+                let left_len = match value_to_finite_vector(left, "boyut_esit_mi") {
+                    Ok(values) => values.len(),
+                    Err(error) => return Deger::Hata(error),
+                };
+                let right_len = match value_to_finite_vector(right, "boyut_esit_mi") {
+                    Ok(values) => values.len(),
+                    Err(error) => return Deger::Hata(error),
+                };
+                Deger::Sayi(if left_len == right_len { 1.0 } else { 0.0 })
             }
-            let esit = match (&args[0], &args[1]) {
-                (Deger::Vektor(v1), Deger::Vektor(v2)) => v1.borrow().len() == v2.borrow().len(),
-                (
-                    Deger::Matris {
-                        satirlar: r1,
-                        sutunlar: c1,
-                        ..
+            [left @ Deger::Matris { .. }, right @ Deger::Matris { .. }] => {
+                let (left_rows, left_columns, _) =
+                    match value_to_finite_matrix(left, "boyut_esit_mi") {
+                        Ok(matrix) => matrix,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                let (right_rows, right_columns, _) =
+                    match value_to_finite_matrix(right, "boyut_esit_mi") {
+                        Ok(matrix) => matrix,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                Deger::Sayi(
+                    if left_rows == right_rows && left_columns == right_columns {
+                        1.0
+                    } else {
+                        0.0
                     },
-                    Deger::Matris {
-                        satirlar: r2,
-                        sutunlar: c2,
-                        ..
-                    },
-                ) => r1 == r2 && c1 == c2,
-                _ => false,
-            };
-            Deger::Sayi(if esit { 1.0 } else { 0.0 })
+                )
+            }
+            [_, _] => Deger::Hata(
+                "boyut_esit_mi: iki vektör veya iki matris karşılaştırılabilir".to_string(),
+            ),
+            _ => Deger::Hata(format!(
+                "boyut_esit_mi: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
@@ -3864,13 +6070,19 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     // zamanlayici_baslat() → anlık zaman (f64 saniye, yüksek çözünürlük)
     globals.insert(
         "zamanlayici_baslat".to_string(),
-        Deger::DahiliFonksiyon(|_| {
-            Deger::Sayi(
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs_f64(),
-            )
+        Deger::DahiliFonksiyon(|args| {
+            if !args.is_empty() {
+                return Deger::Hata(format!(
+                    "zamanlayici_baslat: argüman beklenmiyordu; {} geldi",
+                    args.len()
+                ));
+            }
+            match SystemTime::now().duration_since(UNIX_EPOCH) {
+                Ok(duration) => Deger::Sayi(duration.as_secs_f64()),
+                Err(error) => Deger::Hata(format!(
+                    "zamanlayici_baslat: sistem saati Unix başlangıcından önce: {error}"
+                )),
+            }
         }),
     );
 
@@ -3878,52 +6090,83 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "zamanlayici_bitir".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(baslangic)) = args.first() {
-                let simdi = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs_f64();
-                Deger::Sayi((simdi - baslangic) * 1000.0)
+            let [Deger::Sayi(baslangic)] = args.as_slice() else {
+                return Deger::Hata(
+                    "zamanlayici_bitir: tam olarak bir sayısal başlangıç değeri gerekir"
+                        .to_string(),
+                );
+            };
+            if !baslangic.is_finite() || *baslangic < 0.0 {
+                return Deger::Hata(
+                    "zamanlayici_bitir: başlangıç sonlu ve negatif olmayan sayı olmalı".to_string(),
+                );
+            }
+            let simdi = match SystemTime::now().duration_since(UNIX_EPOCH) {
+                Ok(duration) => duration.as_secs_f64(),
+                Err(error) => {
+                    return Deger::Hata(format!(
+                        "zamanlayici_bitir: sistem saati Unix başlangıcından önce: {error}"
+                    ))
+                }
+            };
+            let elapsed = (simdi - baslangic) * 1000.0;
+            if !elapsed.is_finite() || elapsed < 0.0 {
+                Deger::Hata(
+                    "zamanlayici_bitir: başlangıç sistem saatinden sonra olamaz".to_string(),
+                )
             } else {
-                Deger::Bos
+                Deger::Sayi(elapsed)
             }
         }),
     );
 
-    // ilerleme_cubugu(simdi, toplam, mesaj) → ASCII progress bar yazdır
+    // ilerleme_cubugu(simdi, toplam, mesaj?) → kotaya tabi yazdırma için metin üret
     globals.insert(
         "ilerleme_cubugu".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Sayi(simdi), Deger::Sayi(toplam)) = (&args[0], &args[1]) {
-                    let mesaj = match args.get(2) {
-                        Some(Deger::Metin(s)) => s.as_str(),
-                        _ => "",
-                    };
-                    let yuzde = if *toplam > 0.0 {
-                        (*simdi / toplam * 100.0) as usize
-                    } else {
-                        0
-                    };
-                    let dolu = yuzde / 5;
-                    let bos = 20usize.saturating_sub(dolu);
-                    let cubuk: String = format!(
-                        "[{}{}] {}% {}",
-                        "█".repeat(dolu),
-                        "░".repeat(bos),
-                        yuzde,
-                        mesaj
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Sayi(current), Deger::Sayi(total)]
+            | [Deger::Sayi(current), Deger::Sayi(total), Deger::Metin(_)] => {
+                if !current.is_finite()
+                    || !total.is_finite()
+                    || *total <= 0.0
+                    || *current < 0.0
+                    || *current > *total
+                {
+                    return Deger::Hata(
+                        "ilerleme_cubugu: ilerleme 0 ile pozitif toplam arasında olmalıdır"
+                            .to_string(),
                     );
-                    print!("\r{}", cubuk);
-                    use std::io::Write;
-                    let _ = std::io::stdout().flush();
-                    if (*simdi as usize) >= (*toplam as usize) {
-                        println!();
-                    }
-                    return Deger::Sayi(1.0);
                 }
+                let message = match args.get(2) {
+                    Some(Deger::Metin(message)) => message,
+                    None => "",
+                    Some(_) => {
+                        return Deger::Hata(
+                            "ilerleme_cubugu: isteğe bağlı mesaj metin olmalıdır".to_string(),
+                        )
+                    }
+                };
+                if message.len() > 4096 {
+                    return Deger::Hata("ilerleme_cubugu: mesaj 4096 baytı aşamaz".to_string());
+                }
+                let percentage = ((*current / *total) * 100.0).floor() as usize;
+                let filled = percentage / 5;
+                let empty = 20usize.saturating_sub(filled);
+                Deger::Metin(format!(
+                    "[{}{}] {}% {}",
+                    "█".repeat(filled),
+                    "░".repeat(empty),
+                    percentage,
+                    message
+                ))
             }
-            Deger::Bos
+            [_, _] | [_, _, _] => Deger::Hata(
+                "ilerleme_cubugu: iki sayı ve isteğe bağlı metin mesajı gerekir".to_string(),
+            ),
+            _ => Deger::Hata(format!(
+                "ilerleme_cubugu: 2 veya 3 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
@@ -3934,29 +6177,36 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     // f1_skoru(tahmin_listesi, gercek_listesi) → {f1, precision, recall} sözlüğü
     globals.insert(
         "f1_skoru".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() < 2 {
-                return Deger::Bos;
-            }
-            if let (Deger::Liste(tahmin_l), Deger::Liste(gercek_l)) = (&args[0], &args[1]) {
-                let t = tahmin_l.borrow();
-                let g = gercek_l.borrow();
-                if t.len() != g.len() {
-                    return Deger::Hata("f1_skoru: liste uzunlukları eşit olmalı".to_string());
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [predictions, actuals] => {
+                let predictions = match value_to_finite_vector(predictions, "f1_skoru") {
+                    Ok(values) => values,
+                    Err(error) => return Deger::Hata(error),
+                };
+                let actuals = match value_to_finite_vector(actuals, "f1_skoru") {
+                    Ok(values) => values,
+                    Err(error) => return Deger::Hata(error),
+                };
+                if predictions.len() != actuals.len() {
+                    return Deger::Hata("f1_skoru: liste uzunlukları eşit olmalıdır".to_string());
+                }
+                if predictions.is_empty() {
+                    return Deger::Hata("f1_skoru: boş veri kümesi tanımsızdır".to_string());
+                }
+                if predictions
+                    .iter()
+                    .chain(actuals.iter())
+                    .any(|value| !(0.0..=1.0).contains(value))
+                {
+                    return Deger::Hata(
+                        "f1_skoru: bütün değerler 0 ile 1 arasında olmalıdır".to_string(),
+                    );
                 }
                 let mut tp = 0.0f64;
                 let mut fp = 0.0f64;
                 let mut fn_ = 0.0f64;
-                for (ti, gi) in t.iter().zip(g.iter()) {
-                    let tv = match ti {
-                        Deger::Sayi(n) => *n >= 0.5,
-                        _ => false,
-                    };
-                    let gv = match gi {
-                        Deger::Sayi(n) => *n >= 0.5,
-                        _ => false,
-                    };
-                    match (tv, gv) {
+                for (prediction, actual) in predictions.iter().zip(actuals.iter()) {
+                    match (*prediction >= 0.5, *actual >= 0.5) {
                         (true, true) => tp += 1.0,
                         (true, false) => fp += 1.0,
                         (false, true) => fn_ += 1.0,
@@ -3978,83 +6228,113 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
                 m.insert("fp".to_string(), Deger::Sayi(fp));
                 m.insert("fn".to_string(), Deger::Sayi(fn_));
                 Deger::Sozluk(Rc::new(RefCell::new(m)))
-            } else {
-                Deger::Bos
             }
+            _ => Deger::Hata(format!(
+                "f1_skoru: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     // karisiklik_matrisi(tahmin, gercek, sinif_sayisi) → Matris [n×n]
     globals.insert(
         "karisiklik_matrisi".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() < 3 {
-                return Deger::Bos;
-            }
-            if let (Deger::Liste(tahmin_l), Deger::Liste(gercek_l), Deger::Sayi(sinif_n)) =
-                (&args[0], &args[1], &args[2])
-            {
-                let n = *sinif_n as usize;
-                let mut matris = vec![0.0f64; n * n];
-                let t = tahmin_l.borrow();
-                let g = gercek_l.borrow();
-                for (ti, gi) in t.iter().zip(g.iter()) {
-                    let tv = match ti {
-                        Deger::Sayi(n) => *n as usize,
-                        _ => 0,
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [predictions, actuals, Deger::Sayi(class_count)] => {
+                let class_count = match boyut_dogrula(*class_count, "karisiklik_matrisi", false) {
+                    Ok(value) => value,
+                    Err(error) => return Deger::Hata(error),
+                };
+                let cell_count =
+                    match eleman_sayisi_dogrula(class_count, class_count, "karisiklik_matrisi") {
+                        Ok(value) => value,
+                        Err(error) => return Deger::Hata(error),
                     };
-                    let gv = match gi {
-                        Deger::Sayi(n) => *n as usize,
-                        _ => 0,
-                    };
-                    if gv < n && tv < n {
-                        matris[gv * n + tv] += 1.0;
+                let predictions = match value_to_finite_vector(predictions, "karisiklik_matrisi") {
+                    Ok(values) => values,
+                    Err(error) => return Deger::Hata(error),
+                };
+                let actuals = match value_to_finite_vector(actuals, "karisiklik_matrisi") {
+                    Ok(values) => values,
+                    Err(error) => return Deger::Hata(error),
+                };
+                if predictions.len() != actuals.len() {
+                    return Deger::Hata(
+                        "karisiklik_matrisi: liste uzunlukları eşit olmalıdır".to_string(),
+                    );
+                }
+                if predictions.is_empty() {
+                    return Deger::Hata(
+                        "karisiklik_matrisi: boş veri kümesi tanımsızdır".to_string(),
+                    );
+                }
+                let mut matrix = vec![0.0f64; cell_count];
+                for (index, (prediction, actual)) in
+                    predictions.iter().zip(actuals.iter()).enumerate()
+                {
+                    if prediction.fract() != 0.0
+                        || actual.fract() != 0.0
+                        || *prediction < 0.0
+                        || *actual < 0.0
+                        || *prediction >= class_count as f64
+                        || *actual >= class_count as f64
+                    {
+                        return Deger::Hata(format!(
+                            "karisiklik_matrisi: {}. etiket 0 ile {} arasında tamsayı olmalıdır",
+                            index + 1,
+                            class_count - 1
+                        ));
                     }
+                    let prediction = *prediction as usize;
+                    let actual = *actual as usize;
+                    matrix[actual * class_count + prediction] += 1.0;
                 }
                 Deger::Matris {
-                    satirlar: n,
-                    sutunlar: n,
-                    veri: Rc::new(RefCell::new(matris)),
+                    satirlar: class_count,
+                    sutunlar: class_count,
+                    veri: Rc::new(RefCell::new(matrix)),
                 }
-            } else {
-                Deger::Bos
             }
+            [_, _, _] => Deger::Hata(
+                "karisiklik_matrisi: iki sayı listesi ve pozitif sınıf sayısı gerekir".to_string(),
+            ),
+            _ => Deger::Hata(format!(
+                "karisiklik_matrisi: tam olarak 3 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
     // perplexity(log_olasiliklar_listesi) → e^(-ortalama_log_olasilik)
     globals.insert(
         "perplexity".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Liste(l)) = args.first() {
-                let b = l.borrow();
-                let n = b.len();
-                if n == 0 {
-                    return Deger::Bos;
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [values] => {
+                let values = match value_to_finite_vector(values, "perplexity") {
+                    Ok(values) => values,
+                    Err(error) => return Deger::Hata(error),
+                };
+                if values.is_empty() {
+                    return Deger::Hata("perplexity: boş veri kümesi tanımsızdır".to_string());
                 }
-                let ort_log: f64 = b
-                    .iter()
-                    .filter_map(|d| {
-                        if let Deger::Sayi(x) = d {
-                            Some(*x)
-                        } else {
-                            None
-                        }
-                    })
-                    .sum::<f64>()
-                    / n as f64;
-                Deger::Sayi((-ort_log).exp())
-            } else if let Some(Deger::Vektor(v)) = args.first() {
-                let b = v.borrow();
-                let n = b.len();
-                if n == 0 {
-                    return Deger::Bos;
+                if values.iter().any(|value| *value > 0.0) {
+                    return Deger::Hata(
+                        "perplexity: log olasılıkları sıfırdan büyük olamaz".to_string(),
+                    );
                 }
-                let ort_log: f64 = b.iter().sum::<f64>() / n as f64;
-                Deger::Sayi((-ort_log).exp())
-            } else {
-                Deger::Bos
+                let count = values.len() as f64;
+                let mean = values.iter().map(|value| value / count).sum::<f64>();
+                let result = (-mean).exp();
+                if result.is_finite() {
+                    Deger::Sayi(result)
+                } else {
+                    Deger::Hata("perplexity: sonuç sonlu sayı aralığını aşıyor".to_string())
+                }
             }
+            _ => Deger::Hata(format!(
+                "perplexity: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
 
@@ -4069,6 +6349,12 @@ impl Default for Yorumlayici {
     }
 }
 
+impl BuiltinRuntime for Yorumlayici {
+    fn call_value(&mut self, function: Deger, args: Vec<Deger>) -> Deger {
+        self.fonksiyon_cagrisi(function, args)
+    }
+}
+
 impl Yorumlayici {
     pub fn new() -> Self {
         Self {
@@ -4076,6 +6362,12 @@ impl Yorumlayici {
             yerel_scopes: Vec::new(),
             donus_degeri: None,
             yuklenen_dosyalar: HashSet::new(),
+            yuklenmekte_olan_dosyalar: HashSet::new(),
+            module_namespaces: HashMap::new(),
+            module_environments: HashMap::new(),
+            active_exports: Vec::new(),
+            active_module_bindings: Vec::new(),
+            active_module_calls: Vec::new(),
             arama_yolları: vec![
                 ".".to_string(),
                 "./lib".to_string(),
@@ -4084,13 +6376,30 @@ impl Yorumlayici {
             output_buffer: None,
             call_depth: 0,
             runtime_errors: Vec::new(),
+            current_location: None,
+            call_stack: Vec::new(),
             dongu_kontrolu: None,
             dongu_derinligi: 0,
+            limits: crate::limits::ExecutionLimits::default(),
+            executed_steps: 0,
+            output_bytes: 0,
         }
     }
 
+    pub fn with_limits(mut self, limits: crate::limits::ExecutionLimits) -> Result<Self, String> {
+        self.limits = limits.validate()?;
+        if self.limits.max_call_depth > INTERPRETER_MAX_CALL_DEPTH {
+            return Err(format!(
+                "Yorumlayıcı çağrı derinliği güvenli üst sınırı olan {}'ü aşamaz; \
+                 daha derin çağrılar için VM kullanın",
+                INTERPRETER_MAX_CALL_DEPTH
+            ));
+        }
+        Ok(self)
+    }
+
     pub fn fonksiyon_cagrisi(&mut self, f: Deger, args: Vec<Deger>) -> Deger {
-        self.fonksiyon_cagrisi_detayli(f, args, None)
+        self.fonksiyon_cagrisi_detayli(f, args, None, None)
     }
 
     pub fn fonksiyon_cagrisi_detayli(
@@ -4098,41 +6407,99 @@ impl Yorumlayici {
         f: Deger,
         args: Vec<Deger>,
         nesne: Option<Deger>,
+        call_site: Option<StackFrame>,
     ) -> Deger {
-        if self.call_depth >= 50 {
+        if let Some(frame) = &call_site {
+            self.call_stack.push(frame.clone());
+        }
+        let effective_call_limit = self.limits.max_call_depth.min(INTERPRETER_MAX_CALL_DEPTH);
+        if self.call_depth >= effective_call_limit {
             let message = "Azami özyineleme derinliği aşıldı".to_string();
             self.runtime_error_ekle(message.clone());
+            if call_site.is_some() {
+                self.call_stack.pop();
+            }
             return Deger::Hata(message);
         }
+        let module_context = match &f {
+            Deger::Fonksiyon { module_kimligi, .. } | Deger::Sinif { module_kimligi, .. } => {
+                module_kimligi.clone()
+            }
+            _ => None,
+        };
         self.call_depth += 1;
+        if let Some(module_id) = &module_context {
+            self.active_module_calls.push(module_id.clone());
+        }
 
         let res = match f {
             Deger::Sinif {
-                ad, alan_baslangic, ..
+                ad,
+                alan_baslangic,
+                module_kimligi,
+                ..
             } => {
-                let alanlar = Rc::new(RefCell::new(HashMap::new()));
+                if !args.is_empty() {
+                    let message = format!(
+                        "{} sınıfı kurucu argümanı kabul etmiyor; {} argüman geldi",
+                        ad,
+                        args.len()
+                    );
+                    self.runtime_error_ekle(message.clone());
+                    if module_context.is_some() {
+                        self.active_module_calls.pop();
+                    }
+                    if call_site.is_some() {
+                        self.call_stack.pop();
+                    }
+                    self.call_depth -= 1;
+                    return Deger::Hata(message);
+                }
+                let mut fields = HashMap::new();
                 for (alan_ad, alan_ifade) in alan_baslangic {
                     let val = self.ifade_hesapla(alan_ifade);
-                    alanlar.borrow_mut().insert(alan_ad, val);
+                    if !self.runtime_errors.is_empty() {
+                        break;
+                    }
+                    fields.insert(alan_ad, val);
                 }
                 Deger::Nesne {
                     sinif_adi: ad,
-                    alanlar,
+                    alanlar: Rc::new(RefCell::new(fields)),
+                    module_kimligi,
                 }
             }
             Deger::Fonksiyon {
                 parametreler,
                 govde,
+                yakalanan_kapsamlar,
+                ..
             } => {
+                if args.len() != parametreler.len() {
+                    let message = format!(
+                        "Fonksiyon {} argüman bekliyor; {} argüman geldi",
+                        parametreler.len(),
+                        args.len()
+                    );
+                    self.runtime_error_ekle(message.clone());
+                    if module_context.is_some() {
+                        self.active_module_calls.pop();
+                    }
+                    if call_site.is_some() {
+                        self.call_stack.pop();
+                    }
+                    self.call_depth -= 1;
+                    return Deger::Hata(message);
+                }
                 let mut yerel = HashMap::new();
                 if let Some(ins) = nesne {
                     yerel.insert("kendisi".to_string(), ins);
                 }
                 for (i, p) in parametreler.iter().enumerate() {
-                    if i < args.len() {
-                        yerel.insert(p.clone(), args[i].clone());
-                    }
+                    yerel.insert(p.clone(), args[i].clone());
                 }
+                let onceki_kapsamlar =
+                    std::mem::replace(&mut self.yerel_scopes, yakalanan_kapsamlar);
                 self.yerel_scopes.push(yerel);
                 let eski = self.donus_degeri.take();
                 let eski_dongu_kontrolu = self.dongu_kontrolu.take();
@@ -4155,11 +6522,36 @@ impl Yorumlayici {
                 }
                 self.dongu_derinligi = eski_dongu_derinligi;
                 self.dongu_kontrolu = eski_dongu_kontrolu;
-                self.yerel_scopes.pop();
+                self.yerel_scopes = onceki_kapsamlar;
                 self.donus_degeri = eski;
                 res
             }
-            Deger::DahiliFonksiyon(df) => df(args),
+            Deger::DahiliFonksiyon(df) => {
+                match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| df(args))) {
+                    Ok(value) => value,
+                    Err(payload) => {
+                        let message = format!(
+                            "Yerleşik fonksiyon paniği güvenli biçimde yakalandı: {}",
+                            crate::error::panik_mesaji(payload)
+                        );
+                        self.runtime_error_ekle(message.clone());
+                        Deger::Hata(message)
+                    }
+                }
+            }
+            Deger::BaglamliDahiliFonksiyon(df) => {
+                match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| df(self, args))) {
+                    Ok(value) => value,
+                    Err(payload) => {
+                        let message = format!(
+                            "Bağlamlı yerleşik fonksiyon paniği güvenli biçimde yakalandı: {}",
+                            crate::error::panik_mesaji(payload)
+                        );
+                        self.runtime_error_ekle(message.clone());
+                        Deger::Hata(message)
+                    }
+                }
+            }
             _ => {
                 let message = format!("Çağrılamayan değer: {}", f);
                 self.runtime_error_ekle(message.clone());
@@ -4167,6 +6559,12 @@ impl Yorumlayici {
             }
         };
 
+        if module_context.is_some() {
+            self.active_module_calls.pop();
+        }
+        if call_site.is_some() {
+            self.call_stack.pop();
+        }
         self.call_depth -= 1;
         res
     }
@@ -4176,26 +6574,53 @@ impl Yorumlayici {
         self
     }
 
-    #[allow(dead_code)]
-    fn yazdir(&self, content: &str) {
-        if let Some(buf) = &self.output_buffer {
-            buf.borrow_mut().push_str(content);
-        } else {
-            print!("{}", content);
-            let _ = io::stdout().flush();
-        }
-    }
-
-    fn satir_yazdir(&self, content: &str) {
-        if let Some(buf) = &self.output_buffer {
-            buf.borrow_mut().push_str(content);
-            buf.borrow_mut().push('\n');
+    fn satir_yazdir(&mut self, content: &str) {
+        let byte_count = match content.len().checked_add(1) {
+            Some(byte_count) => byte_count,
+            None => {
+                self.runtime_error_ekle("Çıktı boyutu hesaplanırken taştı".to_string());
+                return;
+            }
+        };
+        let next_output = match self.output_bytes.checked_add(byte_count) {
+            Some(next_output) if next_output <= self.limits.max_output_bytes => next_output,
+            _ => {
+                self.runtime_error_ekle(format!(
+                    "Çıktı sınırı aşıldı: en fazla {} bayt",
+                    self.limits.max_output_bytes
+                ));
+                return;
+            }
+        };
+        self.output_bytes = next_output;
+        if let Some(buf) = self.output_buffer.clone() {
+            match buf.try_borrow_mut() {
+                Ok(mut output) => {
+                    output.push_str(content);
+                    output.push('\n');
+                }
+                Err(_) => self.runtime_error_ekle("Çıktı tamponu kullanımda".to_string()),
+            }
         } else {
             println!("{}", content);
         }
     }
 
     pub fn yorumla(&mut self, komutlar: Vec<Komut>) {
+        self.executed_steps = 0;
+        self.output_bytes = 0;
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            self.yorumla_ic(komutlar);
+        }));
+        if let Err(payload) = result {
+            self.runtime_error_ekle(format!(
+                "Çalışma zamanı paniği güvenli biçimde yakalandı: {}",
+                crate::error::panik_mesaji(payload)
+            ));
+        }
+    }
+
+    fn yorumla_ic(&mut self, komutlar: Vec<Komut>) {
         for komut in komutlar {
             self.komut_calistir(komut);
             if self.donus_degeri.is_some() || !self.runtime_errors.is_empty() {
@@ -4208,22 +6633,36 @@ impl Yorumlayici {
         self.runtime_errors.clear();
         self.yorumla(komutlar);
         match self.runtime_errors.first() {
-            Some(message) => Err(HumaError::RuntimeError(message.clone())),
+            Some(diagnostic) => Err(HumaError::RuntimeError(diagnostic.clone())),
             None => Ok(()),
         }
     }
 
-    pub fn runtime_hatalari(&self) -> &[String] {
+    pub fn runtime_hatalari(&self) -> &[RuntimeDiagnostic] {
         &self.runtime_errors
     }
 
     fn runtime_error_ekle(&mut self, message: String) {
-        if !self
-            .runtime_errors
-            .iter()
-            .any(|existing| existing == &message)
-        {
-            self.runtime_errors.push(message);
+        let diagnostic = RuntimeDiagnostic {
+            message,
+            location: self.current_location,
+            stack: self.call_stack.iter().rev().cloned().collect(),
+        };
+        if !self.runtime_errors.contains(&diagnostic) {
+            self.runtime_errors.push(diagnostic);
+        }
+    }
+
+    fn adim_tuket(&mut self) -> bool {
+        self.executed_steps = self.executed_steps.saturating_add(1);
+        if self.executed_steps > self.limits.max_steps {
+            self.runtime_error_ekle(format!(
+                "Çalıştırma adım sınırı aşıldı: {}",
+                self.limits.max_steps
+            ));
+            false
+        } else {
+            true
         }
     }
 
@@ -4231,6 +6670,15 @@ impl Yorumlayici {
         for scope in self.yerel_scopes.iter().rev() {
             if let Some(val) = scope.get(ad) {
                 return val.clone();
+            }
+        }
+        for module_id in self.active_module_calls.iter().rev() {
+            if let Some(value) = self
+                .module_environments
+                .get(module_id)
+                .and_then(|environment| environment.get(ad))
+            {
+                return value.clone();
             }
         }
         match self.global_degiskenler.get(ad).cloned() {
@@ -4250,12 +6698,38 @@ impl Yorumlayici {
             let alan_adi = parts[1];
             let obj = self.get_degisken(nesne_adi);
             if let Deger::Nesne { alanlar, .. } = obj {
-                alanlar.borrow_mut().insert(alan_adi.to_string(), deger);
+                let mut fields = match alanlar.try_borrow_mut() {
+                    Ok(fields) => fields,
+                    Err(_) => {
+                        self.runtime_error_ekle("Nesne alanları kullanımda".to_string());
+                        return;
+                    }
+                };
+                if !fields.contains_key(alan_adi)
+                    && fields.len() >= self.limits.max_collection_items
+                {
+                    self.runtime_error_ekle(format!(
+                        "Nesne alan sınırı aşıldı: {}",
+                        self.limits.max_collection_items
+                    ));
+                    return;
+                }
+                fields.insert(alan_adi.to_string(), deger);
                 return;
             }
         }
         for scope in self.yerel_scopes.iter_mut().rev() {
             if let Some(current) = scope.get_mut(&ad) {
+                *current = deger;
+                return;
+            }
+        }
+        for module_id in self.active_module_calls.iter().rev() {
+            if let Some(current) = self
+                .module_environments
+                .get_mut(module_id)
+                .and_then(|environment| environment.get_mut(&ad))
+            {
                 *current = deger;
                 return;
             }
@@ -4270,29 +6744,80 @@ impl Yorumlayici {
             let alan_adi = parts[1];
             let obj = self.get_degisken(nesne_adi);
             if let Deger::Nesne { alanlar, .. } = obj {
-                alanlar.borrow_mut().insert(alan_adi.to_string(), deger);
+                let mut fields = match alanlar.try_borrow_mut() {
+                    Ok(fields) => fields,
+                    Err(_) => {
+                        self.runtime_error_ekle("Nesne alanları kullanımda".to_string());
+                        return;
+                    }
+                };
+                if !fields.contains_key(alan_adi)
+                    && fields.len() >= self.limits.max_collection_items
+                {
+                    self.runtime_error_ekle(format!(
+                        "Nesne alan sınırı aşıldı: {}",
+                        self.limits.max_collection_items
+                    ));
+                    return;
+                }
+                fields.insert(alan_adi.to_string(), deger);
                 return;
             }
         }
         if let Some(scope) = self.yerel_scopes.last_mut() {
             scope.insert(ad, deger);
         } else {
+            if let Some(bindings) = self.active_module_bindings.last_mut() {
+                bindings.insert(ad.clone());
+            }
             self.global_degiskenler.insert(ad, deger);
         }
     }
 
     fn komut_calistir(&mut self, komut: Komut) {
+        if let Komut::Konumlu {
+            komut,
+            satir,
+            sutun,
+        } = komut
+        {
+            let previous = self.current_location.replace(SourceSpan {
+                line: satir,
+                column: sutun,
+            });
+            self.komut_calistir(*komut);
+            self.current_location = previous;
+            return;
+        }
         if self.donus_degeri.is_some()
             || self.dongu_kontrolu.is_some()
             || !self.runtime_errors.is_empty()
         {
             return;
         }
+        if !self.adim_tuket() {
+            return;
+        }
         match komut {
+            Komut::Konumlu {
+                komut,
+                satir,
+                sutun,
+            } => {
+                let previous = self.current_location.replace(SourceSpan {
+                    line: satir,
+                    column: sutun,
+                });
+                self.komut_calistir(*komut);
+                self.current_location = previous;
+            }
             Komut::YazdirKomutu(ifade) => {
                 let d = self.ifade_hesapla(ifade);
                 if self.runtime_errors.is_empty() {
-                    self.satir_yazdir(&format!("{}", d));
+                    match d.to_string_limited(self.limits.max_output_bytes) {
+                        Ok(text) => self.satir_yazdir(&text),
+                        Err(error) => self.runtime_error_ekle(error),
+                    }
                 }
             }
             Komut::DegiskenTanimla { ad, deger } => {
@@ -4313,7 +6838,14 @@ impl Yorumlayici {
                 degilse_govde,
             } => {
                 let r = self.ifade_hesapla(kosul);
-                if self.dogruluk_kontrolu(r) {
+                let condition = match self.dogruluk_kontrolu(r) {
+                    Ok(condition) => condition,
+                    Err(error) => {
+                        self.runtime_error_ekle(error);
+                        return;
+                    }
+                };
+                if condition {
                     for k in govde {
                         self.komut_calistir(k);
                         if self.donus_degeri.is_some() {
@@ -4332,8 +6864,18 @@ impl Yorumlayici {
             Komut::DonguKomutu { kosul, govde } => {
                 self.dongu_derinligi += 1;
                 loop {
+                    if !self.adim_tuket() {
+                        break;
+                    }
                     let r = self.ifade_hesapla(kosul.clone());
-                    if !self.dogruluk_kontrolu(r) || self.donus_degeri.is_some() {
+                    let condition = match self.dogruluk_kontrolu(r) {
+                        Ok(condition) => condition,
+                        Err(error) => {
+                            self.runtime_error_ekle(error);
+                            break;
+                        }
+                    };
+                    if !condition || self.donus_degeri.is_some() {
                         break;
                     }
                     for k in &govde {
@@ -4365,6 +6907,8 @@ impl Yorumlayici {
                     Deger::Fonksiyon {
                         parametreler,
                         govde,
+                        yakalanan_kapsamlar: self.yerel_scopes.clone(),
+                        module_kimligi: None,
                     },
                 );
             }
@@ -4384,12 +6928,13 @@ impl Yorumlayici {
                         init_fields.push((f_ad, deger));
                     }
                 }
-                self.global_degiskenler.insert(
+                self.degisken_tanimla(
                     ad.clone(),
                     Deger::Sinif {
                         ad,
                         metotlar: ms,
                         alan_baslangic: init_fields,
+                        module_kimligi: None,
                     },
                 );
             }
@@ -4397,42 +6942,115 @@ impl Yorumlayici {
                 let v = self.ifade_hesapla(ifade);
                 self.donus_degeri = Some(v);
             }
-            Komut::YukleKomutu(yol) => self.modül_yükle(&yol),
+            Komut::YukleKomutu { yol, takma_ad } => self.modül_yükle(&yol, takma_ad.as_deref()),
+            Komut::DisaAktar(ad) => {
+                if self.active_exports.is_empty() {
+                    self.runtime_error_ekle(
+                        "dışa aktar yalnızca yüklenen bir modül içinde kullanılabilir".to_string(),
+                    );
+                } else if !self.yerel_scopes.is_empty() {
+                    self.runtime_error_ekle(
+                        "dışa aktar yalnızca modülün üst düzeyinde kullanılabilir".to_string(),
+                    );
+                } else if !self.global_degiskenler.contains_key(&ad)
+                    && !self
+                        .yerel_scopes
+                        .iter()
+                        .rev()
+                        .any(|scope| scope.contains_key(&ad))
+                {
+                    self.runtime_error_ekle(format!("Dışa aktarılacak değer tanımlı değil: {ad}"));
+                } else if let Some(exports) = self.active_exports.last_mut() {
+                    exports.insert(ad);
+                }
+            }
             Komut::ListeOlustur { ad } => {
                 self.degisken_tanimla(ad, Deger::Liste(Rc::new(RefCell::new(Vec::new()))));
             }
             Komut::ListeEkle { liste, deger } => {
                 let deger_val = self.ifade_hesapla(deger);
                 let liste_val = self.ifade_hesapla(liste);
-                if let Deger::Liste(l) = liste_val {
-                    if let Deger::Liste(vals) = &deger_val {
-                        // Eğer değer bir listeyse (özellikle [x] syntax'ında), elemanlarını ekle
-                        l.borrow_mut().extend(vals.borrow().iter().cloned());
-                    } else {
-                        l.borrow_mut().push(deger_val);
+                let Deger::Liste(list) = liste_val else {
+                    if self.runtime_errors.is_empty() {
+                        self.runtime_error_ekle("Liste ekleme hedefi liste olmalıdır".to_string());
                     }
+                    return;
+                };
+                let additions = if let Deger::Liste(values) = &deger_val {
+                    match values.try_borrow() {
+                        Ok(values) => values.clone(),
+                        Err(_) => {
+                            self.runtime_error_ekle("Eklenecek liste kullanımda".to_string());
+                            return;
+                        }
+                    }
+                } else {
+                    vec![deger_val]
+                };
+                let mut list = match list.try_borrow_mut() {
+                    Ok(list) => list,
+                    Err(_) => {
+                        self.runtime_error_ekle("Hedef liste kullanımda".to_string());
+                        return;
+                    }
+                };
+                let Some(next_length) = list.len().checked_add(additions.len()) else {
+                    self.runtime_error_ekle("Liste uzunluğu taştı".to_string());
+                    return;
+                };
+                if next_length > self.limits.max_collection_items {
+                    self.runtime_error_ekle(format!(
+                        "Liste eleman sınırı aşıldı: {} > {}",
+                        next_length, self.limits.max_collection_items
+                    ));
+                    return;
                 }
+                list.extend(additions);
             }
             Komut::ListeCikar { liste, indeks } => {
                 let idx_val = self.ifade_hesapla(indeks);
                 let liste_val = self.ifade_hesapla(liste);
 
                 // Eğer indeks bir listeyse (özellikle [i] syntax'ında), ilk elemanı al
-                let mut final_idx = idx_val.clone();
-                if let Deger::Liste(l_idx) = &idx_val {
-                    let b = l_idx.borrow();
-                    if let Some(first) = b.first() {
-                        final_idx = first.clone();
+                let final_idx = if let Deger::Liste(index_list) = &idx_val {
+                    let index_list = match index_list.try_borrow() {
+                        Ok(index_list) => index_list,
+                        Err(_) => {
+                            self.runtime_error_ekle("İndeks listesi kullanımda".to_string());
+                            return;
+                        }
+                    };
+                    if index_list.len() != 1 {
+                        self.runtime_error_ekle(
+                            "Liste çıkarma indeks sarmalayıcısı tek elemanlı olmalıdır".to_string(),
+                        );
+                        return;
                     }
-                }
-
-                if let (Deger::Liste(l), Deger::Sayi(i)) = (liste_val, final_idx) {
-                    let idx = i as usize;
-                    let mut b = l.borrow_mut();
-                    if idx < b.len() {
-                        b.remove(idx);
+                    index_list[0].clone()
+                } else {
+                    idx_val
+                };
+                let (Deger::Liste(list), Deger::Sayi(index)) = (liste_val, final_idx) else {
+                    self.runtime_error_ekle(
+                        "Liste çıkarma hedefi liste, indeks ise sayı olmalıdır".to_string(),
+                    );
+                    return;
+                };
+                let mut list = match list.try_borrow_mut() {
+                    Ok(list) => list,
+                    Err(_) => {
+                        self.runtime_error_ekle("Hedef liste kullanımda".to_string());
+                        return;
                     }
-                }
+                };
+                let index = match indeks_dogrula(index, list.len(), "Liste çıkarma") {
+                    Ok(index) => index,
+                    Err(error) => {
+                        self.runtime_error_ekle(error);
+                        return;
+                    }
+                };
+                list.remove(index);
             }
             Komut::DeneKomutu {
                 dene_govde,
@@ -4455,21 +7073,19 @@ impl Yorumlayici {
                 }));
                 let yakalanan_hata = match result {
                     Ok(()) => self.runtime_errors.first().cloned(),
-                    Err(error) => Some(
-                        error
-                            .downcast_ref::<&str>()
-                            .map(|message| (*message).to_string())
-                            .or_else(|| error.downcast_ref::<String>().cloned())
-                            .unwrap_or_else(|| "Bilinmeyen çalışma zamanı paniği".to_string()),
-                    ),
+                    Err(error) => Some(RuntimeDiagnostic {
+                        message: crate::error::panik_mesaji(error),
+                        location: self.current_location,
+                        stack: self.call_stack.iter().rev().cloned().collect(),
+                    }),
                 };
 
-                if let Some(message) = yakalanan_hata {
+                if let Some(diagnostic) = yakalanan_hata {
                     self.runtime_errors = onceki_hatalar;
                     self.donus_degeri = onceki_donus;
                     self.dongu_kontrolu = onceki_dongu_kontrolu;
                     if let Some(var) = hata_degisken {
-                        self.degisken_tanimla(var, Deger::Metin(message));
+                        self.degisken_tanimla(var, Deger::Metin(diagnostic.to_string()));
                     }
                     for k in hata_govde {
                         self.komut_calistir(k);
@@ -4508,6 +7124,9 @@ impl Yorumlayici {
                     self.dongu_derinligi += 1;
                     let mut i = s;
                     while i <= e {
+                        if !self.adim_tuket() {
+                            break;
+                        }
                         self.degisken_tanimla(degisken.clone(), Deger::Sayi(i));
                         for k in &govde {
                             self.komut_calistir(k.clone());
@@ -4563,7 +7182,15 @@ impl Yorumlayici {
                 let deger_val = self.ifade_hesapla(deger);
                 let nesne_val = self.ifade_hesapla(nesne);
                 if let Deger::Nesne { alanlar, .. } = nesne_val {
-                    alanlar.borrow_mut().insert(ozellik, deger_val);
+                    if let Err(error) = insert_keyed_value(
+                        &alanlar,
+                        ozellik,
+                        deger_val,
+                        self.limits.max_collection_items,
+                        "Nesne alan ataması",
+                    ) {
+                        self.runtime_error_ekle(error);
+                    }
                 } else if self.runtime_errors.is_empty() {
                     self.runtime_error_ekle(
                         "Alan atamasının hedefi bir nesne olmalıdır".to_string(),
@@ -4582,13 +7209,38 @@ impl Yorumlayici {
                         Ifade::Degisken(ad) => self.degisken_ata(ad, d),
                         Ifade::NesneErisim { nesne, ozellik } => {
                             if let Deger::Nesne { alanlar, .. } = self.ifade_hesapla(*nesne) {
-                                alanlar.borrow_mut().insert(ozellik, d);
+                                if let Err(error) = insert_keyed_value(
+                                    &alanlar,
+                                    ozellik,
+                                    d,
+                                    self.limits.max_collection_items,
+                                    "Nesne alan ataması",
+                                ) {
+                                    self.runtime_error_ekle(error);
+                                }
+                            } else if self.runtime_errors.is_empty() {
+                                self.runtime_error_ekle(
+                                    "Alan atamasının hedefi nesne olmalıdır".to_string(),
+                                );
                             }
                         }
                         Ifade::KendisiErisim { ozellik } => {
                             let kendisi = self.get_degisken("kendisi");
                             if let Deger::Nesne { alanlar, .. } = kendisi {
-                                alanlar.borrow_mut().insert(ozellik, d);
+                                if let Err(error) = insert_keyed_value(
+                                    &alanlar,
+                                    ozellik,
+                                    d,
+                                    self.limits.max_collection_items,
+                                    "kendisi alan ataması",
+                                ) {
+                                    self.runtime_error_ekle(error);
+                                }
+                            } else if self.runtime_errors.is_empty() {
+                                self.runtime_error_ekle(
+                                    "kendisi yalnızca sınıf metotlarında kullanılabilir"
+                                        .to_string(),
+                                );
                             }
                         }
                         Ifade::ListeErisim { liste, indeks } => {
@@ -4598,22 +7250,46 @@ impl Yorumlayici {
                                 (Deger::Liste(l), Deger::Sayi(i))
                                     if i >= 0.0 && i.fract() == 0.0 =>
                                 {
-                                    let idx = i as usize;
-                                    let mut b = l.borrow_mut();
-                                    if idx < b.len() {
-                                        b[idx] = d.clone();
-                                    } else {
-                                        self.runtime_error_ekle(format!(
-                                            "Liste atamasında indeks sınır dışında: {}",
-                                            i
-                                        ));
-                                    }
+                                    let mut values = match l.try_borrow_mut() {
+                                        Ok(values) => values,
+                                        Err(_) => {
+                                            self.runtime_error_ekle(
+                                                "Liste ataması hedefi kullanımda".to_string(),
+                                            );
+                                            return;
+                                        }
+                                    };
+                                    let index =
+                                        match indeks_dogrula(i, values.len(), "Liste ataması") {
+                                            Ok(index) => index,
+                                            Err(error) => {
+                                                self.runtime_error_ekle(error);
+                                                return;
+                                            }
+                                        };
+                                    values[index] = d.clone();
                                 }
                                 (Deger::Sozluk(m), Deger::Metin(key)) => {
-                                    m.borrow_mut().insert(key, d.clone());
+                                    if let Err(error) = insert_keyed_value(
+                                        &m,
+                                        key,
+                                        d.clone(),
+                                        self.limits.max_collection_items,
+                                        "Sözlük ataması",
+                                    ) {
+                                        self.runtime_error_ekle(error);
+                                    }
                                 }
                                 (Deger::Nesne { alanlar, .. }, Deger::Metin(key)) => {
-                                    alanlar.borrow_mut().insert(key, d.clone());
+                                    if let Err(error) = insert_keyed_value(
+                                        &alanlar,
+                                        key,
+                                        d.clone(),
+                                        self.limits.max_collection_items,
+                                        "Nesne ataması",
+                                    ) {
+                                        self.runtime_error_ekle(error);
+                                    }
                                 }
                                 (container, index) if self.runtime_errors.is_empty() => {
                                     self.runtime_error_ekle(format!(
@@ -4633,91 +7309,283 @@ impl Yorumlayici {
         }
     }
 
-    fn modül_yükle(&mut self, dosya_adı: &str) {
-        // Önce gömülü kütüphaneleri kontrol et
-        for (ad, icerik) in builtin_files::get_lib_files() {
-            if ad == dosya_adı {
-                if self.yuklenen_dosyalar.contains(ad) {
+    fn modül_programi_calistir(
+        &mut self,
+        kimlik: String,
+        gorunen_ad: &str,
+        program: Vec<Komut>,
+        parent: Option<&Path>,
+        takma_ad: Option<&str>,
+    ) {
+        if self.yuklenen_dosyalar.contains(&kimlik) {
+            if let Some(alias) = takma_ad {
+                let Some(namespace) = self.module_namespaces.get(&kimlik).cloned() else {
+                    self.runtime_error_ekle(format!(
+                        "{gorunen_ad} modülünün önbelleğe alınmış ad alanı bulunamadı"
+                    ));
                     return;
+                };
+                self.degisken_tanimla(
+                    alias.to_string(),
+                    Deger::Sozluk(Rc::new(RefCell::new(namespace))),
+                );
+            }
+            return;
+        }
+        if let Some(alias) = takma_ad {
+            if self.global_degiskenler.contains_key(alias)
+                || self
+                    .yerel_scopes
+                    .iter()
+                    .rev()
+                    .any(|scope| scope.contains_key(alias))
+            {
+                self.runtime_error_ekle(format!("Modül takma adı zaten tanımlı: {alias}"));
+                return;
+            }
+        }
+        if !self.yuklenmekte_olan_dosyalar.insert(kimlik.clone()) {
+            self.runtime_error_ekle(format!("Döngüsel modül yükleme algılandı: {}", gorunen_ad));
+            return;
+        }
+
+        let onceki_globaller = self.global_degiskenler.clone();
+        let onceki_yuklenenler = self.yuklenen_dosyalar.clone();
+        let onceki_ad_alanlari = self.module_namespaces.clone();
+        let onceki_modul_ortamlari = self.module_environments.clone();
+        let onceki_donus = self.donus_degeri.take();
+        let onceki_hata_sayisi = self.runtime_errors.len();
+        let mut arama_yolu_eklendi = false;
+        if takma_ad.is_some() {
+            self.global_degiskenler = varsayilan_global_degiskenler();
+        }
+        self.active_exports.push(HashSet::new());
+        self.active_module_bindings.push(HashSet::new());
+
+        if let Some(parent) = parent {
+            let parent = parent.to_string_lossy().to_string();
+            if !parent.is_empty() && !self.arama_yolları.contains(&parent) {
+                self.arama_yolları.insert(0, parent);
+                arama_yolu_eklendi = true;
+            }
+        }
+
+        self.yorumla_ic(program);
+
+        if arama_yolu_eklendi {
+            self.arama_yolları.remove(0);
+        }
+        let export_names = self.active_exports.pop();
+        let binding_names = self.active_module_bindings.pop();
+        let (Some(export_names), Some(mut binding_names)) = (export_names, binding_names) else {
+            self.runtime_error_ekle(
+                "İç hata: modül bağlamı beklenmedik biçimde kayboldu".to_string(),
+            );
+            self.global_degiskenler = onceki_globaller;
+            self.yuklenen_dosyalar = onceki_yuklenenler;
+            self.module_namespaces = onceki_ad_alanlari;
+            self.module_environments = onceki_modul_ortamlari;
+            self.donus_degeri = onceki_donus;
+            self.yuklenmekte_olan_dosyalar.remove(&kimlik);
+            return;
+        };
+        binding_names.extend(export_names.iter().cloned());
+        self.donus_degeri = onceki_donus;
+        self.yuklenmekte_olan_dosyalar.remove(&kimlik);
+
+        if self.runtime_errors.len() == onceki_hata_sayisi {
+            let mut module_environment = HashMap::with_capacity(binding_names.len());
+            for name in binding_names {
+                let Some(value) = self.global_degiskenler.get(&name).cloned() else {
+                    self.runtime_error_ekle(format!(
+                        "{gorunen_ad} modülünde tanımlanan '{name}' değeri kayboldu"
+                    ));
+                    break;
+                };
+                module_environment.insert(name, Self::module_degerini_bagla(value, &kimlik));
+            }
+            let mut namespace = HashMap::with_capacity(export_names.len());
+            if self.runtime_errors.len() == onceki_hata_sayisi {
+                for name in export_names {
+                    let Some(value) = module_environment.get(&name).cloned() else {
+                        self.runtime_error_ekle(format!(
+                            "{gorunen_ad} modülü dışa aktarılan '{name}' değerini kaybetti"
+                        ));
+                        break;
+                    };
+                    namespace.insert(name, value);
                 }
-                self.yuklenen_dosyalar.insert(ad.to_string());
-                let mut parser = crate::parser::Parser::new(crate::lexer::Lexer::new(icerik));
-                let (prog, diagnostics) = parser.parse_program_with_diagnostics();
-                if let Some(first) = diagnostics.into_iter().next() {
-                    self.runtime_error_ekle(format!("{} modülü: {}", dosya_adı, first));
-                    return;
+            }
+            if self.runtime_errors.len() == onceki_hata_sayisi {
+                self.module_environments
+                    .insert(kimlik.clone(), module_environment.clone());
+                self.module_namespaces
+                    .insert(kimlik.clone(), namespace.clone());
+                self.yuklenen_dosyalar.insert(kimlik);
+                if let Some(alias) = takma_ad {
+                    self.global_degiskenler = onceki_globaller;
+                    self.degisken_tanimla(
+                        alias.to_string(),
+                        Deger::Sozluk(Rc::new(RefCell::new(namespace))),
+                    );
+                } else {
+                    for (name, value) in module_environment {
+                        self.global_degiskenler.insert(name, value);
+                    }
                 }
-                let eski = self.donus_degeri.take(); // Save return value state
-                self.yorumla(prog);
-                self.donus_degeri = eski; // Restore return value state
                 return;
             }
         }
 
-        let mut bulundu = None;
+        self.global_degiskenler = onceki_globaller;
+        self.yuklenen_dosyalar = onceki_yuklenenler;
+        self.module_namespaces = onceki_ad_alanlari;
+        self.module_environments = onceki_modul_ortamlari;
+    }
+
+    fn module_degerini_bagla(value: Deger, module_id: &str) -> Deger {
+        match value {
+            Deger::Fonksiyon {
+                parametreler,
+                govde,
+                yakalanan_kapsamlar,
+                ..
+            } => Deger::Fonksiyon {
+                parametreler,
+                govde,
+                yakalanan_kapsamlar,
+                module_kimligi: Some(module_id.to_string()),
+            },
+            Deger::Sinif {
+                ad,
+                metotlar,
+                alan_baslangic,
+                ..
+            } => Deger::Sinif {
+                ad,
+                metotlar,
+                alan_baslangic,
+                module_kimligi: Some(module_id.to_string()),
+            },
+            other => other,
+        }
+    }
+
+    fn modül_yükle(&mut self, dosya_adı: &str, takma_ad: Option<&str>) {
+        if dosya_adı.trim().is_empty() {
+            self.runtime_error_ekle("Modül yolu boş olamaz".to_string());
+            return;
+        }
+        if Path::new(dosya_adı).is_absolute() {
+            self.runtime_error_ekle(
+                "Mutlak modül yolları desteklenmez; arama yollarından göreli yol kullanın"
+                    .to_string(),
+            );
+            return;
+        }
+        // Önce gömülü kütüphaneleri kontrol et
+        for (ad, icerik) in builtin_files::get_lib_files() {
+            if ad == dosya_adı {
+                let mut parser = crate::parser::Parser::new(crate::lexer::Lexer::new(icerik));
+                let (program, diagnostics) = parser.parse_program_with_diagnostics();
+                if let Some(first) = diagnostics.into_iter().next() {
+                    self.runtime_error_ekle(format!("{} modülü: {}", dosya_adı, first));
+                    return;
+                }
+                self.modül_programi_calistir(
+                    format!("gömülü:{ad}"),
+                    dosya_adı,
+                    program,
+                    None,
+                    takma_ad,
+                );
+                return;
+            }
+        }
+
+        let mut bulunan_yol: Option<PathBuf> = None;
         for temel in &self.arama_yolları {
-            let tam_yol = format!("{}/{}", temel, dosya_adı);
-            let path = Path::new(&tam_yol);
-            if path.is_file() {
-                bulundu = Some(tam_yol);
+            let temel = Path::new(temel);
+            let tam_yol = temel.join(dosya_adı);
+            if tam_yol.is_file() {
+                bulunan_yol = Some(tam_yol);
                 break;
             }
 
             // Paket yöneticisi için destek: modul/modul.hb pattern'ini kontrol et
-            let paket_yol = format!("{}/{}/{}.hb", temel, dosya_adı, dosya_adı);
-            if Path::new(&paket_yol).is_file() {
-                bulundu = Some(paket_yol);
+            let paket_yol = temel.join(dosya_adı).join(format!("{dosya_adı}.hb"));
+            if paket_yol.is_file() {
+                bulunan_yol = Some(paket_yol);
                 break;
             }
 
             // Uzantı ekleyerek kontrol et
             if !dosya_adı.ends_with(".hb") {
-                let hb_yol = format!("{}.hb", tam_yol);
-                if Path::new(&hb_yol).is_file() {
-                    bulundu = Some(hb_yol);
+                let hb_yol = temel.join(format!("{dosya_adı}.hb"));
+                if hb_yol.is_file() {
+                    bulunan_yol = Some(hb_yol);
                     break;
                 }
             }
         }
 
-        if let Some(yol) = bulundu {
-            if self.yuklenen_dosyalar.contains(&yol) {
+        let Some(yol) = bulunan_yol else {
+            self.runtime_error_ekle(format!("Modül bulunamadı: {}", dosya_adı));
+            return;
+        };
+        let kanonik_yol = match yol.canonicalize() {
+            Ok(yol) => yol,
+            Err(error) => {
+                self.runtime_error_ekle(format!(
+                    "Modül yolu çözülemedi ({}): {}",
+                    dosya_adı, error
+                ));
                 return;
             }
-            self.yuklenen_dosyalar.insert(yol.clone());
-            match std::fs::read_to_string(&yol) {
-                Ok(icerik) => {
-                    let mut parser = crate::parser::Parser::new(crate::lexer::Lexer::new(&icerik));
-                    let (prog, diagnostics) = parser.parse_program_with_diagnostics();
-                    if let Some(first) = diagnostics.into_iter().next() {
-                        self.runtime_error_ekle(format!("{} modülü: {}", dosya_adı, first));
-                        return;
-                    }
-                    let eski = self.donus_degeri.take();
-
-                    let mut pushed = false;
-                    if let Some(parent) = Path::new(&yol).parent() {
-                        let parent_str = parent.to_string_lossy().to_string();
-                        if !parent_str.is_empty() && !self.arama_yolları.contains(&parent_str) {
-                            self.arama_yolları.insert(0, parent_str);
-                            pushed = true;
-                        }
-                    }
-
-                    self.yorumla(prog);
-
-                    if pushed {
-                        self.arama_yolları.remove(0);
-                    }
-                    self.donus_degeri = eski;
-                }
-                Err(error) => {
-                    self.runtime_error_ekle(format!("Modül okunamadı ({}): {}", dosya_adı, error));
-                }
-            }
-        } else {
-            self.runtime_error_ekle(format!("Modül bulunamadı: {}", dosya_adı));
+        };
+        let izinli = self.arama_yolları.iter().any(|base| {
+            Path::new(base)
+                .canonicalize()
+                .is_ok_and(|canonical_base| kanonik_yol.starts_with(canonical_base))
+        });
+        if !izinli {
+            self.runtime_error_ekle(format!(
+                "Modül yolu izin verilen arama köklerinin dışında: {}",
+                kanonik_yol.display()
+            ));
+            return;
         }
+        let kimlik = format!("dosya:{}", kanonik_yol.to_string_lossy());
+        if self.yuklenen_dosyalar.contains(&kimlik) {
+            if let Some(alias) = takma_ad {
+                let Some(namespace) = self.module_namespaces.get(&kimlik).cloned() else {
+                    self.runtime_error_ekle(format!(
+                        "{} modülünün önbelleğe alınmış ad alanı bulunamadı",
+                        dosya_adı
+                    ));
+                    return;
+                };
+                self.degisken_tanimla(
+                    alias.to_string(),
+                    Deger::Sozluk(Rc::new(RefCell::new(namespace))),
+                );
+            }
+            return;
+        }
+        let icerik = match read_utf8_file_limited(&kanonik_yol, "Modül okuma") {
+            Ok(icerik) => icerik,
+            Err(error) => {
+                self.runtime_error_ekle(format!("Modül okunamadı ({}): {}", dosya_adı, error));
+                return;
+            }
+        };
+        let mut parser = crate::parser::Parser::new(crate::lexer::Lexer::new(&icerik));
+        let (program, diagnostics) = parser.parse_program_with_diagnostics();
+        if let Some(first) = diagnostics.into_iter().next() {
+            self.runtime_error_ekle(format!("{} modülü: {}", dosya_adı, first));
+            return;
+        }
+        self.modül_programi_calistir(kimlik, dosya_adı, program, kanonik_yol.parent(), takma_ad);
     }
 
     fn ifade_hesapla(&mut self, ifade: Ifade) -> Deger {
@@ -4733,7 +7601,7 @@ impl Yorumlayici {
             Ifade::Bekle(inner) => {
                 let v = self.ifade_hesapla(*inner);
                 match v {
-                    Deger::GorevId(id) => YAPRAK.with(|y| y.borrow_mut().await_task(id)),
+                    Deger::GorevId(id) => gorev_bekle(id),
                     other => Deger::Hata(format!("bekle: await edilemez değer: {}", other)),
                 }
             }
@@ -4743,13 +7611,37 @@ impl Yorumlayici {
             Ifade::Dogru => Deger::Sayi(1.0),
             Ifade::Yanlis => Deger::Sayi(0.0),
             Ifade::Degisken(ad) => self.get_degisken(&ad),
-            Ifade::Liste(el) => Deger::Liste(Rc::new(RefCell::new(
-                el.into_iter().map(|e| self.ifade_hesapla(e)).collect(),
-            ))),
+            Ifade::Liste(el) => {
+                if el.len() > self.limits.max_collection_items {
+                    return Deger::Hata(format!(
+                        "Liste eleman sınırı aşıldı: {} > {}",
+                        el.len(),
+                        self.limits.max_collection_items
+                    ));
+                }
+                Deger::Liste(Rc::new(RefCell::new(
+                    el.into_iter().map(|e| self.ifade_hesapla(e)).collect(),
+                )))
+            }
             Ifade::Sozluk(el) => {
+                if el.len() > self.limits.max_collection_items {
+                    return Deger::Hata(format!(
+                        "Sözlük eleman sınırı aşıldı: {} > {}",
+                        el.len(),
+                        self.limits.max_collection_items
+                    ));
+                }
                 let mut map = HashMap::new();
                 for (k, v) in el {
-                    let key = self.ifade_hesapla(k).to_string();
+                    let key = match self.ifade_hesapla(k) {
+                        Deger::Metin(key) => key,
+                        other => {
+                            return Deger::Hata(format!(
+                                "Sözlük anahtarı metin olmalıdır; {} geldi",
+                                other
+                            ))
+                        }
+                    };
                     let val = self.ifade_hesapla(v);
                     map.insert(key, val);
                 }
@@ -4760,22 +7652,38 @@ impl Yorumlayici {
                 let i_val = self.ifade_hesapla(*indeks);
                 match (l_val, i_val) {
                     (Deger::Liste(l), Deger::Sayi(i)) if i >= 0.0 && i.fract() == 0.0 => {
-                        l.borrow().get(i as usize).cloned().unwrap_or_else(|| {
-                            Deger::Hata(format!("Liste indeksi sınır dışında: {}", i))
-                        })
+                        let values = match l.try_borrow() {
+                            Ok(values) => values,
+                            Err(_) => return Deger::Hata("Liste kullanımda".to_string()),
+                        };
+                        let index = match indeks_dogrula(i, values.len(), "Liste erişimi") {
+                            Ok(index) => index,
+                            Err(error) => return Deger::Hata(error),
+                        };
+                        values[index].clone()
                     }
-                    (Deger::Metin(s), Deger::Sayi(i)) if i >= 0.0 && i.fract() == 0.0 => s
-                        .chars()
-                        .nth(i as usize)
-                        .map(|c| Deger::Metin(c.to_string()))
-                        .unwrap_or_else(|| {
-                            Deger::Hata(format!("Metin indeksi sınır dışında: {}", i))
-                        }),
+                    (Deger::Metin(s), Deger::Sayi(i)) if i >= 0.0 && i.fract() == 0.0 => {
+                        let length = s.chars().count();
+                        let index = match indeks_dogrula(i, length, "Metin erişimi") {
+                            Ok(index) => index,
+                            Err(error) => return Deger::Hata(error),
+                        };
+                        match s.chars().nth(index) {
+                            Some(character) => Deger::Metin(character.to_string()),
+                            None => Deger::Hata("Metin indeksi çözülemedi".to_string()),
+                        }
+                    }
                     (Deger::Sozluk(m), Deger::Metin(key)) => {
-                        m.borrow().get(&key).cloned().unwrap_or(Deger::Bos)
+                        match get_keyed_value(&m, &key, "Sözlük erişimi") {
+                            Ok(value) => value.unwrap_or(Deger::Bos),
+                            Err(error) => Deger::Hata(error),
+                        }
                     }
                     (Deger::Nesne { alanlar, .. }, Deger::Metin(key)) => {
-                        alanlar.borrow().get(&key).cloned().unwrap_or(Deger::Bos)
+                        match get_keyed_value(&alanlar, &key, "Nesne erişimi") {
+                            Ok(value) => value.unwrap_or(Deger::Bos),
+                            Err(error) => Deger::Hata(error),
+                        }
                     }
                     (container, index) => Deger::Hata(format!(
                         "{} değeri {} indeksiyle erişilemez",
@@ -4786,11 +7694,16 @@ impl Yorumlayici {
             Ifade::NesneErisim { nesne, ozellik } => {
                 let inst = self.ifade_hesapla(*nesne);
                 if let Deger::Nesne { alanlar, .. } = inst {
-                    alanlar.borrow().get(&ozellik).cloned().unwrap_or_else(|| {
-                        Deger::Hata(format!("Nesne özelliği bulunamadı: {}", ozellik))
-                    })
+                    match get_keyed_value(&alanlar, &ozellik, "Nesne özelliği erişimi") {
+                        Ok(Some(value)) => value,
+                        Ok(None) => Deger::Hata(format!("Nesne özelliği bulunamadı: {}", ozellik)),
+                        Err(error) => Deger::Hata(error),
+                    }
                 } else if let Deger::Sozluk(m) = inst {
-                    m.borrow().get(&ozellik).cloned().unwrap_or(Deger::Bos)
+                    match get_keyed_value(&m, &ozellik, "Sözlük özelliği erişimi") {
+                        Ok(value) => value.unwrap_or(Deger::Bos),
+                        Err(error) => Deger::Hata(error),
+                    }
                 } else {
                     Deger::Hata(format!("Nesne özelliğine erişilemez: {}", ozellik))
                 }
@@ -4798,9 +7711,11 @@ impl Yorumlayici {
             Ifade::KendisiErisim { ozellik } => {
                 let kendisi = self.get_degisken("kendisi");
                 if let Deger::Nesne { alanlar, .. } = kendisi {
-                    alanlar.borrow().get(&ozellik).cloned().unwrap_or_else(|| {
-                        Deger::Hata(format!("Nesne özelliği bulunamadı: {}", ozellik))
-                    })
+                    match get_keyed_value(&alanlar, &ozellik, "kendisi özelliği erişimi") {
+                        Ok(Some(value)) => value,
+                        Ok(None) => Deger::Hata(format!("Nesne özelliği bulunamadı: {}", ozellik)),
+                        Err(error) => Deger::Hata(error),
+                    }
                 } else {
                     Deger::Hata("kendisi yalnızca sınıf metotlarında kullanılabilir".to_string())
                 }
@@ -4808,9 +7723,20 @@ impl Yorumlayici {
             Ifade::Uzunluk(ifade) => {
                 let val = self.ifade_hesapla(*ifade);
                 match val {
-                    Deger::Liste(l) => Deger::Sayi(l.borrow().len() as f64),
+                    Deger::Liste(l) => match l.try_borrow() {
+                        Ok(values) => Deger::Sayi(values.len() as f64),
+                        Err(_) => Deger::Hata("Uzunluk alınırken liste kullanımda".to_string()),
+                    },
                     Deger::Metin(s) => Deger::Sayi(s.chars().count() as f64),
-                    Deger::Sozluk(m) => Deger::Sayi(m.borrow().len() as f64),
+                    Deger::Bayt(b) => Deger::Sayi(b.len() as f64),
+                    Deger::Sozluk(m) => match m.try_borrow() {
+                        Ok(values) => Deger::Sayi(values.len() as f64),
+                        Err(_) => Deger::Hata("Uzunluk alınırken sözlük kullanımda".to_string()),
+                    },
+                    Deger::Vektor(v) => match v.try_borrow() {
+                        Ok(values) => Deger::Sayi(values.len() as f64),
+                        Err(_) => Deger::Hata("Uzunluk alınırken vektör kullanımda".to_string()),
+                    },
                     other => Deger::Hata(format!("{} değerinin uzunluğu alınamaz", other)),
                 }
             }
@@ -4820,6 +7746,8 @@ impl Yorumlayici {
             } => Deger::Fonksiyon {
                 parametreler,
                 govde,
+                yakalanan_kapsamlar: self.yerel_scopes.clone(),
+                module_kimligi: self.active_module_calls.last().cloned(),
             },
             Ifade::NesneOlustur { sinif_adi, .. } => Deger::Hata(format!(
                 "Eski nesne oluşturma AST biçimi desteklenmiyor: {}",
@@ -4830,51 +7758,87 @@ impl Yorumlayici {
                 argumanlar,
                 pos,
             } => {
+                let call_name = match fonksiyon.as_ref() {
+                    Ifade::Degisken(name) => name.clone(),
+                    Ifade::NesneErisim { ozellik, .. } => ozellik.clone(),
+                    _ => "<anonim>".to_string(),
+                };
                 let mut method_instance = None;
                 let f = if let Ifade::NesneErisim { nesne, ozellik } = *fonksiyon.clone() {
                     let instance = self.ifade_hesapla(*nesne);
                     if let Deger::Nesne {
                         ref sinif_adi,
                         ref alanlar,
+                        ref module_kimligi,
                     } = instance
                     {
                         // 1. Önce sınıf metotlarını kontrol et
-                        if let Some(Deger::Sinif { metotlar, .. }) =
-                            self.global_degiskenler.get(sinif_adi)
+                        let class_value = module_kimligi
+                            .as_ref()
+                            .and_then(|module_id| self.module_environments.get(module_id))
+                            .and_then(|environment| environment.get(sinif_adi))
+                            .or_else(|| self.global_degiskenler.get(sinif_adi))
+                            .cloned();
+                        if let Some(Deger::Sinif {
+                            metotlar,
+                            module_kimligi,
+                            ..
+                        }) = class_value
                         {
                             if let Some((ps, bd)) = metotlar.get(&ozellik) {
                                 method_instance = Some(instance.clone());
                                 Deger::Fonksiyon {
                                     parametreler: ps.clone(),
                                     govde: bd.clone(),
+                                    yakalanan_kapsamlar: Vec::new(),
+                                    module_kimligi,
                                 }
                             } else {
                                 // 2. Sınıf metodu yoksa alanlara bak
-                                if let Some(field_val) = alanlar.borrow().get(&ozellik) {
-                                    if matches!(
-                                        field_val,
-                                        Deger::Fonksiyon { .. } | Deger::DahiliFonksiyon(_)
-                                    ) {
-                                        method_instance = Some(instance.clone());
-                                    }
-                                    field_val.clone()
-                                } else {
-                                    self.ifade_hesapla(*fonksiyon)
-                                }
-                            }
-                        } else {
-                            // 3. Sınıf yoksa (düz nesne) alanlara bak
-                            if let Some(field_val) = alanlar.borrow().get(&ozellik) {
+                                let field =
+                                    match get_keyed_value(alanlar, &ozellik, "Metot/alan erişimi")
+                                    {
+                                        Ok(Some(field)) => field,
+                                        Ok(None) => {
+                                            return Deger::Hata(format!(
+                                                "Nesne özelliği bulunamadı: {}",
+                                                ozellik
+                                            ))
+                                        }
+                                        Err(error) => return Deger::Hata(error),
+                                    };
                                 if matches!(
-                                    field_val,
-                                    Deger::Fonksiyon { .. } | Deger::DahiliFonksiyon(_)
+                                    &field,
+                                    Deger::Fonksiyon { .. }
+                                        | Deger::DahiliFonksiyon(_)
+                                        | Deger::BaglamliDahiliFonksiyon(_)
                                 ) {
                                     method_instance = Some(instance.clone());
                                 }
-                                field_val.clone()
-                            } else {
-                                self.ifade_hesapla(*fonksiyon)
+                                field
                             }
+                        } else {
+                            // 3. Sınıf yoksa (düz nesne) alanlara bak
+                            let field =
+                                match get_keyed_value(alanlar, &ozellik, "Metot/alan erişimi") {
+                                    Ok(Some(field)) => field,
+                                    Ok(None) => {
+                                        return Deger::Hata(format!(
+                                            "Nesne özelliği bulunamadı: {}",
+                                            ozellik
+                                        ))
+                                    }
+                                    Err(error) => return Deger::Hata(error),
+                                };
+                            if matches!(
+                                &field,
+                                Deger::Fonksiyon { .. }
+                                    | Deger::DahiliFonksiyon(_)
+                                    | Deger::BaglamliDahiliFonksiyon(_)
+                            ) {
+                                method_instance = Some(instance.clone());
+                            }
+                            field
                         }
                     } else if let Deger::Sozluk(ref m) = instance {
                         if ozellik == "getir" {
@@ -4882,23 +7846,44 @@ impl Yorumlayici {
                                 .into_iter()
                                 .map(|a| self.ifade_hesapla(a))
                                 .collect::<Vec<_>>();
-                            if let Some(Deger::Metin(k)) = args.first() {
-                                return m.borrow().get(k).cloned().unwrap_or(Deger::Bos);
-                            }
-                            return Deger::Bos;
+                            let [Deger::Metin(key)] = args.as_slice() else {
+                                return Deger::Hata(
+                                    "sözlük.getir: tam olarak 1 metin anahtarı gerekir".to_string(),
+                                );
+                            };
+                            return match get_keyed_value(m, key, "sözlük.getir") {
+                                Ok(value) => value.unwrap_or(Deger::Bos),
+                                Err(error) => Deger::Hata(error),
+                            };
                         } else if ozellik == "ayarla" {
                             let args = argumanlar
                                 .into_iter()
                                 .map(|a| self.ifade_hesapla(a))
                                 .collect::<Vec<_>>();
-                            if args.len() >= 2 {
-                                if let Deger::Metin(k) = &args[0] {
-                                    m.borrow_mut().insert(k.clone(), args[1].clone());
-                                }
-                            }
-                            return Deger::Bos;
+                            let [Deger::Metin(key), value] = args.as_slice() else {
+                                return Deger::Hata(
+                                    "sözlük.ayarla: tam olarak metin anahtar ve değer gerekir"
+                                        .to_string(),
+                                );
+                            };
+                            return match insert_keyed_value(
+                                m,
+                                key.clone(),
+                                value.clone(),
+                                self.limits.max_collection_items,
+                                "sözlük.ayarla",
+                            ) {
+                                Ok(()) => Deger::Sayi(1.0),
+                                Err(error) => Deger::Hata(error),
+                            };
                         } else {
-                            self.ifade_hesapla(*fonksiyon)
+                            match get_keyed_value(m, &ozellik, "Sözlük özelliği erişimi") {
+                                Ok(Some(value)) => value,
+                                Ok(None) => {
+                                    Deger::Hata(format!("Sözlük özelliği bulunamadı: {}", ozellik))
+                                }
+                                Err(error) => Deger::Hata(error),
+                            }
                         }
                     } else {
                         self.ifade_hesapla(*fonksiyon)
@@ -4913,149 +7898,79 @@ impl Yorumlayici {
                     .collect();
                 if !matches!(
                     f,
-                    Deger::Fonksiyon { .. } | Deger::DahiliFonksiyon(_) | Deger::Sinif { .. }
+                    Deger::Fonksiyon { .. }
+                        | Deger::DahiliFonksiyon(_)
+                        | Deger::BaglamliDahiliFonksiyon(_)
+                        | Deger::Sinif { .. }
                 ) {
                     return Deger::Hata(format!(
                         "Satır {}, Sütun {}: Çağrılamayan değer: {}",
                         pos.0, pos.1, f
                     ));
                 }
-                self.fonksiyon_cagrisi_detayli(f, args, method_instance)
+                let previous_location = self.current_location.replace(SourceSpan {
+                    line: pos.0,
+                    column: pos.1,
+                });
+                let result = self.fonksiyon_cagrisi_detayli(
+                    f,
+                    args,
+                    method_instance,
+                    Some(StackFrame {
+                        function: call_name,
+                        location: Some(SourceSpan {
+                            line: pos.0,
+                            column: pos.1,
+                        }),
+                    }),
+                );
+                self.current_location = previous_location;
+                result
             }
             Ifade::IkiliIslem { sol, operator, sag } => {
-                let mut l = self.ifade_hesapla(*sol);
+                let l = self.ifade_hesapla(*sol);
                 if operator == Token::Ve {
-                    if !self.dogruluk_kontrolu(l) {
+                    let left = match self.dogruluk_kontrolu(l) {
+                        Ok(value) => value,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                    if !left {
                         return Deger::Sayi(0.0);
                     }
                     let r = self.ifade_hesapla(*sag);
-                    return Deger::Sayi(if self.dogruluk_kontrolu(r) { 1.0 } else { 0.0 });
+                    return match self.dogruluk_kontrolu(r) {
+                        Ok(value) => Deger::Sayi(if value { 1.0 } else { 0.0 }),
+                        Err(error) => Deger::Hata(error),
+                    };
                 }
                 if operator == Token::Veya {
-                    if self.dogruluk_kontrolu(l) {
+                    let left = match self.dogruluk_kontrolu(l) {
+                        Ok(value) => value,
+                        Err(error) => return Deger::Hata(error),
+                    };
+                    if left {
                         return Deger::Sayi(1.0);
                     }
                     let r = self.ifade_hesapla(*sag);
-                    return Deger::Sayi(if self.dogruluk_kontrolu(r) { 1.0 } else { 0.0 });
+                    return match self.dogruluk_kontrolu(r) {
+                        Ok(value) => Deger::Sayi(if value { 1.0 } else { 0.0 }),
+                        Err(error) => Deger::Hata(error),
+                    };
                 }
-                let mut r = self.ifade_hesapla(*sag);
-
-                // Tip zorlama (Coercion) - Arti hariç diğer sayısal işlemlerde zorla
-                if matches!(
-                    operator,
-                    Token::Eksi
-                        | Token::Carpi
-                        | Token::Bolnu
-                        | Token::Mod
-                        | Token::Kucuktur
-                        | Token::Buyuktur
-                        | Token::KucukEsit
-                        | Token::BuyukEsit
-                ) {
-                    if let Deger::Metin(ref s) = l {
-                        if let Ok(n) = s.parse::<f64>() {
-                            l = Deger::Sayi(n);
-                        }
-                    }
-                    if let Deger::Metin(ref s) = r {
-                        if let Ok(n) = s.parse::<f64>() {
-                            r = Deger::Sayi(n);
-                        }
-                    }
-                }
-
-                match operator {
-                    Token::EsitEsittir | Token::Esittir => {
-                        Deger::Sayi(if l == r { 1.0 } else { 0.0 })
-                    }
-                    Token::EsitDegil => Deger::Sayi(if l != r { 1.0 } else { 0.0 }),
-                    _ => match (l, r) {
-                        (Deger::Sayi(a), Deger::Sayi(b)) => match operator {
-                            Token::Arti => Deger::Sayi(a + b),
-                            Token::Eksi => Deger::Sayi(a - b),
-                            Token::Carpi => Deger::Sayi(a * b),
-                            Token::Bolnu if b == 0.0 => {
-                                Deger::Hata("Sıfıra bölme hatası".to_string())
-                            }
-                            Token::Bolnu => Deger::Sayi(a / b),
-                            Token::Mod if b == 0.0 => {
-                                Deger::Hata("Sıfıra göre kalan hesaplanamaz".to_string())
-                            }
-                            Token::Mod => Deger::Sayi(a % b),
-                            Token::Kucuktur => Deger::Sayi(if a < b { 1.0 } else { 0.0 }),
-                            Token::Buyuktur => Deger::Sayi(if a > b { 1.0 } else { 0.0 }),
-                            Token::KucukEsit => Deger::Sayi(if a <= b { 1.0 } else { 0.0 }),
-                            Token::BuyukEsit => Deger::Sayi(if a >= b { 1.0 } else { 0.0 }),
-                            _ => Deger::Hata(format!(
-                                "Desteklenmeyen sayısal operatör: {}",
-                                operator
-                            )),
-                        },
-                        (l_val, r_val) => match operator {
-                            Token::Arti => {
-                                // Sayısal olmayan kombinasyonlarda tip kontrolü:
-                                // - Sayı + Boş veya Boş + Sayı → Tip Hatası (sessiz string birleştirme engellendi)
-                                // - Metin + herhangi → string birleştirme (izin verilir)
-                                let l_is_num = matches!(l_val, Deger::Sayi(_));
-                                let r_is_num = matches!(r_val, Deger::Sayi(_));
-                                let l_is_bos = matches!(l_val, Deger::Bos);
-                                let r_is_bos = matches!(r_val, Deger::Bos);
-
-                                if (l_is_num && r_is_bos) || (l_is_bos && r_is_num) {
-                                    // Sayı ile Boş toplanamaz — Tip Hatası
-                                    Deger::Hata(format!(
-                                        "Tip Hatası: '{}' ile '{}' toplanamaz. Sayısal işlemde Boş değer kullanılamaz.",
-                                        l_val, r_val
-                                    ))
-                                } else {
-                                    // Metin birleştirme (Metin + herhangi veya herhangi + Metin)
-                                    Deger::Metin(format!("{}{}", l_val, r_val))
-                                }
-                            }
-                            Token::Eksi | Token::Carpi | Token::Bolnu | Token::Mod => {
-                                // Sayısal operatörlerde Boş değer kullanılamaz → Tip Hatası
-                                Deger::Hata(format!(
-                                    "Tip Hatası: '{}' ve '{}' arasında sayısal işlem yapılamaz. Her iki değer de sayı olmalıdır.",
-                                    l_val, r_val
-                                ))
-                            }
-                            Token::Kucuktur => {
-                                Deger::Sayi(if l_val.to_string() < r_val.to_string() {
-                                    1.0
-                                } else {
-                                    0.0
-                                })
-                            }
-                            Token::Buyuktur => {
-                                Deger::Sayi(if l_val.to_string() > r_val.to_string() {
-                                    1.0
-                                } else {
-                                    0.0
-                                })
-                            }
-                            _ => Deger::Hata(format!(
-                                "Desteklenmeyen işlem: {} ile {} arasında {}",
-                                l_val, r_val, operator
-                            )),
-                        },
-                    },
-                }
+                let r = self.ifade_hesapla(*sag);
+                crate::semantics::ikili_islem(&operator, l, r).unwrap_or_else(Deger::Hata)
             }
             Ifade::MantıksalDegil(i) => {
                 let v = self.ifade_hesapla(*i);
-                Deger::Sayi(if self.dogruluk_kontrolu(v) { 0.0 } else { 1.0 })
+                match self.dogruluk_kontrolu(v) {
+                    Ok(value) => Deger::Sayi(if value { 0.0 } else { 1.0 }),
+                    Err(error) => Deger::Hata(error),
+                }
             }
         }
     }
 
-    fn dogruluk_kontrolu(&self, deger: Deger) -> bool {
-        match deger {
-            Deger::Sayi(n) => n != 0.0,
-            Deger::Metin(s) => !s.is_empty(),
-            Deger::Liste(l) => !l.borrow().is_empty(),
-            Deger::Sozluk(m) => !m.borrow().is_empty(),
-            Deger::Bos => false,
-            _ => true,
-        }
+    fn dogruluk_kontrolu(&self, deger: Deger) -> Result<bool, String> {
+        crate::semantics::dogru_mu(&deger)
     }
 }
