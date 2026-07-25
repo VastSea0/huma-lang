@@ -1,0 +1,10 @@
+//! # Hüma AOT Derleyici 
+//!
+//! Hüma kaynak kodunu Cranelift IR 
+//! (ELF / Mach-O nesne dosyasi) derler, 
+//! ile linkleyerek bagimsiz bir binary uretir.
+//!
+//! ## Faz 1 Kapsami
+//!
+//! * `f64` sayisal degerler (tek calisma zamani tipi)
+

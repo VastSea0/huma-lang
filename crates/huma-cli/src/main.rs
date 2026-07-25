@@ -101,6 +101,22 @@ enum Commands {
         output: String,
     },
 
+    /// Cranelift AOT kullanarak doğrudan native makine koduna (binary) derle
+    #[command(alias = "native", alias = "makine")]
+    Aot {
+        /// Girdi .hb dosyası
+        file: String,
+
+        /// Çıktı binary adı (varsayılan: program)
+        #[arg(short, long, default_value = "program")]
+        output: String,
+
+        /// Optimizasyon seviyesi (0=yok, 1=hız, 2=hız ve boyut)
+        #[arg(short = 'O', long, default_value = "2")]
+        opt_level: u8,
+    },
+
+
     /// Etkileşimli REPL (Okuma-Değerlendirme-Yazdırma Döngüsü)
     #[command(alias = "kabuk")]
     Repl,
@@ -271,7 +287,9 @@ fn run(cli: Cli) -> i32 {
         Some(Commands::Build { file, output, json }) => commands::build_file(&file, &output, json),
         Some(Commands::Exec { file }) => commands::exec_bytecode(&file),
         Some(Commands::Gen { file, output }) => commands::generate_standalone(&file, &output),
+        Some(Commands::Aot { file, output, opt_level }) => commands::compile_aot(&file, &output, opt_level),
         Some(Commands::Repl) => commands::start_repl(),
+
         Some(Commands::Test { target }) => commands::run_tests(target.as_deref()),
         Some(Commands::Update { check }) => {
             if check {

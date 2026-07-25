@@ -5,6 +5,8 @@
 
 pub mod pipeline;
 pub mod codegen;
+pub mod aot;
+
 
 #[cfg(test)]
 mod tests {

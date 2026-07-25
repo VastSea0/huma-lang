@@ -90,6 +90,29 @@ pub fn generate_standalone(input: &str, output_name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Compile a `.hb` file to a native machine code binary using Cranelift AOT.
+pub fn compile_aot(input: &str, output_name: &str, opt_level: u8) -> Result<()> {
+    let source = std::fs::read_to_string(input)
+        .with_context(|| format!("'{}' dosyası okunamadı", input))?;
+
+    let out_path = std::path::Path::new(output_name);
+    let opts = huma_compiler::aot::AotOptions {
+        output_bin: out_path,
+        opt_level,
+    };
+
+    huma_compiler::aot::compile_to_binary(&source, &opts)
+        .with_context(|| format!("'{}' Cranelift AOT derlemesi sırasında hata oluştu", input))?;
+
+    println!(
+        "{} Native binary üretildi: {}",
+        "[Başarı]".bright_green().bold(),
+        output_name.bright_cyan().bold(),
+    );
+    Ok(())
+}
+
+
 /// Start the interactive REPL.
 pub fn start_repl() -> Result<()> {
     println!(
