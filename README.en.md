@@ -97,6 +97,7 @@ The current runtime targets learning experiments and small CPU workloads. It doe
 - [Libraries](KUTUPHANELER.md)
 - [Package Security](docs/PAKET_GUVENLIGI.md)
 - [Performance and Memory Measurement](docs/PERFORMANS.md)
+- [Cross-Language Benchmark](docs/KARSILASTIRMALI_BENCHMARK.md)
 - [Status and Roadmap](docs/DURUM_VE_YOL_HARITASI.md)
 - [Changelog](CHANGELOG.md)
 

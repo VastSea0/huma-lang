@@ -299,7 +299,7 @@
       "title": "Derleyici İç Yapısı",
       "description": "Hüma derleyici hattına derinlemesine bakış: lexer, ek sistemi, AST ve yorumlayıcı.",
       "hero_title": "Derleyici Mimarisi",
-      "hero_desc": "Hüma'nın varsayılan yürütücüsü Rust ile geliştirilmiş ağaç yürüyen yorumlayıcıdır. Depoda henüz onu başka dillerle karşılaştıran yayımlanmış bir performans ölçümü yoktur.",
+      "hero_desc": "Hüma'nın varsayılan yürütücüsü Rust ile geliştirilmiş ağaç yürüyen yorumlayıcıdır. Depoda Apple M4 üzerinde Python, Node.js, Ruby, C, Rust, Swift ve Java ile tekrarlanabilir mikro benchmark bulunur; sonuçlar tanımlı iş yüklerinin dışına genellenmez.",
       "pipeline": {
         "title": "İşleme Hattı",
         "desc": "Hüma kaynak kodu dört ana aşamadan geçer: Kaynak Metin, Lexer (Belirteçleyici), Parser (Ayrıştırıcı) ve Interpret (Yorumlayıcı).",
@@ -337,7 +337,8 @@
           "Yorumlayıcı kısa devre mantığı, liste ataması, döngü kontrolü ve dene/yakala davranışı regresyon testleriyle doğrulandı.",
           "VM desteklenmeyen sözdizimini reddediyor; AOT yalnızca doğrulanan sayısal alt kümeyi kabul ediyor.",
           "CPU yoğun katman ve Adam eğitim akışı gerçek ağırlık güncellemesiyle uçtan uca test edildi.",
-          "Yanıltıcı yetenek ve performans iddiaları kaldırıldı; güncel sınırlamalar belgelendi."
+          "Yanıltıcı yetenek ve performans iddiaları kaldırıldı; güncel sınırlamalar belgelendi.",
+          "Dört doğrulanmış iş yükünde yedi gerçek dil araç zinciriyle karşılaştırmalı benchmark ve ham sonuçlar eklendi."
         ]
       }
     },

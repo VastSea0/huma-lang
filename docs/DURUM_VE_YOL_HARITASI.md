@@ -53,8 +53,9 @@ hatasızdır” veya “işletim sistemi sandbox’ı vardır” anlamına gelme
   yeniden adlandırma ve bütün referansları bulma henüz yoktur.
 - Bytecode opcode’ları, paket şeması ve yerleşik kamu API’si 1.0 öncesinde
   geriye uyumluluk garantisi taşımaz; uyumsuz dosya biçimleri sürümle reddedilir.
-- Ölçülmüş performans sonucu olmayan başka dillerle hız eşitliği veya üstünlüğü
-  iddia edilmez.
+- Diller arası mikro benchmark yalnız tanımlı iş yükleri ve kayıtlı ortam için
+  geçerlidir; başka uygulama alanlarına hız eşitliği veya üstünlüğü olarak
+  genellenmez.
 
 ## Sonraki mühendislik aşamaları
 
@@ -69,7 +70,8 @@ hatasızdır” veya “işletim sistemi sandbox’ı vardır” anlamına gelme
 
 - Tam dil için sürekli yorumlayıcı/VM diferansiyel üretim testi
 - Uzun süreli fuzz, hata enjeksiyonu ve bellek profili iş akışları
-- Tekrarlanabilir benchmark veri kümesi; süre, tepe bellek ve çıktı boyutu raporu
+- Diller arası benchmark geçmişi, hata enjeksiyonlu performans testleri ve
+  platformlara göre süre/tepe bellek/çıktı boyutu raporları
 - Tam değer modeli, hata ABI’si ve çöp toplama stratejisi tanımlanmış AOT arka ucu
 
 ### 0.9 — Dağıtım ve ekosistem

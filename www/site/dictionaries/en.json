@@ -299,7 +299,7 @@
       "title": "Compiler Internals",
       "description": "Deep-dive into the Hüma compiler pipeline: lexer, suffix system, AST, and interpreter.",
       "hero_title": "Compiler Architecture",
-      "hero_desc": "Hüma's default executor is a tree-walking interpreter implemented in Rust. The repository does not yet publish comparative performance benchmarks.",
+      "hero_desc": "Hüma's default executor is a tree-walking interpreter implemented in Rust. The repository includes reproducible Apple M4 microbenchmarks against Python, Node.js, Ruby, C, Rust, Swift, and Java; the results do not generalize beyond the defined workloads.",
       "pipeline": {
         "title": "The Pipeline",
         "desc": "Hüma source code passes through four main stages: Source Text, Lexer (Tokenizer), Parser, and Interpreter.",
@@ -337,7 +337,8 @@
           "Interpreter short-circuit logic, list assignment, loop control, and dene/yakala behavior are covered by regression tests.",
           "The VM rejects unsupported syntax; AOT accepts only its validated numeric subset.",
           "The CPU dense-layer and Adam training path is tested end-to-end with real weight updates.",
-          "Unsubstantiated capability and performance claims were removed and current limitations documented."
+          "Unsubstantiated capability and performance claims were removed and current limitations documented.",
+          "A cross-language suite and raw results were added for four verified workloads across seven real language toolchains."
         ]
       }
     },

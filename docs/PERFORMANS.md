@@ -1,7 +1,22 @@
 # Hüma Performans ve Bellek Ölçümü
 
-Bu belge başka dillere karşı ölçülmemiş hız iddiası içermez. Amacı aynı Hüma
-sürümündeki gerilemeleri yeniden üretilebilir bir iş yüküyle görünür kılmaktır.
+Bu belgenin amacı aynı Hüma sürümündeki gerilemeleri yeniden üretilebilir iş
+yükleriyle görünür kılmaktır. Diller arası sonuçlar yalnız tanımlı mikro
+iş yükleri için raporlanır; genel hız üstünlüğü iddiası olarak kullanılamaz.
+
+## Diller arası benchmark
+
+Python, Node.js, Ruby, C, Rust, Swift ve Java için eşdeğer kaynaklar; çıktı
+doğrulayan runner, ham örnekler ve ölçüm yorumu [Diller Arası Benchmark
+Raporu](KARSILASTIRMALI_BENCHMARK.md) belgesindedir.
+
+```bash
+python3 benchmarks/cross_language/run.py --samples 30 --warmups 5
+```
+
+Bu ölçüm süreç başlangıcını içerir. Hüma'nın parser, yorumlayıcı ve VM
+çekirdeklerini süreç başlangıcı olmadan izlemek için aşağıdaki Criterion
+benchmark'ı ayrı tutulur.
 
 ## Mikro benchmark
 

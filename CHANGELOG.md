@@ -86,3 +86,6 @@
   sabitlendi.
 - Web araç zinciri güncel Next.js sürümüne taşındı; temiz `npm ci`, güvenlik
   denetimi, lint ve üretim derlemesi kabul kapısına alındı.
+- Hüma yorumlayıcı, VM ve AOT'yi Python, Node.js, Ruby, C, Rust, Swift ve Java
+  ile aynı çıktıyı doğrulayan dört iş yükünde ölçen tekrarlanabilir benchmark
+  paketi ve ham Apple M4 sonuçları eklendi.

@@ -132,6 +132,7 @@ Bu çekirdek eğitim/çıkarım deneyi için uygundur. Büyük model eğitimi i�
 - [Kütüphaneler](KUTUPHANELER.md)
 - [Paket Güvenliği](docs/PAKET_GUVENLIGI.md)
 - [Performans ve Bellek Ölçümü](docs/PERFORMANS.md)
+- [Diller Arası Benchmark](docs/KARSILASTIRMALI_BENCHMARK.md)
 - [Durum ve Yol Haritası](docs/DURUM_VE_YOL_HARITASI.md)
 - [Değişim Günlüğü](CHANGELOG.md)
 
