@@ -1,5 +1,6 @@
 /target
 /fuzz/target
+/benchmarks/cross_language/.build
 /src-tauri/target
 *.hbc
 !lib/*.hb
