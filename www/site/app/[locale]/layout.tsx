@@ -23,12 +23,12 @@ export const metadata: Metadata = {
     default: "Hüma — Code as You Think",
   },
   description:
-    "Hüma is a high-performance programming language featuring native Turkish syntax. Built with a Rust-backed core, it combines the expressiveness of natural language with the raw speed of a systems compiler.",
+    "Hüma is an experimental programming language with Turkish keywords, a Rust-based interpreter, a limited bytecode VM, and an experimental AOT subset.",
   keywords: ["hüma", "programming language", "Turkish", "compiler", "Rust"],
   openGraph: {
     title: "Hüma — Code as You Think",
     description:
-      "High-performance programming language with native Turkish syntax.",
+      "Experimental programming language with Turkish-oriented syntax and explicit execution limits.",
     type: "website",
   },
 };
@@ -53,6 +53,7 @@ export default async function RootLayout({
       data-scroll-behavior="smooth"
     >
       <head>
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"

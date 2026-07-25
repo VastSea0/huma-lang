@@ -46,20 +46,6 @@ sayaç < 5 olduğu sürece {
 i = 0'dan 5'e kadar {
     "Adım: " + i'yi yazdır;
 }`;
-const fullExampleCode = `// Tam örnek: değişkenler + aralık döngüleri + edatlı çağrılar
-veriler = [10, 20, 30] olsun
-
-topla = fonksiyon olsun a, b alsın {
-    a + b döndür
-}
-
-i = 0'dan 2'ye kadar {
-    sayı = veriler[i] olsun
-    sayı > 15 ise {
-        10 ile sayı'yı topla'yı yazdır;
-    }
-}`;
-
 export default async function SyntaxPage({
   params,
 }: {

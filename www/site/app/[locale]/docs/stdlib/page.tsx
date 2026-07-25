@@ -1,11 +1,14 @@
 import Link from "next/link";
-import { getDictionary } from "@/dictionaries/dictionaries";
+import {
+  getDictionary,
+  type Dictionary,
+} from "@/dictionaries/dictionaries";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Standard Library",
   description:
-    "Complete API reference for Hüma's built-in standard library modules.",
+    "Selected API reference for Hüma's built-in functions and helper modules.",
 };
 
 interface StdlibFunction {
@@ -19,7 +22,7 @@ interface StdlibModule {
   file: string;
   icon: string;
   title: string;
-  descriptionKey: string;
+  descriptionKey: keyof Dictionary["Docs"]["stdlib"]["modules"];
   constants?: { name: string; value: string; description: string }[];
   functions: StdlibFunction[];
   colorAccent: string;
@@ -111,12 +114,12 @@ export default async function StdlibPage({
         {
           name: "kronometre_başlat()",
           signature: "kronometre_başlat() → Sayı",
-          description: locale === "tr" ? "Mevcut zaman damgasını döndürür (ms)" : "Returns current timestamp (milliseconds)",
+          description: locale === "tr" ? "Unix başlangıcından beri geçen saniyeyi döndürür" : "Returns seconds elapsed since the Unix epoch",
         },
         {
           name: "kronometre_bitir(başlangıç)",
           signature: "kronometre_bitir(başlangıç: Sayı) → Sayı",
-          description: locale === "tr" ? "Başlangıçtan itibaren geçen ms'yi döndürür" : "Returns elapsed ms since başlangıç",
+          description: locale === "tr" ? "Başlangıçtan itibaren geçen saniyeyi yazdırır ve döndürür" : "Prints and returns seconds elapsed since the start value",
         },
       ],
     },
@@ -324,19 +327,19 @@ export default async function StdlibPage({
       colorAccent: "text-primary",
       functions: [
         {
-          name: "bpe_tokenizer_oluştur(sözlük)",
-          signature: "bpe_tokenizer_oluştur(sözlük: Sözlük) → Tokenizer",
-          description: locale === "tr" ? "Rust yerel BPE Tokenizer motorunu başlatır" : "Initializes native Rust BPE Tokenizer engine",
+          name: "bpe_eğit(metin, sözlük_boyutu)",
+          signature: "bpe_eğit(metin: Yazı, sözlük_boyutu: Sayı) → Sayı",
+          description: locale === "tr" ? "Küresel bayt düzeyli BPE modelini 256–65536 token sınırında eğitir" : "Trains the global byte-level BPE model with a 256–65536 token bound",
         },
         {
-          name: "otomatik_türev_grafı()",
-          signature: "otomatik_türev_grafı() → AutogradGraph",
-          description: locale === "tr" ? "Otomatik türev hesaplama grafı (Autograd) oluşturur" : "Creates automatic differentiation computation graph (Autograd)",
+          name: "bpe_kodla(metin)",
+          signature: "bpe_kodla(metin: Yazı) → Liste<Sayı>",
+          description: locale === "tr" ? "UTF-8 metni eğitilmiş BPE sözlüğündeki token kimliklerine dönüştürür" : "Encodes UTF-8 text into token IDs from the trained BPE vocabulary",
         },
         {
-          name: "sinir_ağı_katmanı(giriş, çıkış)",
-          signature: "sinir_ağı_katmanı(giriş: Sayı, çıkış: Sayı) → Katman",
-          description: locale === "tr" ? "Ağırlıkları rastgele ilklendirilmiş katman oluşturur" : "Creates dense neural network layer with initialized weights",
+          name: "bpe_çöz(tokenler)",
+          signature: "bpe_çöz(tokenler: Liste<Sayı>) → Yazı",
+          description: locale === "tr" ? "Geçerli token kimliklerini kayıpsız UTF-8 metne geri çözer" : "Decodes valid token IDs back to lossless UTF-8 text",
         },
       ],
     },
@@ -349,14 +352,14 @@ export default async function StdlibPage({
       colorAccent: "text-secondary",
       functions: [
         {
-          name: "ffi_yükle(kütüphane_yolu)",
-          signature: "ffi_yükle(kütüphane_yolu: Yazı) → FFIDomain",
-          description: locale === "tr" ? "Dinamik C/C++/CUDA kütüphanesini (.so/.dylib/.dll) yükler" : "Loads dynamic C/C++/CUDA shared library (.so/.dylib/.dll)",
+          name: "ffi_yükle(ad, kütüphane_yolu)",
+          signature: "ffi_yükle(ad: Yazı, kütüphane_yolu: Yazı) → Sayı",
+          description: locale === "tr" ? "C ABI kullanan dinamik kütüphaneyi verilen adla yükler; başarıda 1 döndürür" : "Loads a C-ABI dynamic library under the given name and returns 1 on success",
         },
         {
-          name: "ffi_çağır(domain, sembol, argümanlar)",
-          signature: "ffi_çağır(domain: FFIDomain, sembol: Yazı, args: Liste) → Değer",
-          description: locale === "tr" ? "Yerel C/CUDA sembolünü doğrudan çağırır" : "Calls native C/CUDA symbol directly at native speeds",
+          name: "ffi_çağır(ad, sembol, ...argümanlar)",
+          signature: "ffi_çağır(ad: Yazı, sembol: Yazı, ...argümanlar) → Değer",
+          description: locale === "tr" ? "C ABI sembolünü desteklenen 0–2 sayı veya tek metin imzasıyla çağırır" : "Calls a C-ABI symbol using the supported 0–2 number or single-string signatures",
         },
       ],
     },
@@ -409,7 +412,7 @@ export default async function StdlibPage({
                     {mod.file}
                   </h2>
                   <p className="text-sm text-on-surface-variant mt-1 font-medium">
-                    {(s.modules as any)[mod.descriptionKey]}
+                    {s.modules[mod.descriptionKey]}
                   </p>
                 </div>
               </div>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useDocs } from "@/context/DocsContext";
-import { useState, useEffect } from "react";
+import type { Dictionary } from "@/dictionaries/dictionaries";
 
 interface NavItem {
   href: string;
@@ -11,37 +11,20 @@ interface NavItem {
   icon: string;
 }
 
-interface NavCategory {
+interface NavSection {
   title: string;
   items: NavItem[];
 }
 
-interface NavSection {
-  title: string;
-  items?: NavItem[];
-  categories?: NavCategory[];
-}
-
-export default function Sidebar({ dict, locale }: { dict: any; locale: string }) {
+export default function Sidebar({
+  dict,
+  locale,
+}: {
+  dict: Dictionary;
+  locale: string;
+}) {
   const pathname = usePathname();
   const { isSidebarOpen, setSidebarOpen } = useDocs();
-
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Track which sub-categories are expanded
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({
-    core_libraries: true,
-    tooling: true,
-    community: false,
-  });
-
-  const toggleCategory = (key: string) => {
-    setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
 
   const getPath = (path: string) => {
     if (path.startsWith("http")) return path;
@@ -76,34 +59,6 @@ export default function Sidebar({ dict, locale }: { dict: any; locale: string })
     },
   ];
 
-  const renderItem = (item: NavItem) => {
-    const isActive = pathname === item.href;
-    return (
-      <li key={item.href}>
-        <Link
-          href={item.href}
-          onClick={() => setSidebarOpen(false)}
-          className={`flex items-center gap-3 px-3 py-2 rounded-sm transition-all hover:translate-x-1 ${
-            isActive
-              ? "text-primary bg-surface-container-high"
-              : "text-on-surface-variant hover:bg-surface-container-low"
-          }`}
-        >
-          <span className="material-symbols-outlined text-sm">{item.icon}</span>
-          <span>{item.label}</span>
-        </Link>
-      </li>
-    );
-  };
-
-  // Determine category key from title for expand/collapse state
-  const getCategoryKey = (title: string): string => {
-    if (title === dict.Sidebar.core_libraries) return "core_libraries";
-    if (title === dict.Sidebar.tooling) return "tooling";
-    if (title === dict.Sidebar.community) return "community";
-    return title;
-  };
-
   return (
     <>
       {/* Backdrop for mobile */}
@@ -128,7 +83,7 @@ export default function Sidebar({ dict, locale }: { dict: any; locale: string })
           </p>
         </div>
         <nav className="space-y-8">
-          {mounted && navSections.map((section, sectionIdx) => {
+          {navSections.map((section, sectionIdx) => {
             const sectionKey = `section-${sectionIdx}-${section.title?.toLowerCase().replace(/\s+/g, '-')}`;
             return (
               <div key={sectionKey}>

@@ -5,8 +5,15 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { useDocs } from "@/context/DocsContext";
+import type { Dictionary } from "@/dictionaries/dictionaries";
 
-export default function Navbar({ dict, locale }: { dict: any; locale: string }) {
+export default function Navbar({
+  dict,
+  locale,
+}: {
+  dict: Dictionary;
+  locale: string;
+}) {
   const pathname = usePathname();
   const [copied, setCopied] = useState(false);
   const { toggleSidebar, isSidebarOpen } = useDocs();

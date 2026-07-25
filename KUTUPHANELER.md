@@ -1,148 +1,69 @@
-# Hüma Sistem Kütüphaneleri
+# Hüma 0.6 Kütüphaneleri
 
-Hüma ile birlikte gelen standart kütüphanelerin detaylı kullanım rehberi.
+Bu belge depodaki çalışan giriş noktalarını listeler. Tam imza için ilgili `.hb` kaynağı ve Rust yerleşik kayıtları esas alınır.
 
-> **Not:** Tüm kütüphaneler `yükle "kütüphane_adı.hb"` komutuyla yüklenir.
-> Harici modüller ise `yükle "modül_adı"` ile `huma_modulleri/` dizininden yüklenir.
+## Gömülü `lib/` kütüphaneleri
 
----
+Bu dosyalar binary içine gömülür ve her dizinden yüklenebilir:
 
-## Gömülü Kütüphaneler (`lib/`)
+```huma
+"matematik.hb"'yi yükle
+```
 
-### 1. Matematik (`matematik.hb`)
+| Dosya | Başlıca API |
+|---|---|
+| `matematik.hb` | `karesi`, `küpü`, `mutlak`, `kuvvet`, `yuvarla`, `faktöriyel`, `ebob`, `ekok`, `asal_mı` |
+| `istatistik.hb` | `ortalama`, `en_büyük`, `en_küçük`, `varyans`, `standart_sapma` |
+| `liste.hb` | `yazdır_liste`, `içeriyor_mu`, `ters_cevir`, `eşle`, `filtrele`, `indirge`, `dilimle` |
+| `dizgi.hb` | `büyük_mü`, `küçük_mü`, `boşluk_mu`, başlangıç/bitiş uyumluluk adları |
+| `dosya.hb` | `güvenli_oku`, `satırlara_ayır` |
+| `rastgele.hb` | `r_tamsayı`, `r_seç`, `r_karıştır` |
+| `renkler.hb` | terminal renk sabitleri, `renkli_yaz`, `başarı_yaz`, `uyarı_yaz`, `hata_yaz` |
+| `zaman.hb` | `beklet`, `kronometre_başlat`, `kronometre_bitir` |
+| `birim_test.hb` | `test_et`, `iddia_et`, `test_raporu` |
+| `yapay_zeka_temel.hb` | vektör/matris yardımcıları, aktivasyonlar, kayıplar, başlatıcılar, metrikler |
 
-Temel matematiksel sabitler ve fonksiyonlar içerir.
+Yaygın Rust yerleşikleri arasında `uzunluk`, `listeye_ekle`, `içeriyor`, `kırp`, `böl`, `birleştir`, `küçük_harf`, `büyük_harf`, JSON, dosya, ağ, SQLite, vektör/matris ve tensor işlevleri bulunur. Geçersiz argüman davranışı henüz bütün yerleşiklerde tek tip olmadığından yeni kod, dönüş değerlerini ve boyutları doğrulamalıdır.
 
-- **Sabitler:** `PI`, `E`
-- **`karesi(n)`**, **`küpü(n)`**: n sayısının karesini/küpünü alır.
-- **`mutlak(n)`**: Sayının mutlak değerini döner.
-- **`kuvvet(a, b)`**: a^b hesaplar.
-- **`yuvarla(n)`**: En yakın tam sayıya yuvarlar.
-- **`faktöriyel(n)`**: n! hesaplar.
-- *Rust Built-in:* `karekök(n)` bu dosyada tanımlı değildir, interpreter tarafından sağlanır.
+## `huma_modulleri/` paketleri
 
-### 2. Renkler (`renkler.hb`)
+### `nlp_temel`
 
-Terminal çıktılarını renklendirmek için kullanılır.
+```huma
+"nlp_temel"'i yükle
+```
 
-- **Sabitler:** `KIRMIZI`, `YEŞİL`, `SARI`, `MAVI`, `TURKUAZ`, `KALIN`, `SIFIR`
-  - *Not:* Eski `YESIL` adı geriye dönük uyumluluk için alias olarak korunmuştur.
-- **`renkli_yaz(metin, renk)`**: Belirtilen renkte metin yazdırır.
-- **`başarı_yaz(metin)`**, **`hata_yaz(metin)`**, **`uyarı_yaz(metin)`**: Renkli etiketli çıktılar.
+Türkçe temizleme/tokenizasyon, durak kelime filtresi, kural tabanlı kök bulma, duygu/POS/NER yardımcıları sağlar. Bunlar kural tabanlı prototiplerdir; dilbilimsel doğruluk veri kümesiyle garanti edilmez.
 
-### 3. Zaman (`zaman.hb`)
+### `nlp_ileri`
 
-- **`beklet(saniye)`**: Programı durdurur.
-- **`kronometre_başlat()`**, **`kronometre_bitir(başlangıç)`**: Süre ölçümü.
+```huma
+"nlp_ileri"'i yükle
+```
 
-### 4. Liste Araçları (`liste.hb`)
+TF-IDF ve CPU tabanlı sözcük gömme araçlarını yükler. Önceki eksik Hüma
+modülü BPE taslağı kararlı API'den çıkarılmıştır. Çekirdekteki `bpe_eğit`,
+`bpe_kodla` ve `bpe_çöz` işlevleri UTF-8'i kayıpsız işleyen, bayt düzeyli ve
+testli temel bir tokenizer sağlar; model kalıcılığı yoktur.
 
-- **`yazdır_liste(liste)`**: Listeyi güzel formatta yazar.
-- **`içeriyor_mu(liste, eleman)`**: Varlık kontrolü.
-- **`ters_cevir(liste)`**: Listeyi tersine döndürür.
-- **`eşle(liste, f)`**: Her elemana f fonksiyonunu uygular (Map).
-- **`filtrele(liste, f)`**: f koşuluna uyanları seçer (Filter).
-- **`indirge(liste, f, başlangıç)`**: Liste elemanlarını tek bir değere indirger (Reduce).
-- **`dilimle(liste, baş, son)`**: Alt liste alır.
-- *Rust Built-in:* `uzunluk()`, `listeye_ekle()`, `içeriyor()` interpreter tarafından sağlanır.
+### `yapay_zeka`
 
-### 5. Dizgi (`dizgi.hb`)
+```huma
+"yapay_zeka"'i yükle
 
-- **`büyük_mü(karakter)`**, **`küçük_mü(karakter)`**, **`boşluk_mu(karakter)`**: Karakter kontrolleri.
-- **`başıyla_mı_başlıyor(dizgi, ön_ek)`** → `başlıyor_mu()` alias'ıdır.
-- **`sonuyla_mı_bitiyor(dizgi, son_ek)`** → `bitiyor_mu()` alias'ıdır.
-- *Kaldırılan fonksiyonlar (v1.1.0):* `kırp()` ve `içeriyor_mu()` Rust built-in ile çakıştığı için kaldırılmıştır. Yerlerine `kırp()` ve `içeriyor()` built-in'lerini kullanın.
+model = sinir_agi() olsun
+model.ilklendir() olsun
+model.katman_ekle(8, 16, "relu") olsun
+model.katman_ekle(16, 1, "sigmoid") olsun
+```
 
-### 6. Rastgele (`rastgele.hb`)
+Yoğun katman, MSE tabanlı geri yayılım, Adam güncellemesi, gradyan kırpma ve JSON model kaydı sağlar. Çalışma zamanı CPU ve `f64` odaklıdır.
 
-- **`r_tamsayı(min, max)`**: Aralıklı rastgele tam sayı.
-- **`r_seç(liste)`**: Listeden rastgele eleman seçer.
-- **`r_karıştır(liste)`**: Listeyi rastgele karıştırır.
+### Sistem modülleri
 
-### 7. Dosya (`dosya.hb`)
+- `ag_istekleri`: HTTP istemci sarmalayıcıları
+- `huma_sunucu`: HTTP sunucu sarmalayıcıları
+- `huma_sqlite`: SQLite bağlantı/sorgu API’si
+- `gui`: egui tabanlı masaüstü arayüz API’si
 
-- **`güvenli_oku(yol)`**: Hata vermeden dosya okumaya çalışır.
-- **`satırlara_ayır(metin)`**: Metni satır listesine çevirir.
-- *Not:* `dosya_var_mı()` artık Rust built-in olarak sağlanır, lib versiyonu kaldırılmıştır (v1.1.0).
-
-### 8. İstatistik (`istatistik.hb`)
-
-- **`ortalama(liste)`**, **`en_büyük(liste)`**, **`en_küçük(liste)`**
-- **`varyans(liste)`**, **`standart_sapma(liste)`**
-- *Bağımlılıklar:* `matematik.hb` (`karesi()`), Rust built-in `karekök()`.
-
-### 9. Birim Test (`birim_test.hb`)
-
-- **`test_et(ad, f)`**: Test çalıştırır.
-- **`iddia_et(beklenen, gelen, mesaj)`**: Eşitlik kontrolü (assertion).
-- **`test_raporu()`**: Sonuç özetini yazar.
-
-### 10. NLP — Türkçe Doğal Dil İşleme (`nlp.hb`)
-
-26KB'lık kapsamlı Türkçe NLP kütüphanesi. Tokenizasyon, stemming, POS etiketleme, NER, duygu analizi ve metin benzerliği.
-
----
-
-## Harici Modüller (`huma_modulleri/`)
-
-Bu modüller `huma kur <paket_adı>` ile kurulabilir veya `yükle "<paket_adı>"` ile kullanılabilir.
-
-### huma_sunucu
-HTTP sunucu kütüphanesi. GET/POST route tanımlama, JSON/HTML yanıt.
-- **GitHub:** [VastSea0/huma-lang](https://github.com/VastSea0/huma-lang)
-- **Sürüm:** 1.0.0
-
-### huma_sqlite
-SQLite veritabanı desteği. Sınıf tabanlı sorgulama API'si.
-- **GitHub:** [VastSea0/huma-lang](https://github.com/VastSea0/huma-lang)
-- **Sürüm:** 1.0.0
-
-### ag_istekleri
-HTTP istek kütüphanesi. GET, POST, PUT, DELETE desteği.
-- **GitHub:** [VastSea0/ag_istekleri](https://github.com/VastSea0/ag_istekleri)
-- **Sürüm:** 1.1.0
-
-### nlp_temel
-Türkçe NLP modülü. `nlp.hb` kütüphanesini yükleyen wrapper.
-- **GitHub:** [VastSea0/huma-lang](https://github.com/VastSea0/huma-lang)
-- **Sürüm:** 3.1.0
-
-### gui
-Native GUI kütüphanesi. egui tabanlı masaüstü arayüz araçları.
-- **GitHub:** [VastSea0/huma-lang](https://github.com/VastSea0/huma-lang)
-- **Sürüm:** 0.4.0
-- *Not:* Yalnızca GUI modunda (Tauri/egui) çalışır.
-
----
-
-## Rust Built-in Fonksiyonlar
-
-Bu fonksiyonlar interpreter tarafından otomatik olarak sağlanır ve her zaman mevcuttur:
-
-| Fonksiyon | Açıklama |
-|-----------|----------|
-| `uzunluk(x)` | Metin/liste uzunluğu |
-| `oku()` | Kullanıcıdan girdi al |
-| `uyut(ms)` | Milisaniye bekle |
-| `zaman()` | Epoch timestamp |
-| `listeye_ekle(l, e)` | Listeye eleman ekle |
-| `karekök(n)` | Kare kök |
-| `rastgele()` | 0-1 arası rastgele sayı |
-| `dosya_oku(yol)` | Dosya oku |
-| `dosya_yaz(yol, i)` | Dosya yaz |
-| `dosya_var_mı(yol)` | Dosya varlık kontrolü |
-| `tipi(x)` | Değer tipini döndür |
-| `küçük_harf(m)` | Küçük harfe çevir |
-| `büyük_harf(m)` | Büyük harfe çevir |
-| `böl(m, a)` | Metni parçala |
-| `birleştir(l, a)` | Listeyi birleştir |
-| `değiştir(m, a, b)` | Metin değiştir |
-| `kırp(m)` | Boşluk kırp |
-| `içeriyor(k, a)` | İçerik kontrolü |
-| `başlıyor_mu(m, ö)` | Önek kontrolü |
-| `bitiyor_mu(m, s)` | Sonek kontrolü |
-| `dizi_dilim(m, b, s)` | Alt dizgi al |
-| `sayıya_çevir(m)` | Metni sayıya çevir |
-| `metne_çevir(n)` | Sayıyı metne çevir |
-| `nesneden_metine(n)` | JSON serialize |
-| `metinden_nesneye(m)` | JSON deserialize |
+Bu modüller dosya, ağ, veritabanı veya native kitaplıklara erişebilir. Güvenilmeyen kod için sandbox sağlamazlar.

@@ -36,22 +36,6 @@ araba = araç() olsun
 araba.hızlan(10)
 araba.hız_göster()`;
 
-const combinedCode = `// Fonksiyonlar ve Sınıflar Birlikte
-çember sınıf olsun {
-    yarıçap = 0 olsun
-
-    alan_hesapla fonksiyon olsun {
-        // PI * r^2
-        3.14159 * kendisi'nin yarıçap'ı * kendisi'nin yarıçap'ı döndür
-    }
-}
-
-küçük_çember = çember() olsun
-küçük_çember.yarıçap = 5 olsun
-
-alan = küçük_çember.alan_hesapla() olsun
-"Alan: " + alan'ı yazdır;`;
-
 export default async function FunctionsClassesPage({
   params,
 }: {

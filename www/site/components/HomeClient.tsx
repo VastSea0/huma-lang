@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import type { Dictionary } from "@/dictionaries/dictionaries";
 
 const INSTALL_URL =
   "curl -fsSL https://raw.githubusercontent.com/VastSea0/huma-lang/main/install.sh | sh";
 
-export default function HomeClient({ dict }: { dict: any }) {
+export default function HomeClient({ dict }: { dict: Dictionary }) {
   const [ctaCopied, setCtaCopied] = useState(false);
 
   const copyInstall = () => {

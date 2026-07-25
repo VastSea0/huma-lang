@@ -5,7 +5,7 @@ import { getDictionary } from "@/dictionaries/dictionaries";
 
 export const metadata: Metadata = {
   title: "CLI Command Reference",
-  description: "Comprehensive guide for all Hüma command-line interface tools and subcommands.",
+  description: "Verified reference for Hüma command-line tools and execution limits.",
 };
 
 export default async function CLIPage({
@@ -51,6 +51,11 @@ export default async function CLIPage({
           <div className="space-y-4 mb-6">
             <p className="text-on-surface-variant text-sm font-medium">{cli.execution.run}</p>
             <CodeBlock variant="terminal" code="$ huma run index.hb" />
+
+            <p className="text-on-surface-variant text-sm font-medium">
+              {locale === "tr" ? "Desteklenen alt kümeyi VM ile çalıştır" : "Run the supported subset on the VM"}
+            </p>
+            <CodeBlock variant="terminal" code="$ huma run index.hb --vm" />
             
             <p className="text-on-surface-variant text-sm font-medium">{cli.execution.repl}</p>
             <CodeBlock variant="terminal" code="$ huma repl" />
@@ -72,13 +77,16 @@ export default async function CLIPage({
           </h2>
           <div className="space-y-4 mb-6">
             <p className="text-on-surface-variant text-sm font-medium">{cli.compilation.build}</p>
-            <CodeBlock variant="terminal" code="$ huma build main.hb" />
+            <CodeBlock variant="terminal" code="$ huma build main.hb --output main.hbc" />
             
             <p className="text-on-surface-variant text-sm font-medium">{cli.compilation.exec}</p>
             <CodeBlock variant="terminal" code="$ huma exec main.hbc" />
 
             <p className="text-on-surface-variant text-sm font-medium">{cli.compilation.gen}</p>
             <CodeBlock variant="terminal" code="$ huma gen main.hb" />
+
+            <p className="text-on-surface-variant text-sm font-medium">{cli.compilation.aot}</p>
+            <CodeBlock variant="terminal" code="$ huma aot numeric.hb --output numeric" />
           </div>
         </section>
 
@@ -102,7 +110,7 @@ export default async function CLIPage({
                 ? "Native kod içeren paketleri güvenilir modda kur"
                 : "Install native packages in trusted mode"}
             </p>
-            <CodeBlock variant="terminal" code="$ huma paket kur my_pkg --güvenilir" />
+            <CodeBlock variant="terminal" code="$ huma paket kur huma_sqlite --güvenilir" />
 
             <p className="text-on-surface-variant text-sm font-medium">
               {locale === "tr" ? "Projedeki betiği çalıştır (npm run benzeri)" : "Run a project script (npm run style)"}
@@ -113,7 +121,7 @@ export default async function CLIPage({
             <CodeBlock variant="terminal" code="$ huma paket liste" />
 
             <p className="text-on-surface-variant text-sm font-medium">
-              {locale === "tr" ? "Paket bütünlüğünü yayın öncesi doğrula" : "Verify package integrity before publishing"}
+              {locale === "tr" ? "Yerel paket manifestini ve dosyalarını doğrula" : "Verify the local package manifest and files"}
             </p>
             <CodeBlock variant="terminal" code="$ huma paket doğrula" />
           </div>
@@ -129,8 +137,7 @@ export default async function CLIPage({
           </h2>
           <div className="space-y-4 mb-6">
             <p className="text-on-surface-variant text-sm font-medium">{cli.maintenance.update}</p>
-            <CodeBlock variant="terminal" code="$ huma güncelle" />
-            
+
             <p className="text-on-surface-variant text-sm font-medium">{cli.maintenance.version}</p>
             <CodeBlock variant="terminal" code="$ huma --version" />
           </div>

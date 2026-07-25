@@ -45,19 +45,6 @@ yazdır ayarlar.getir("dil");
 // Değer güncelleme
 ayarlar.ayarla("sürüm", 2.0);`;
 
-const combinedCode = `// Listeler ve Hata Yönetimi Birlikte
-sayılar = [10, 20, 30] olsun
-
-dene {
-    // İndeks sınır dışı olabilir
-    sayılar'dan [10]'u çıkar;
-} yakala hata {
-    "İşlem başarısız: " + hata'yı yazdır;
-}
-
-sayılar'a [99]'u ekle;
-sayılar'ı yazdır;`;
-
 export default async function ListsErrorsPage({
   params,
 }: {

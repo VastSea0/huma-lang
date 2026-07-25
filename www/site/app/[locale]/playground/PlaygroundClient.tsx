@@ -1,6 +1,7 @@
 "use client";
 
 import Navbar from "@/components/Navbar";
+import type { Dictionary } from "@/dictionaries/dictionaries";
 import Link from "next/link";
 
 const GITHUB_URL = "https://github.com/VastSea0/huma-lang";
@@ -114,7 +115,13 @@ function CodeBlock({ code, label }: { code: string; label: string }) {
   );
 }
 
-export default function PlaygroundClient({ dict, locale }: { dict: any; locale: string }) {
+export default function PlaygroundClient({
+  dict,
+  locale,
+}: {
+  dict: Dictionary;
+  locale: string;
+}) {
   return (
     <>
       <Navbar dict={dict} locale={locale} />

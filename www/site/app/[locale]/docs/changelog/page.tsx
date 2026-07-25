@@ -16,7 +16,7 @@ export default async function ChangelogPage({
   const dict = await getDictionary(locale as "en" | "tr");
   const ch = dict.Docs.changelog;
 
-  const versions = ["v0_6_0_alfa_3", "v0_6_0_alfa_2", "v0_6_0_alfa_1", "v0_5_2", "v0_5_1", "v0_5_0", "v0_4_0", "v0_3_1", "v0_2_0", "v0_1_0"];
+  const versions = [["v0_6_0", ch.v0_6_0] as const];
 
   const getPath = (path: string) => `/${locale}${path}`;
 
@@ -44,10 +44,7 @@ export default async function ChangelogPage({
           {/* Vertical line for timeline */}
           <div className="absolute left-0 top-4 bottom-0 w-px bg-outline-variant/20 ml-[7px] hidden md:block" />
 
-          {versions.map((vKey) => {
-            const v = (ch as any)[vKey];
-            if (!v) return null;
-
+          {versions.map(([vKey, v]) => {
             return (
               <section key={vKey} className="relative md:pl-12" id={vKey}>
                 {/* Timeline Dot */}
@@ -79,26 +76,6 @@ export default async function ChangelogPage({
           })}
         </div>
 
-        {/* Raw commits link */}
-        <div className="mt-32 p-10 rounded-3xl bg-surface-container-low border border-outline-variant/5 text-center relative overflow-hidden group">
-          <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-          <h3 className="text-xl font-bold text-on-surface mb-3 relative z-10">
-            {locale === "tr" ? "Ham Veriye mi İhtiyacınız Var?" : "Need the Raw Data?"}
-          </h3>
-          <p className="text-sm text-on-surface-variant mb-8 max-w-md mx-auto relative z-10">
-            {locale === "tr" 
-              ? "Geliştirme sürecindeki her adımı görmek için son 100 git commit mesajını ham metin olarak inceleyebilirsiniz."
-              : "You can examine the last 100 git commit messages as raw text to see every step in the development process."}
-          </p>
-          <a 
-            href="/commits.txt" 
-            target="_blank"
-            className="relative z-10 inline-flex items-center gap-3 px-8 py-3.5 rounded-xl bg-primary text-on-primary font-bold text-sm shadow-lg shadow-primary/20 hover:scale-105 transition-all"
-          >
-            <span className="material-symbols-outlined text-base">history</span>
-            {locale === "tr" ? "Commit Geçmişini Gör" : "View Commit History"}
-          </a>
-        </div>
       </main>
 
       {/* Right TOC */}
@@ -107,9 +84,7 @@ export default async function ChangelogPage({
            {locale === "tr" ? "VERSİYONLAR" : "VERSIONS"}
         </h5>
         <ul className="space-y-4 text-[11px] font-bold uppercase tracking-widest">
-          {versions.map((vKey) => {
-             const v = (ch as any)[vKey];
-             if (!v) return null;
+          {versions.map(([vKey, v]) => {
              return (
                <li key={vKey}>
                  <a

@@ -6,22 +6,13 @@ import { getDictionary } from "@/dictionaries/dictionaries";
 export const metadata: Metadata = {
   title: "Getting Started",
   description:
-    "Install Hüma and write your first program in minutes. Complete getting-started guide.",
+    "Build Hüma from source and follow the verified getting-started guide.",
 };
 
 const installCode = `curl -fsSL https://raw.githubusercontent.com/VastSea0/huma-lang/main/install.sh | sh`;
 
 const versionCode = `$ huma --version
-Hüma 0.5.2 (darwin aarch64)`;
-
-const firstProgramCode = `// Değişken tanımlayıp koşullu mantık
-puan = 85 olsun
-
-puan > 50 ise {
-    "Başarılı!"'yı yazdır;
-} yoksa {
-    "Tekrar dene."'i yazdır;
-}`;
+Hüma 0.6.0`;
 
 export default async function DocsPage({
   params,
@@ -69,7 +60,7 @@ export default async function DocsPage({
           </p>
           <CodeBlock code={installCode} variant="terminal" />
           <CodeBlock
-            code={`$ huma --version\nHüma 0.5.2`}
+            code={`$ huma --version\nHüma 0.6.0`}
             variant="terminal"
           />
 

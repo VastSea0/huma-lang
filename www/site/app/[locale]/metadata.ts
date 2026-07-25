@@ -4,5 +4,5 @@ import type { Metadata } from "next";
 export const homeMetadata: Metadata = {
   title: "Hüma — Code as You Think",
   description:
-    "High-performance programming language with native Turkish syntax. Built with a Rust-backed core.",
+    "Experimental programming language with Turkish-oriented syntax and a Rust-based interpreter.",
 };

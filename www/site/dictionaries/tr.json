@@ -11,10 +11,10 @@
     "search_placeholder": "Dokümanlarda ara..."
   },
   "Hero": {
-    "badge": "v0.5.2 KARARLI",
+    "badge": "v0.6.0 ÇEKİRDEK SÜRÜM",
     "headline": "Doğal Kod,",
-    "subheadline": "Yerel Performans.",
-    "description": "Hüma, Türkçe doğal dil yapısına sahip, yüksek performanslı bir programlama dilidir. Rust tabanlı çekirdeği ile doğal dilin ifade gücünü sistem derleyicisinin hızıyla birleştirir.",
+    "subheadline": "Ölçülebilir Doğruluk.",
+    "description": "Hüma, Türkçe anahtar sözcükler ve tanımlı Türkçe ek biçimleri kullanan deneysel bir programlama dilidir. Rust tabanlı yorumlayıcı kararlı yürütme yoludur; VM ve AOT yalnızca belgelenmiş alt kümeleri destekler.",
     "cta_get_started": "Hemen Başlayın",
     "cta_docs": "Dokümanları Oku"
   },
@@ -23,42 +23,19 @@
     "success_message": "Başarılı!",
     "terminal_output": "Terminal Çıktısı"
   },
-  "IDE_Page": {
-    "badge": "MASAÜSTÜ İÇİN HAZIR",
-    "headline": "Hassasiyetle Kodlayın,",
-    "subheadline": "Hüma IDE.",
-    "description": "Hüma IDE, Hüma dili için özel olarak tasarlanmış, yüksek performanslı ve hafif bir geliştirme ortamıdır. Özel terminal, Monaco editör entegrasyonu ve Tauri ile yerel performans sunar.",
-    "cta_download": "Masaüstü İçin İndir",
-    "cta_docs": "IDE Dokümantasyonu",
-    "features_headline": "Profesyonel Geliştiriciler İçin Tasarlandı",
-    "features": {
-      "monaco": {
-        "title": "Monaco Editör",
-        "desc": "VS Code'u güçlendiren aynı yüksek performanslı editör. Sözdizimi vurgulama, otomatik tamamlama ve yerel ek desteği."
-      },
-      "terminal": {
-        "title": "Entegre Terminal",
-        "desc": "Editörden ayrılmadan Hüma programlarınızı çalıştırın ve derleyin. Standart çıktı ve hatalar üzerinde anında geri bildirim."
-      },
-      "tauri": {
-        "title": "Sıfır Gecikmeli Çekirdek",
-        "desc": "Hafiflik ve maksimum hız için Tauri ve Rust ile inşa edildi. Electron hantallığı yok, sadece performans."
-      }
-    }
-  },
   "Features": {
-    "headline": "Gelişmiş Özellikler",
+    "headline": "Doğrulanmış Özellikler",
     "natural_syntax": {
       "title": "Doğal Sözdizimi",
       "description": "Okunabilirliği artıran ve doğal hissettiren Türkçe eklerle kod yazın."
     },
     "hybrid_execution": {
-      "title": "Hibrit Çalıştırma",
-      "description": "Geliştirme hızı için yorumlama ile üretim gücü için derlemeyi harmanlayın."
+      "title": "Denetimli Yürütme",
+      "description": "Yorumlayıcı tam ve varsayılan yoldur. VM desteklemediği sözdizimini açıkça reddeden sınırlı bir alternatiftir."
     },
     "standalone_compilation": {
-      "title": "Bağımsız İkili",
-      "description": "Kodunuzu her sistem için tek, statik olarak bağlanmış bir ikili dosyaya derleyin."
+      "title": "Deneysel AOT",
+      "description": "AOT yalnızca doğrulanan sayısal alt kümeyi kabul eder; genel Hüma programları için bağımsız ikili garantisi vermez."
     },
     "standard_library": {
       "title": "Standart Kütüphane",
@@ -69,12 +46,12 @@
     "headline": "Hemen İnşa Etmeye Başlayın",
     "description": "Hüma ile yeni nesil yazılımlar geliştiren topluluğa katılın.",
     "copy_install_command": "Kurulum Komutunu Kopyala",
-    "available_platforms": "Windows, macOS ve Linux'ta kullanılabilir"
+    "available_platforms": "Kaynak koddan Rust araç zinciriyle derlenebilir"
   },
   "Footer": {
     "copy": "© 2026 Hüma Vakfı",
     "license": "MIT Lisansı",
-    "build": "Sürüm v0.5.2-kararlı",
+    "build": "Sürüm v0.6.0",
     "github": "GitHub",
     "discord": "Discord",
     "releases": "Sürümler",
@@ -105,32 +82,32 @@
   "Docs": {
     "introduction": {
       "title": "Giriş ve Felsefe",
-      "description": "Hüma'nın tasarım prensiplerini ve neden bu kadar hızlı olduğunu keşfedin.",
-      "hero_title": "Modern Yazılımın Yeni Kanatları: Hüma",
-      "hero_desc": "Hüma, sadece bir programlama dili değil; geliştirici deneyimini (DX) en üst düzeye çıkarmak için tasarlanmış bir ekosistemdir. Rust'ın güvenliğini, Türkçe'nin doğal ek sistemiyle birleştirir.",
+      "description": "Hüma'nın tasarım ilkelerini, doğrulanmış kapsamını ve sınırlarını keşfedin.",
+      "hero_title": "Türkçe Anahtar Sözcüklü Deneysel Bir Dil",
+      "hero_desc": "Hüma, Rust ile yazılmış yorumlayıcısı ve Türkçe odaklı sözdizimiyle geliştirilen deneysel bir dildir. 0.6.0 sürümü üretim veya kritik sistem garantisi vermez.",
       "philosophy": {
         "title": "Tasarım Felsefesi",
         "cognitive_ease": {
           "title": "Bilişsel Kolaylık",
-          "desc": "Anadilde kod yazmak, mantıksal kurgu ile sözdizimi arasındaki engelleri kaldırarak hata payını azaltır."
+          "desc": "Türkçe anahtar sözcükler bazı Türkçe konuşan kullanıcılar için okunabilirliği artırmayı amaçlar; hata oranını düşürdüğüne ilişkin ölçüm henüz yoktur."
         },
         "agglutination": {
           "title": "Eklemeli Yapı (Suffix System)",
-          "desc": "Hüma'nın benzersiz ek sistemi, kodun okunabilirliğini artırırken derleme zamanında saf performansa dönüşür."
+          "desc": "Kesme işaretinden sonra yalnızca tanımlı ek biçimleri kabul edilir. Sistem tam doğal dil çözümlemesi veya otomatik ünlü uyumu yapmaz."
         },
         "industrial": {
-          "title": "Endüstriyel Güç",
-          "desc": "Gevşek tipli dillerin aksine Hüma, kritik sistemlerde güvenle kullanılabilecek sağlam bir altyapı sunar."
+          "title": "Açık Sınırlar",
+          "desc": "Yorumlayıcı testlidir; buna karşın dil henüz 1.0 değildir, statik tip sistemi ve üretim güvenlik garantisi yoktur."
         }
       },
       "why_huma": {
         "title": "Neden Hüma?",
         "points": [
-          "huma_turkce_dilbilgisi_raporu.md: Tam uyumluluk raporu",
-          "Rust tabanlı güvenlik mimarisi",
-          "Düşük bellek kullanımı ve yüksek hız",
-          "Genişletilmiş ek sistemi (İyelik, Çoğul, Belirtme)",
-          "Dahili paket yöneticisi ve web desteği"
+          "docs/DIL_TANIMI.md: Normatif sözdizimi sözleşmesi",
+          "Çalışma zamanı hatalarını raporlayan Rust tabanlı yorumlayıcı",
+          "Yorumlayıcı, sınırlı bytecode VM ve deneysel AOT ayrımı",
+          "Tanımlı iyelik, çoğul ve hâl eki biçimleri",
+          "CPU üzerinde testli yoğun katman ve Adam eğitim prototipi"
         ]
       }
     },
@@ -145,7 +122,7 @@
       },
       "suffix_system": {
         "title": "Ek Sistemi (Suffix System)",
-        "desc": "Hüma, Türkçe'nin eklemeli yapısını derleyici seviyesinde destekler. Apostrof (') işaretinden sonra gelen tüm ekler derleyici tarafından otomatik olarak temizlenir, böylece hem doğal bir dil hem de yüksek performans elde edilir."
+        "desc": "Hüma, kesme işaretinden sonra belgelenmiş Türkçe ek biçimlerini kabul eder. Bilinmeyen ekler sözdizimi hatasıdır; sistem tam Türkçe biçimbilim çözümleyicisi değildir."
       },
       "data_types": {
         "title": "Veri Tipleri",
@@ -160,7 +137,7 @@
       },
       "conditionals": {
         "title": "Koşul Blokları (ise / yoksa)",
-        "desc": "Uygulamanızın akışını doğal dil mantığıyla kontrol edin. Hüma, 'ise' ve 'yoksa' anahtar kelimelerini kullanır."
+        "desc": "Program akışını Türkçe 'ise' ve 'yoksa' anahtar kelimeleriyle kontrol edin."
       },
       "loops": {
         "title": "Döngüler (olduğu sürece / aralık)",
@@ -176,16 +153,16 @@
     },
     "grammar": {
       "title": "Dilbilgisi ve Ekler",
-      "description": "Hüma'nın Türkçe doğal dil yapısı ve çalışma zamanı etkileşimi.",
+      "description": "Hüma'nın Türkçe odaklı programlama sözdizimi ve çalışma zamanı etkileşimi.",
       "hero_title": "Ek Sistemi (Suffix System)",
-      "hero_desc": "Hüma, Türkçe'nin eklemeli yapısını derleyici seviyesinde optimize eder. Kesme işaretiyle (') eklenen dilbilgisi kuralları hem okunabilirliği artırır hem de performans kaybına yol açmaz.",
+      "hero_desc": "Hüma, kesme işaretiyle ayrılan sınırlı ve belgelenmiş ek biçimlerini lexer aşamasında doğrular. Bu bir programlama dili sözdizimi kuralıdır; tam Türkçe dilbilgisi modeli değildir.",
       "mechanics": {
         "title": "Sistem Nasıl Çalışıyor?",
-        "desc": "Derleyici (lexer), kaynak kodunuzu tararken kesme işaretiyle (') ayrılmış özel ekleri tespit eder ve bunları sanal makineye (VM) iletmeden önce otomatik olarak soyutlar (stripping). Bu sayede 'isim'i döndür' ile 'isim döndür' komutları bytecode seviyesinde birebir aynıdır, sıfır çalışma zamanı gecikmesi yaşanır."
+        "desc": "Lexer, kesme işaretiyle ayrılmış eki desteklenen biçimler listesinde doğrular ve kök belirteci üretir. Yorumlayıcı varsayılan yürütme yoludur; VM aynı dilin yalnızca desteklenen alt kümesini kabul eder."
       },
       "suffixes": {
         "title": "Desteklenen Türkçe Ekler",
-        "desc": "Hüma aşağıdaki ismin halleri için geniş destek sunar. Kodunuzun doğal akışını bozmamak için istediğiniz eki kullanabilirsiniz.",
+        "desc": "Aşağıdaki biçimler sözdizimsel ayraç olarak desteklenir. Ek seçiminin Türkçe anlam bakımından doğruluğu programcıya aittir.",
         "accusative": {
           "name": "Belirtme Durumu (-i hali)",
           "suffixes": "'i, 'ı, 'u, 'ü, 'yi, 'yı, 'yu, 'yü",
@@ -231,37 +208,38 @@
       },
       "best_practices": {
         "title": "Doğru Kullanım (Best Practices)",
-        "desc": "Hüma sadece ekleri desteklemekle kalmaz, kod standartlarınızı Türkçe'nin gramer kurallarına uygun yazmanızı tavsiye eder. Değişken ve özellik adlarıyla ekleri mantıklı bir şekilde eşleştirin."
+        "desc": "İlgi eki özellik erişiminde yapısaldır; diğer eklerin çoğu okunabilirlik ayıracıdır. Hüma ek seçiminin doğal Türkçe bakımından doğruluğunu otomatik denetlemez."
       }
     },
     "cli": {
       "title": "CLI Referansı",
-      "description": "Tüm Hüma komut satırı araçları için kapsamlı rehber.",
+      "description": "Belgelenen Hüma komut satırı araçlarının güncel referansı.",
       "hero_title": "Komut Satırı Referansı",
       "hero_desc": "Hüma, çift dilli bir CLI tasarımına sahiptir. İngilizce veya Türkçe komutları birbirinin yerine kullanabilirsiniz.",
       "execution": {
         "title": "Çalıştırma ve REPL",
         "run": "huma çalıştır <hedef> — Bir kaynak dosyasını veya paket betiğini koşturur.",
         "repl": "huma kabuk — Etkileşimli kabuğu (REPL) başlatır.",
-        "ide": "huma arayüz — Masaüstü geliştirme ortamını açar."
+        "ide": "Masaüstü IDE komutu yoktur; VS Code dil dosyaları ve temel LSP ayrı araçlardır."
       },
       "compilation": {
         "title": "Derleme ve VM",
         "build": "huma derle <dosya> — Kaynak kodu .hbc bytecode'una derler.",
         "exec": "huma yürüt <dosya> — Derlenmiş bytecode'u VM'de çalıştırır.",
-        "gen": "huma üret <dosya> — Bağımsız Rust kaynak kodu üretir."
+        "gen": "huma üret <dosya> — Desteklenen bytecode alt kümesi için Rust kaynak kodu üretir.",
+        "aot": "huma aot <dosya> — Deneysel sayısal alt kümeyi makine koduna derler."
       },
       "package": {
         "title": "Paket Yönetimi",
         "init": "huma ilkle — Mevcut dizinde proje oluşturur.",
         "new": "huma yeni <isim> — Yeni klasörde proje oluşturur.",
-        "install": "huma kur — Bağımlılıkları huma.json'dan yükler.",
+        "install": "huma kur — huma.json'daki yerel dağıtılmış bağımlılıkları yükler.",
         "list": "huma liste — Kurulu paketleri gösterir.",
         "remove": "huma sil <isim> — Bir paketi kaldırır."
       },
       "maintenance": {
         "title": "Bakım ve Bilgi",
-        "update": "huma güncelle — Hüma binary dosyasını günceller.",
+        "update": "İmzalı yayın kanalı bulunmadığı için CLI çalıştırılabilir dosyayı kendi kendine güncellemez; doğrulanan yol kaynak koddan derlemedir.",
         "version": "huma sürüm — Mevcut versiyon bilgisini gösterir."
       }
     },
@@ -276,11 +254,11 @@
       },
       "classes": {
         "title": "Sınıflar (OOP)",
-        "desc": "Hüma'daki sınıflar, veri ve davranışı bir arada tutan güçlü yapılardır. 'bu' anahtar kelimesi ile nesne özelliklerine erişebilirsiniz."
+        "desc": "Hüma'daki sınıflar veri ve davranışı bir arada tutar. Nesne özelliklerine 'kendisi' anahtar kelimesi ile erişilir."
       },
       "methods": {
-        "title": "Metotlar ve 'bu' Çağrısı",
-        "desc": "Bir nesneye ait metodun içinde, nesnenin kendisine 'bu' anahtar kelimesi ile erişilir. Bu, nesne yönelimli programlamanın temelidir."
+        "title": "Metotlar ve 'kendisi' Bağlamı",
+        "desc": "Bir nesneye ait metodun içinde nesnenin kendisine 'kendisi' anahtar kelimesi ile erişilir."
       }
     },
     "lists_errors": {
@@ -290,39 +268,39 @@
       "hero_desc": "Uygulamalarınızın veri akışını yönetmek ve beklenmedik durumlarla başa çıkmak için Hüma gelişmiş araçlar sunar. Listeler ve Sözlüklerle veri kümelerini işleyebilir, 'dene...yakala' yapısı ile programınızın çökmesini engelleyebilirsiniz.",
       "lists": {
         "title": "Listeler ve Sözlükler",
-        "desc": "Hüma listeleri dinamiktir. Sözlükler (Maps) ise anahtar-değer çiftlerini saklamak için optimize edilmiştir."
+        "desc": "Hüma listeleri dinamiktir; sözlükler anahtar-değer çiftlerini saklar."
       },
       "errors": {
         "title": "Yapısal Hata Yönetimi",
-        "desc": "Programlarınızın darboğazlarında güvenli bir çıkış yolu sunar. 'dene...yakala' yapısı ile hataları yakalayabilir ve hataya ait mesajı bir değişkene atayabilirsiniz."
+        "desc": "'dene...yakala' yapısı çalışma zamanı hatalarını yakalar ve hata mesajını bir değişkene atayabilir."
       }
     },
     "stdlib": {
       "title": "Standart Kütüphane",
       "description": "Hüma'nın dahili API referansı ve yardımcı modülleri.",
       "hero_title": "Standart Kütüphane Rehberi",
-      "hero_desc": "Hüma, geliştirme sürecinizi hızlandırmak için zengin bir dahili kütüphane setiyle birlikte gelir. Matematikten dosya sistemine kadar her şey optimize edilmiştir.",
+      "hero_desc": "Bu sayfa çekirdek işlevlerden ve depodaki Hüma yardımcı modüllerinden doğrulanmış bir seçkiyi gösterir.",
       "import_info": "Bir modülü projenize dahil etmek için 'yükle' direktifini kullanın:",
       "modules": {
-        "matematik": "Modern matematiksel fonksiyonlar ve sabitler.",
+        "matematik": "Matematiksel yardımcı fonksiyonlar ve sabitler.",
         "renkler": "Terminal için ANSI renk çıktıları.",
         "zaman": "Zaman ölçümü ve geciktirme araçları.",
-        "liste": "İleri seviye liste (eşle, filtrele) işlemleri.",
+        "liste": "Liste eşleme, filtreleme ve indirgeme işlemleri.",
         "dosya": "Dosya okuma, yazma ve satır ayrıştırma.",
         "sistem": "Ortam değişkenleri ve kabuk (shell) etkileşimi.",
         "istatistik": "Ortalama, varyans ve standart sapma hesaplamaları.",
         "dizgi": "Karakter kontrolü ve metin yardımcıları.",
         "rastgele": "Rastgele sayı üretimi ve liste karıştırma.",
         "birim_test": "Birim test çerçevesi: test_et, iddia_et, test_raporu.",
-        "yapay_zeka": "Otomatik türev (Autograd), BPE Tokenizer ve Yapay Sinir Ağı paket kütüphanesi.",
-        "ffi": "C, C++ ve CUDA dinamik kütüphaneleriyle yerel FFI köprüsü."
+        "yapay_zeka": "CPU yoğun katman, Adam, TF-IDF ve sözcük gömme prototipleri.",
+        "ffi": "Sınırlı C ABI imzaları için deneysel dinamik kütüphane köprüsü."
       }
     },
     "compiler": {
       "title": "Derleyici İç Yapısı",
       "description": "Hüma derleyici hattına derinlemesine bakış: lexer, ek sistemi, AST ve yorumlayıcı.",
       "hero_title": "Derleyici Mimarisi",
-      "hero_desc": "Hüma, Rust ile geliştirilmiş yüksek performanslı bir yorumlayıcıdır. Kaynak kodunuz önce belirteçlere ayrılır, ardından bir sözdizimi ağacına dönüştürülür ve son olarak ağaç üzerinde gezilerek çalıştırılır.",
+      "hero_desc": "Hüma'nın varsayılan yürütücüsü Rust ile geliştirilmiş ağaç yürüyen yorumlayıcıdır. Depoda henüz onu başka dillerle karşılaştıran yayımlanmış bir performans ölçümü yoktur.",
       "pipeline": {
         "title": "İşleme Hattı",
         "desc": "Hüma kaynak kodu dört ana aşamadan geçer: Kaynak Metin, Lexer (Belirteçleyici), Parser (Ayrıştırıcı) ve Interpret (Yorumlayıcı).",
@@ -335,7 +313,7 @@
       },
       "lexer": {
         "title": "Lexer ve Ek Sistemi",
-        "desc": "Hüma lexer'ı, Türkçe dilbilgisi eklerini (i'yi, yı, nı vb.) çalışma zamanında temizleyerek kök kelimeyi belirler. Bu işlem derleme aşamasında yapıldığı için performansa etkisi sıfırdır."
+        "desc": "Hüma lexer'ı kesme işaretinden sonraki tanımlı ek biçimlerini doğrular ve kök belirteci üretir. Bilinmeyen ekler kabul edilmez."
       },
       "ast": {
         "title": "Soyut Sözdizimi Ağacı (AST)",
@@ -351,138 +329,29 @@
       "title": "Sürüm Notları",
       "description": "Hüma dili ve araç zinciri resmi güncelleme geçmişi.",
       "hero_title": "Neler Değişti?",
-      "hero_desc": "Hüma sürekli gelişiyor. Her sürümde dile eklenen yeni özellikleri, performans iyileştirmelerini ve topluluktan gelen hata düzeltmelerini buradan takip edebilirsiniz.",
-      "v0_6_0_alfa_3": {
-        "version": "v0.6.0-alfa.3 (Yapay Zeka, FFI ve Çapraz Derleme)",
+      "hero_desc": "Bu sayfa yalnızca depodaki testler ve kaynak kodla doğrulanabilen güncel sürüm notunu gösterir.",
+      "v0_6_0": {
+        "version": "v0.6.0 (Kararlılık Temeli)",
         "date": "25 Temmuz 2026",
         "changes": [
-          "Autograd & Yapay Zeka Motoru: Otomatik türev alabilen hesaplama grafı (Autograd) ve BPE Tokenizer çekirdeğe eklendi.",
-          "C/C++/CUDA FFI Köprüsü: C, C++ ve CUDA yerel kütüphanelerini doğrudan Hüma içerisinden yükleme desteği (ffi.rs).",
-          "Tüm Platform Çapraz Derleme: Linux (x64/musl/ARM64/ARMv7/RISC-V), macOS (Intel/Apple Silicon) ve Windows (x64/x86/ARM64) için tam GitHub Actions derleme boru hattı.",
-          "Bytecode VM --vm Bayrağı: Bytecode dosyalarını doğrudan sanal makine üzerinde yüksek performansla çalıştırma seçeneği.",
-          "Temiz ve Minimal Dokümantasyon: Web sitesindeki çelişkili eski sayfalar temizlendi, tek kaynaklı modern dokümantasyona geçildi."
-        ]
-      },
-      "v0_6_0_alfa_2": {
-        "version": "v0.6.0-alfa.2 (Dilbilgisi Devrimi)",
-        "date": "15 Nisan 2026",
-        "changes": [
-          "Postfix Yükle: \"dosya.hb\"'yi yükle yapısı ile daha doğal modül yükleme.",
-          "Edatlı Çağrı: '10 ile 20'yi topla' gibi Türkçe cümle yapısına uygun fonksiyon çağrısı.",
-          "Genişletilmiş Ekler: İyelik ('si), Çoğul ('lar), Eşitlik ('ce) ve Belirtme ('ni) ekleri Lexer'a eklendi.",
-          "Aralık Döngüsü: x = 0'dan 10'a kadar { ... } sözdizimi eklendi.",
-          "Nesne Metot Bağlamı: Düz nesnelerde metot çağrılırken 'kendisi' bağlamı otomatik hale getirildi.",
-          "Opsiyonel İyelik: 'nin' erişimlerinde sondaki 'si/ı' ekinin zorunluluğu kaldırıldı."
-        ]
-      },
-      "v0_6_0_alfa_1": {
-        "version": "v0.6.0-alfa.1 (Bakış Açısı: Faz 1)",
-        "date": "9 Nisan 2026",
-        "changes": [
-          "Yapısal Hata Yönetimi: 'dene...yakala' blokları ile hata yakalama ve yönetme desteği.",
-          "Yerleşik Sözlük (Sözlük) Tipi: {} sözdizimi ile yüksek performanslı anahtar-değer haritaları.",
-          "Sözlük Metotları: .getir() ve .ayarla() metotları ile programatik erişim.",
-          "Sözlük Ek Sistemi: 'sozluk'ten anahtar'ı getir' şeklinde doğal dil erişim desteği.",
-          "VM Opcode Genişlemesi: TryBlockStart, TryBlockEnd ve MakeMap komutları bytecode seviyesine eklendi.",
-          "Gelişmiş JSON Sertleştirmesi: Sözlüklerin JSON serileştirme ve geri serileştirme desteği standardize edildi."
-        ]
-      },
-      "v0_5_2": {
-        "version": "v0.5.2 (Güvenlik ve Standardizasyon)",
-        "date": "8 Nisan 2026",
-        "changes": [
-          "Paket Yöneticisi Güvenlik Sertleştirmesi: Path traversal, RCE/kod enjeksiyon ve komut enjeksiyon açıkları kapatıldı.",
-          "SHA-256 Bütünlük Doğrulaması: huma.lock dosyasında paket hash kontrolü eklendi.",
-          "Atomik Dosya Yazımı: Metadata ve kilit dosyaları artık write-then-rename ile güvenli yazılıyor.",
-          "Özyinelemeli Bağımlılık Kurulumu: Döngü tespiti ile derin bağımlılık ağaçları destekleniyor.",
-          "Native Kod Güvenlik Uyarısı: yerleşik_rust içeren paketler için --güvenilir bayrağı eklendi.",
-          "Kütüphane Standardizasyonu: Tüm lib/*.hb dosyalarına sürüm/yazar/bağımlılık başlıkları eklendi.",
-          "Fonksiyon Shadowing Temizliği: dizgi.hb ve dosya.hb'deki Rust built-in çakışmaları giderildi.",
-          "GUI Modül Taşınması: gui.hb artık gömülü değil, huma_modulleri/gui/ altından yükleniyor.",
-          "PaketMetadata Genişletmesi: github ve lisans alanları eklendi.",
-          "Yazım Düzeltmeleri: YESIL→YEŞİL, iceriyor_mu→içeriyor_mu."
-        ]
-      },
-      "v0_5_1": {
-        "version": "v0.5.1 (Doğal Mimari)",
-        "date": "3 Nisan 2026",
-        "changes": [
-          "Native Paket Mimarisi: Hüma projelerine doğrudan Rust Crates (Cargo) dahil etme desteği.",
-          "Resmi SQLite Desteği: rusqlite tabanlı, yüksek performanslı yerel veritabanı modülü (huma_sqlite).",
-          "Tam Bağımsız Derleme: 'huma gen' komutu artık tüm yerel bağımlılıkları içeren tam Cargo projeleri üretiyor.",
-          "Veritabanı Nesne Eşleme: SQL sorgu sonuçlarını otomatik olarak Hüma nesnelerine dönüştürme desteği.",
-          "Hüma CLI İyileştirmeleri: Bağımsız proje üretimi sonrası otomatik Cargo rehberliği."
-        ]
-      },
-      "v0_5_0": {
-        "version": "v0.5.0 (Modern Ağ Şafağı)",
-        "date": "2 Nisan 2026",
-        "changes": [
-          "Modern Ağ Desteği: ag_istekleri kütüphanesi ile yüksek performanslı HTTP istemcisi eklendi.",
-          "Hüma Sunucu (HTTP): Yerleşik web sunucusu framework'ü ile dinamik route yönetimi geldi.",
-          "Çift Dilli CLI: Artık tüm komutlar hem Türkçe hem İngilizce olarak kullanılabilir.",
-          "Bayt Veri Tipi: Resim, ses ve diğer ikili dosyaları işlemek için yerleşik destek eklendi.",
-          "Paket Yöneticisi 2.0: Script desteği, bütünlük kontrolü ve otomatik git entegrasyonu.",
-          "Sunucu Yanıt Başlıkları: HTTP yanıtlarını özelleştirmek için nesne tabanlı header desteği."
-        ]
-      },
-      "v0_4_0": {
-        "version": "v0.4.0 (Görsel ve Modüler Şafak)",
-        "date": "31 Mart 2026",
-        "changes": [
-          "egui tabanlı yerel Görsel Arayüz (GUI) kütüphanesi (gui.hb) yayına alındı.",
-          "'Hüma Kütüphaneleri' topluluk paylaşım platformu açıldı.",
-          "Yeni 'huma_sunucu' çekirdek modülü ile yüksek performanslı web sunucu desteği eklendi.",
-          "Gelişmiş Paket Yöneticisi (huma paket) ve GitHub entegrasyonu eklendi.",
-          "Tekrarlanabilir derlemeler için huma.lock kilit dosyası sistemi uygulandı.",
-          "SemVer uyumlu sürüm kontrolü ve paket meta verileri (huma.json) tanıtıldı.",
-          "Tam Çift Dilli CLI desteği (örn. 'run' veya 'çalıştır', 'build' or 'derle').",
-          "npm tarzı paket scriptleri desteği ('baslat'/'start' önceliğiyle).",
-          "GUI modülleri için optimize edilmiş sözdizimi ve çizim döngüleri."
-        ]
-      },
-      "v0_3_1": {
-        "version": "v0.3.1 (Modüler Yapı ve VS Code)",
-        "date": "24 Mart 2026",
-        "changes": [
-          "Çalışma Alanı (Workspace) Yapısı: Proje huma-core, huma-compiler ve huma-cli olarak modüler sandıklara ayrıldı.",
-          "VS Code Eklentisi: Hüma dili için resmi sözdizimi vurgulama ve dil desteği eklentisi başlatıldı.",
-          "Yenilenen Web Arayüzü: Vite ve React tabanlı modern dökümantasyon sitesi ve IDE.",
-          "Uluslararasılaştırma (i18n): Dökümantasyon ve site için çoklu dil desteği.",
-          "Birleşik CLI: --ide parametresi ile tüm araçların tek bir binary altında toplanması."
-        ]
-      },
-      "v0_2_0": {
-        "version": "v0.2.0 (Tauri ve NLP Devrimi)",
-        "date": "20 Mart 2026",
-        "changes": [
-          "Tauri IDE: Yerleşik dosya erişimi ve kaydetme özelliklerine sahip taşınabilir masaüstü IDE.",
-          "NLP Kütüphanesi: Metin işleme, analiz ve doğal dil işleme araçları (nlp.hb).",
-          "Sözdizimi İyileştirmeleri: Değişken atama, kontrol akışı ve fonksiyon tanımlamalarında daha esnek yapı."
-        ]
-      },
-      "v0_1_0": {
-        "version": "v0.1.0 (Rust Çekirdek ve VM)",
-        "date": "16 Mart 2026",
-        "changes": [
-          "Yeni Rust Temelli Mimari: Dil tamamen Rust ile yeniden yazıldı.",
-          "Bytecode Sanal Makine (VM): Yüksek performanslı bytecode yürütme motoru.",
-          "İkili Dosya Oluşturma: Hüma kodlarını bağımsız çalıştırılabilir dosyalara derleyebilme özelliği.",
-          "REPL: Etkileşimli kod deneme ortamı.",
-          "Modül Sistemi: 'yükle' komutu ile kütüphane desteği."
+          "Ayrıştırma ve çalışma zamanı hataları sessizce yutulmak yerine yapılandırılmış hata olarak raporlanıyor.",
+          "Yorumlayıcı kısa devre mantığı, liste ataması, döngü kontrolü ve dene/yakala davranışı regresyon testleriyle doğrulandı.",
+          "VM desteklenmeyen sözdizimini reddediyor; AOT yalnızca doğrulanan sayısal alt kümeyi kabul ediyor.",
+          "CPU yoğun katman ve Adam eğitim akışı gerçek ağırlık güncellemesiyle uçtan uca test edildi.",
+          "Yanıltıcı yetenek ve performans iddiaları kaldırıldı; güncel sınırlamalar belgelendi."
         ]
       }
     },
     "getting_started": {
       "title": "Hızlı Başlangıç",
-      "description": "Hüma'yı sisteminize kurun ve dakikalar içinde ilk yüksek performanslı programınızı yazın.",
+      "description": "Hüma'yı kaynak koddan derleyin ve ilk doğrulanabilir programınızı çalıştırın.",
       "hero_title": "Hüma'ya Hızlı Başlangıç",
-      "hero_desc": "Hassasiyet ve hız için tasarlanmış Hüma ekosistemine hoş geldiniz. Bu rehber, çalışma ortamınızı optimize etmenize ve ilk profesyonel Hüma programınızı yazmanıza yardımcı olacaktır.",
+      "hero_desc": "Bu rehber, deneysel Hüma 0.6.0 araç takımını kaynak koddan derlemeyi ve yorumlayıcıyla ilk programı çalıştırmayı gösterir.",
       "installation": {
         "title": "Kurulum",
-        "desc": "Hüma araç zinciri; Windows, Linux ve macOS (x64/ARM64) mimarilerini yerel olarak destekler. Kurulum betiğimiz mimarinizi otomatik algılar.",
-        "arch_title": "Geniş Mimari Desteği",
-        "arch_desc": "Hüma, Apple Silicon (M1/M2/M3) ve modern x86_64 işlemcilerde sıfır gecikmeyle çalışır. Derleyici çekirdeği Rust ile inşa edilmiştir."
+        "desc": "Doğrulanan kurulum yolu güncel kararlı Rust araç zinciriyle kaynak koddan derlemedir. Diğer platformlar CI üzerinde ayrıca doğrulanmalıdır.",
+        "arch_title": "Rust Tabanlı Araç Takımı",
+        "arch_desc": "Çekirdek Rust ile yazılmıştır. Depoda mimariler arası gecikme veya performans garantisini destekleyen ölçüm bulunmaz."
       },
       "quick_start": {
         "title": "Doğrulama ve REPL",
@@ -490,16 +359,16 @@
       },
       "first_project": {
         "title": "İlk Projeniz",
-        "desc": "Hüma paket yöneticisi, tek bir komutla profesyonel bir proje yapısı oluşturur. Bu işlem; manifest dosyanızı, örnek kodunuzu ve bağımlılık yönetimini ayarlar.",
+        "desc": "Hüma paket yöneticisi tek komutla manifest ve örnek giriş dosyası içeren bir proje iskeleti oluşturur.",
         "suffix_title": "Proje Mimarisi",
-        "suffix_desc": "'huma paket yeni' komutu otomatik olarak 'huma.json' dosyası ve ana giriş noktası oluşturarak projenizi ilk günden ölçeklenebilir kılar."
+        "suffix_desc": "'huma paket yeni' komutu 'huma.json' dosyasını ve ana giriş noktasını oluşturur."
       },
       "next_steps": {
         "title": "Yol Haritası",
         "syntax": { "title": "Temel Sözdizimi", "desc": "Değişkenler, Operatörler ve Ek Sistemi" },
         "functions": { "title": "Mantık ve Nesneler", "desc": "Fonksiyonlar ve Nesne Yönelimli Programlama" },
         "lists": { "title": "Veri ve Hatalar", "desc": "Gelişmiş Veri Yapıları ve Hata Yönetimi" },
-        "stdlib": { "title": "Standart Kütüphane", "desc": "Dahili Profesyonel Modül Referansı" }
+        "stdlib": { "title": "Standart Kütüphane", "desc": "Dahili Modül Referansı" }
       },
       "toc": {
         "title": "BU SAYFADA",
@@ -518,7 +387,7 @@
   "Community": {
     "headline": "Topluluğa",
     "subheadline": "Katılın",
-    "description": "Hüma'nın bir parçası olun. Gelişmelere yön verin, hataları bildirin ve kod katkısında bulunun. Birlikte daha iyi yerel yazılım araçları inşa edebiliriz.",
+    "description": "Hüma'nın bir parçası olun. Doğrulanabilir hata kayıtları, testler ve kod katkılarıyla dilin kararlılığını geliştirin.",
     "badge": "TOPLULUK",
     "get_involved": "Nasıl Katkı Sağlarsınız?",
     "contributing": "Katkı Kılavuzu",
@@ -545,7 +414,7 @@
       },
       "changelog": {
         "title": "Sürüm Notları",
-        "description": "Her sürümde yapılan güncellemeleri, iyileştirmeleri ve güvenlik yamalarını takip edin.",
+        "description": "Yayımlanan sürümlerde kaydedilen değişiklikleri ve düzeltmeleri okuyun.",
         "label": "Güncellemeleri Oku"
       }
     }
@@ -554,10 +423,10 @@
     "badge": "Oyun Alanı",
     "headline": "Hüma ile Tanışın,",
     "subheadline": "Tarayıcıda Keşfedin.",
-    "description": "Hüma'nın gücünü ve sadeliğini deneyimlemek için hazır örneklerimizi inceleyin. Hiçbir kurulum gerektirmeden kodun nasıl çalıştığını görün.",
+    "description": "Hazır Hüma örneklerini ve beklenen çıktılarını inceleyin. Bu sayfa kodu tarayıcıda çalıştırmaz; gerçek davranış CLI testleriyle doğrulanır.",
     "console_output": "Konsol Çıktısı",
     "cta_title": "Daha Fazlasını Deneyin",
-    "cta_desc": "Yerel makinenizde tam performanslı Hüma geliştirmeye başlamak için dokümantasyonu takip edin.",
+    "cta_desc": "Hüma'yı kaynak koddan derlemek ve doğrulanmış yürütme yollarını denemek için dokümantasyonu takip edin.",
     "cta_docs": "Dokümanlara Git",
     "cta_github": "GitHub'da Yıldızla",
     "examples": {
