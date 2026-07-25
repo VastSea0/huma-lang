@@ -69,6 +69,7 @@ The current runtime targets learning experiments and small CPU workloads. It doe
 ## Documentation
 
 - [Language Specification](docs/DIL_TANIMI.md)
+- [Bytecode Container Specification](docs/BYTECODE_BICIMI.md)
 - [Libraries](KUTUPHANELER.md)
 - [Status and Roadmap](docs/DURUM_VE_YOL_HARITASI.md)
 - [Changelog](CHANGELOG.md)

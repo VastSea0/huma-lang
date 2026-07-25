@@ -224,9 +224,8 @@
       },
       "compilation": {
         "title": "Compilation & VM",
-        "build": "huma build <file> — Compile source to .hbc bytecode.",
+        "build": "huma build <file> — Compile source into a versioned, integrity-checked .hbc container.",
         "exec": "huma exec <file> — Run compiled bytecode on the VM.",
-        "gen": "huma gen <file> — Generate Rust source for the supported bytecode subset.",
         "aot": "huma aot <file> — Compile the experimental numeric subset to machine code."
       },
       "package": {

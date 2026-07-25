@@ -1,10 +1,9 @@
 //! # Hüma Compiler
 //!
-//! High-level compilation operations: parse → compile → serialize to bytecode,
-//! and the standalone-binary code-generation path.
+//! High-level compilation operations: parse → compile → validated bytecode,
+//! plus the explicitly limited Cranelift AOT path.
 
 pub mod aot;
-pub mod codegen;
 pub mod pipeline;
 
 #[cfg(test)]

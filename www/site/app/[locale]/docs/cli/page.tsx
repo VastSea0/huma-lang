@@ -82,9 +82,6 @@ export default async function CLIPage({
             <p className="text-on-surface-variant text-sm font-medium">{cli.compilation.exec}</p>
             <CodeBlock variant="terminal" code="$ huma exec main.hbc" />
 
-            <p className="text-on-surface-variant text-sm font-medium">{cli.compilation.gen}</p>
-            <CodeBlock variant="terminal" code="$ huma gen main.hb" />
-
             <p className="text-on-surface-variant text-sm font-medium">{cli.compilation.aot}</p>
             <CodeBlock variant="terminal" code="$ huma aot numeric.hb --output numeric" />
           </div>

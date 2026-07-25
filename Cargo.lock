@@ -2083,6 +2083,7 @@ dependencies = [
  "huma-core",
  "serde",
  "serde_json",
+ "sha2",
  "target-lexicon",
  "thiserror 2.0.18",
 ]

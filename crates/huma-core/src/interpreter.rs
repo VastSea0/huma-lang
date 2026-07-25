@@ -384,10 +384,20 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     );
     globals.insert(
         "uzunluk".to_string(),
-        Deger::DahiliFonksiyon(|args| match args.first() {
-            Some(Deger::Metin(s)) => Deger::Sayi(s.chars().count() as f64),
-            Some(Deger::Liste(l)) => Deger::Sayi(l.borrow().len() as f64),
-            _ => Deger::Sayi(0.0),
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Metin(value)] => Deger::Sayi(value.chars().count() as f64),
+            [Deger::Bayt(value)] => Deger::Sayi(value.len() as f64),
+            [Deger::Liste(value)] => Deger::Sayi(value.borrow().len() as f64),
+            [Deger::Sozluk(value)] => Deger::Sayi(value.borrow().len() as f64),
+            [Deger::Vektor(value)] => Deger::Sayi(value.borrow().len() as f64),
+            [other] => Deger::Hata(format!(
+                "uzunluk: metin, bayt, liste, sözlük veya vektör bekleniyordu; {} geldi",
+                other
+            )),
+            _ => Deger::Hata(format!(
+                "uzunluk: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
     globals.insert(
@@ -407,59 +417,86 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     );
     globals.insert(
         "uyut".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(ms)) = args.first() {
-                if *ms > 0.0 {
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Sayi(ms)] if ms.is_finite() && *ms >= 0.0 && *ms <= u64::MAX as f64 => {
+                if *ms != 0.0 {
                     thread::sleep(Duration::from_millis(*ms as u64));
                 }
+                Deger::Bos
             }
-            Deger::Bos
+            [Deger::Sayi(_)] => Deger::Hata(
+                "uyut: milisaniye sonlu ve negatif olmayan bir sayı olmalıdır".to_string(),
+            ),
+            [other] => Deger::Hata(format!("uyut: sayı bekleniyordu; {} geldi", other)),
+            _ => Deger::Hata(format!(
+                "uyut: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
     globals.insert(
         "zaman".to_string(),
-        Deger::DahiliFonksiyon(|_| {
-            Deger::Sayi(
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs_f64(),
-            )
+        Deger::DahiliFonksiyon(|args| {
+            if !args.is_empty() {
+                return Deger::Hata(format!(
+                    "zaman: argüman beklenmiyordu; {} geldi",
+                    args.len()
+                ));
+            }
+            match SystemTime::now().duration_since(UNIX_EPOCH) {
+                Ok(duration) => Deger::Sayi(duration.as_secs_f64()),
+                Err(error) => Deger::Hata(format!("zaman: sistem saati hatası: {}", error)),
+            }
         }),
     );
     globals.insert(
         "listeye_ekle".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let Deger::Liste(l) = &args[0] {
-                    // Semantik: Eski kodu bozmamak için kopyasını döndür (O(N))
-                    // Ama NLP kütüphanesi mutation kullanacak şekilde güncellenecek.
-                    let mut yeni = l.borrow().clone();
-                    yeni.push(args[1].clone());
-                    return Deger::Liste(Rc::new(RefCell::new(yeni)));
-                }
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Liste(list), value] => {
+                let mut yeni = list.borrow().clone();
+                yeni.push(value.clone());
+                Deger::Liste(Rc::new(RefCell::new(yeni)))
             }
-            Deger::Bos
+            [other, _] => Deger::Hata(format!(
+                "listeye_ekle: ilk argüman liste olmalıdır; {} geldi",
+                other
+            )),
+            _ => Deger::Hata(format!(
+                "listeye_ekle: tam olarak 2 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
     globals.insert(
         "karekök".to_string(),
-        Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Sayi(n)) = args.first() {
-                Deger::Sayi(n.sqrt())
-            } else {
-                Deger::Bos
+        Deger::DahiliFonksiyon(|args| match args.as_slice() {
+            [Deger::Sayi(value)] if value.is_finite() && *value >= 0.0 => Deger::Sayi(value.sqrt()),
+            [Deger::Sayi(_)] => {
+                Deger::Hata("karekök: sonlu ve negatif olmayan sayı gerekir".to_string())
             }
+            [other] => Deger::Hata(format!("karekök: sayı bekleniyordu; {} geldi", other)),
+            _ => Deger::Hata(format!(
+                "karekök: tam olarak 1 argüman bekleniyordu; {} geldi",
+                args.len()
+            )),
         }),
     );
     globals.insert(
         "rastgele".to_string(),
-        Deger::DahiliFonksiyon(|_| {
-            let n = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as f64;
-            Deger::Sayi((n % 1000000.0) / 1000000.0)
+        Deger::DahiliFonksiyon(|args| {
+            if !args.is_empty() {
+                return Deger::Hata(format!(
+                    "rastgele: argüman beklenmiyordu; {} geldi",
+                    args.len()
+                ));
+            }
+            match SystemTime::now().duration_since(UNIX_EPOCH) {
+                Ok(duration) => {
+                    let nanos = duration.as_nanos() as f64;
+                    Deger::Sayi((nanos % 1_000_000.0) / 1_000_000.0)
+                }
+                Err(error) => Deger::Hata(format!("rastgele: sistem saati hatası: {}", error)),
+            }
         }),
     );
     globals.insert(
@@ -490,33 +527,45 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "ffi_yükle".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Metin(ad), Deger::Metin(yol)) = (&args[0], &args[1]) {
-                    if let Ok(mut mgr) = crate::ffi::FFI_YONETICI.lock() {
-                        if let Ok(()) = mgr.yukle(ad, yol) {
-                            return Deger::Sayi(1.0);
-                        }
-                    }
+            let [Deger::Metin(name), Deger::Metin(path)] = args.as_slice() else {
+                return Deger::Hata(
+                    "ffi_yükle: kütüphane adı ve dosya yolu olmak üzere 2 metin gerekir"
+                        .to_string(),
+                );
+            };
+            let mut manager = match crate::ffi::FFI_YONETICI.lock() {
+                Ok(manager) => manager,
+                Err(_) => {
+                    return Deger::Hata("ffi_yükle: FFI yöneticisi kilidi bozuldu".to_string())
                 }
+            };
+            match manager.yukle(name, path) {
+                Ok(()) => Deger::Sayi(1.0),
+                Err(error) => Deger::Hata(format!("ffi_yükle: {}", error)),
             }
-            Deger::Sayi(0.0)
         }),
     );
     globals.insert(
         "ffi_çağır".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if args.len() >= 2 {
-                if let (Deger::Metin(lib_ad), Deger::Metin(fn_ad)) = (&args[0], &args[1]) {
-                    let fn_args = args[2..].to_vec();
-                    if let Ok(mgr) = crate::ffi::FFI_YONETICI.lock() {
-                        match mgr.cagir_esnek(lib_ad, fn_ad, fn_args) {
-                            Ok(res) => return res,
-                            Err(e) => return Deger::Hata(e),
-                        }
-                    }
+            let (Some(Deger::Metin(library)), Some(Deger::Metin(function))) =
+                (args.first(), args.get(1))
+            else {
+                return Deger::Hata(
+                    "ffi_çağır: kütüphane ve fonksiyon adı olmak üzere en az 2 metin gerekir"
+                        .to_string(),
+                );
+            };
+            let manager = match crate::ffi::FFI_YONETICI.lock() {
+                Ok(manager) => manager,
+                Err(_) => {
+                    return Deger::Hata("ffi_çağır: FFI yöneticisi kilidi bozuldu".to_string())
                 }
+            };
+            match manager.cagir_esnek(library, function, args[2..].to_vec()) {
+                Ok(result) => result,
+                Err(error) => Deger::Hata(format!("ffi_çağır: {}", error)),
             }
-            Deger::Bos
         }),
     );
     globals.insert(
@@ -690,20 +739,41 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
     globals.insert(
         "sistem".to_string(),
         Deger::DahiliFonksiyon(|args| {
-            if let Some(Deger::Metin(komut)) = args.first() {
-                let output = std::process::Command::new("sh")
-                    .arg("-c")
-                    .arg(komut)
-                    .output();
-                match output {
-                    Ok(o) => {
-                        let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
-                        return Deger::Metin(s);
-                    }
-                    Err(_) => return Deger::Bos,
+            let [Deger::Metin(command)] = args.as_slice() else {
+                return Deger::Hata("sistem: tam olarak 1 metin komutu gerekir".to_string());
+            };
+
+            let mut process = if cfg!(target_os = "windows") {
+                let mut process = std::process::Command::new("cmd");
+                process.args(["/C", command]);
+                process
+            } else {
+                let mut process = std::process::Command::new("sh");
+                process.args(["-c", command]);
+                process
+            };
+
+            match process.output() {
+                Ok(output) if output.status.success() => {
+                    Deger::Metin(String::from_utf8_lossy(&output.stdout).trim().to_string())
                 }
+                Ok(output) => {
+                    let code = output
+                        .status
+                        .code()
+                        .map_or_else(|| "sinyal".to_string(), |value| value.to_string());
+                    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+                    if stderr.is_empty() {
+                        Deger::Hata(format!("sistem: komut başarısız oldu (çıkış: {})", code))
+                    } else {
+                        Deger::Hata(format!(
+                            "sistem: komut başarısız oldu (çıkış: {}): {}",
+                            code, stderr
+                        ))
+                    }
+                }
+                Err(error) => Deger::Hata(format!("sistem: komut başlatılamadı: {}", error)),
             }
-            Deger::Bos
         }),
     );
     // dahili_sunucu_baslat(port)

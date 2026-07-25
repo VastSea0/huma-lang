@@ -100,6 +100,32 @@ mod tests {
     }
 
     #[test]
+    fn temel_yerlesikler_gecersiz_girdiyi_sessizce_yutmaz() {
+        assert!(eval_hatasi("uzunluk(42)").contains("uzunluk"));
+        assert!(eval_hatasi("listeye_ekle(42, 1)").contains("ilk argüman liste"));
+        assert!(eval_hatasi("karekök(\"değil\")").contains("sayı bekleniyordu"));
+        assert!(eval_hatasi("karekök(-1)").contains("negatif olmayan"));
+        assert!(eval_hatasi("uyut(-1)").contains("negatif olmayan"));
+        assert!(eval_hatasi("zaman(1)").contains("argüman beklenmiyordu"));
+        assert!(eval_hatasi("rastgele(1)").contains("argüman beklenmiyordu"));
+        assert!(eval_hatasi("sistem(42)").contains("metin komutu"));
+        assert!(eval_hatasi("ffi_yükle(1, 2)").contains("2 metin"));
+        assert!(eval_hatasi("ffi_çağır(1, 2)").contains("en az 2 metin"));
+    }
+
+    #[test]
+    fn uzunluk_desteklenen_koleksiyonlarda_tutarlidir() {
+        let output = eval(
+            r#"
+                uzunluk("Türkçe")'yi yazdır
+                uzunluk([1, 2, 3])'ü yazdır
+                uzunluk({"a": 1, "b": 2})'yi yazdır
+            "#,
+        );
+        assert_eq!(output, "6\n3\n2\n");
+    }
+
+    #[test]
     fn ai_boyutlari_guvenli_sinirlarla_dogrulanir() {
         assert!(eval_hatasi("vektor_olustur(-1, 0)").contains("boyut"));
         assert!(eval_hatasi("matris_olustur(10000000, 2)").contains("güvenlik sınırını"));

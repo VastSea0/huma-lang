@@ -9,6 +9,7 @@ Tamamlanan ve otomatik testle korunan işler:
 - Liste/sözlük erişimi ve atama sınır kontrolleri
 - Kısa devreli mantık, `devam`, `kır`, `dene/yakala`
 - Bytecode alt kümesinde kontrollü derleme ve yorumlayıcıyla Fibonacci eşliği
+- Sürümlü, boyut sınırlı ve bütünlük özeti doğrulanan `.hbc` kapsayıcısı
 - AOT’de desteklenmeyen sözdiziminin açıkça reddedilmesi
 - İzlenen Hüma kaynaklarının tamamı için ayrıştırma testi
 - Hüma ve Rust test süitleri, biçim ve sıfır-uyarı Clippy kapısı

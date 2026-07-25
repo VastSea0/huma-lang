@@ -4,7 +4,6 @@
 //! hüma run   <dosya.hb>              # Interpreter modunda çalıştır
 //! hüma build <dosya.hb> [çıktı.hbc]  # Bytecode'a derle
 //! hüma exec  <dosya.hbc>             # Bytecode çalıştır
-//! hüma gen   <dosya.hb> [isim]       # Standalone Rust dosyası üret
 //! hüma repl                          # Etkileşimli REPL
 //! hüma test  [yol]                   # Testleri çalıştır (tests/ veya *_test.hb)
 //! hüma version                       # Sürüm bilgisi
@@ -85,17 +84,6 @@ enum Commands {
     Exec {
         /// Çalıştırılacak .hbc dosyası
         file: String,
-    },
-
-    /// Kaynak dosyadan bağımsız Rust kaynak kodu üret
-    #[command(alias = "üret")]
-    Gen {
-        /// Girdi .hb dosyası
-        file: String,
-
-        /// Çıktı adı (varsayılan: program)
-        #[arg(short, long, default_value = "program")]
-        output: String,
     },
 
     /// Cranelift AOT kullanarak doğrudan native makine koduna (binary) derle
@@ -278,7 +266,6 @@ fn run(cli: Cli) -> i32 {
         }
         Some(Commands::Build { file, output, json }) => commands::build_file(&file, &output, json),
         Some(Commands::Exec { file }) => commands::exec_bytecode(&file),
-        Some(Commands::Gen { file, output }) => commands::generate_standalone(&file, &output),
         Some(Commands::Aot {
             file,
             output,

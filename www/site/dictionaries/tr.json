@@ -224,9 +224,8 @@
       },
       "compilation": {
         "title": "Derleme ve VM",
-        "build": "huma derle <dosya> — Kaynak kodu .hbc bytecode'una derler.",
+        "build": "huma derle <dosya> — Kaynak kodu sürümlü ve bütünlüğü doğrulanan .hbc kapsayıcısına derler.",
         "exec": "huma yürüt <dosya> — Derlenmiş bytecode'u VM'de çalıştırır.",
-        "gen": "huma üret <dosya> — Desteklenen bytecode alt kümesi için Rust kaynak kodu üretir.",
         "aot": "huma aot <dosya> — Deneysel sayısal alt kümeyi makine koduna derler."
       },
       "package": {

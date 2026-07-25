@@ -17,6 +17,8 @@
 - VM’ye kalan, büyük-eşit, mantıksal işlemler, değil ve uzunluk işlemleri eklendi.
 - VM fonksiyon kapsamı ve özyinelemeli Fibonacci sonucu düzeltildi.
 - Bytecode derleyici desteklemediği komut ve atama hedeflerini açıkça reddediyor.
+- `.hbc` dosyaları magic imzası, biçim sürümü, uzunluk, SHA-256 bütünlük özeti ve yapısal opcode doğrulaması içeren sınırlandırılmış bir kapsayıcıya taşındı.
+- Yorumlayıcı/VM hata semantiğini korumayan yinelenen `huma gen` Rust çalışma zamanı kaldırıldı.
 - AOT derleyici desteklenmeyen AST için sahte `0` çıktısı üretmek yerine derleme hatası veriyor.
 
 ### AI/NLP

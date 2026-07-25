@@ -99,6 +99,7 @@ Bu çekirdek eğitim/çıkarım deneyi için uygundur. Büyük model eğitimi i�
 ## Belgeler
 
 - [Dil Tanımı](docs/DIL_TANIMI.md)
+- [Bytecode Biçimi](docs/BYTECODE_BICIMI.md)
 - [Kütüphaneler](KUTUPHANELER.md)
 - [Durum ve Yol Haritası](docs/DURUM_VE_YOL_HARITASI.md)
 - [Değişim Günlüğü](CHANGELOG.md)

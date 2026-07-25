@@ -30,7 +30,8 @@ pub struct PaketMetadata {
     /// Native Rust bağımlılıkları (crate adı -> sürüm)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub crate_bagimliliklari: Option<HashMap<String, String>>,
-    /// Transpilation (huma gen) sırasında enjekte edilecek Rust kodu
+    /// Gelecekteki sürümlü native paket ABI'si için ayrılmış alan.
+    /// Hüma 0.6 bu kodu derlemez veya çalıştırmaz.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub yerleşik_rust: Option<String>,
     /// Paketin GitHub kaynak URL'si (lock dosyasında izlenebilmesi için)

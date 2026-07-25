@@ -81,20 +81,6 @@ pub fn exec_bytecode(path: &str) -> Result<()> {
     Ok(())
 }
 
-/// Generate a standalone Rust source file from a `.hb` file.
-pub fn generate_standalone(input: &str, output_name: &str) -> Result<()> {
-    let rs_file = huma_compiler::codegen::generate_standalone(input, output_name)
-        .with_context(|| format!("'{}' standalone kod üretimi sırasında hata oluştu", input))?;
-
-    println!(
-        "{} {} oluşturuldu. Derlemek için: {}",
-        "[Başarı]".bright_green().bold(),
-        rs_file.bright_white(),
-        format!("cd {} && cargo build", rs_file).bright_cyan(),
-    );
-    Ok(())
-}
-
 /// Compile a `.hb` file to a native machine code binary using Cranelift AOT.
 pub fn compile_aot(input: &str, output_name: &str, opt_level: u8) -> Result<()> {
     let source =
