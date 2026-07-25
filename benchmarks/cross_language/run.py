@@ -9,6 +9,7 @@ import math
 import os
 import platform
 import random
+import re
 import shutil
 import statistics
 import subprocess
@@ -17,7 +18,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -193,6 +194,9 @@ def compile_programs() -> Tuple[List[Candidate], Dict[str, str], List[str]]:
                     clang,
                     "-O3",
                     "-std=c17",
+                    "-Wall",
+                    "-Wextra",
+                    "-Werror",
                     str(PROGRAMS / workload / "program.c"),
                     "-o",
                     str(output),
@@ -223,6 +227,8 @@ def compile_programs() -> Tuple[List[Candidate], Dict[str, str], List[str]]:
                     "opt-level=3",
                     "-C",
                     "debuginfo=0",
+                    "-D",
+                    "warnings",
                     str(PROGRAMS / workload / "program.rs"),
                     "-o",
                     str(output),
@@ -250,6 +256,7 @@ def compile_programs() -> Tuple[List[Candidate], Dict[str, str], List[str]]:
                 [
                     swiftc,
                     "-O",
+                    "-warnings-as-errors",
                     str(PROGRAMS / workload / "program.swift"),
                     "-o",
                     str(output),
@@ -276,7 +283,10 @@ def compile_programs() -> Tuple[List[Candidate], Dict[str, str], List[str]]:
         java_build.mkdir(parents=True, exist_ok=True)
         for workload in WORKLOADS:
             source = PROGRAMS / workload / JAVA_SOURCES[workload]
-            run_command([javac, "-d", str(java_build), str(source)], timeout=180)
+            run_command(
+                [javac, "-Xlint:all", "-Werror", "-d", str(java_build), str(source)],
+                timeout=180,
+            )
             candidates.append(
                 Candidate(
                     f"java:{workload}",
@@ -309,7 +319,29 @@ JAVA_CLASSES = {
 
 def last_error_line(stderr: str) -> str:
     lines = [line.strip() for line in stderr.splitlines() if line.strip()]
-    return lines[-1] if lines else "ayrıntı yok"
+    return sanitize_text(lines[-1]) if lines else "ayrıntı yok"
+
+
+def sanitize_text(text: str) -> str:
+    sanitized = text.replace(str(ROOT), ".")
+    return re.sub(
+        r"^\d{4}-\d{2}-\d{2}T\S+\s+(?:ERROR|WARN|INFO)\s+",
+        "",
+        sanitized,
+    )
+
+
+def display_command(command: Sequence[str]) -> List[str]:
+    displayed: List[str] = []
+    root_prefix = f"{ROOT}{os.sep}"
+    for index, argument in enumerate(command):
+        if argument.startswith(root_prefix):
+            displayed.append(f"./{argument[len(root_prefix):]}")
+        elif index == 0 and os.path.isabs(argument):
+            displayed.append(Path(argument).name)
+        else:
+            displayed.append(argument)
+    return displayed
 
 
 def probe_candidate(candidate: Candidate) -> Optional[str]:
@@ -428,7 +460,7 @@ def benchmark(
                 "label": candidate.label,
                 "toolchain": candidate.toolchain,
                 "workload": candidate.workload,
-                "command": list(candidate.command),
+                "command": display_command(candidate.command),
                 "samples": len(values),
                 "median_ms": statistics.median(values),
                 "mean_ms": statistics.mean(values),
