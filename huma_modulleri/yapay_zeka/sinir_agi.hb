@@ -107,6 +107,55 @@ sinir_agi sınıf olsun {
         dogru_sayisi / n'yi döndür
     }
 
+    // Çok-sınıflı doğruluk değerlendirmesi (softmax çıkışlı modeller için)
+    // veri: liste<vektör>, etiketler: liste<tamsayı> (0-tabanlı sınıf indeksi)
+    dogruluk_cok_sinif fonksiyon olsun veri, etiketler alsın {
+        n = uzunluk(veri) olsun
+        n = 0 ise { 0.0'ı döndür }
+        dogru = 0 olsun
+        i = 0'dan (n - 1)'e kadar {
+            giris_v = listeye_vektor(veri[i]) olsun
+            tahmin = kendisi.tahmin_et(giris_v) olsun
+            // En yüksek aktivasyonlu çıkış sınıfı
+            tahmin_sinif = vektor_argmax(tahmin) olsun
+            tahmin_sinif = etiketler[i] ise { dogru = dogru + 1 olsun }
+        }
+        dogru / n'yi döndür
+    }
+
+    // argmax_tahmin(giris) → tahmin edilen sınıf indeksi (skaler)
+    // Doğrudan sınıf numarası döndürür — softmax olasılıkları değil
+    argmax_tahmin fonksiyon olsun giris alsın {
+        t = kendisi.tahmin_et(giris) olsun
+        vektor_argmax(t)'ı döndür
+    }
+
+    // Tek örnek üzerinde cross-entropy + softmax eğitim adımı
+    // gercek_sinif: 0-tabanlı sınıf indeksi (skaler)
+    egitim_adimi_ce fonksiyon olsun giris, gercek_sinif, ogrenme_hizi alsın {
+        tahmin = kendisi.tahmin_et(giris) olsun
+        n_sinif = vektor_uzunluk(tahmin) olsun
+
+        // Kategorik cross-entropy gradyanı: (softmax_cikis - tek_sicak)
+        // Not: softmax aktivasyon son katmanda olduğunda: grad = p - y
+        grad = vektor_olustur(n_sinif, 0.0) olsun
+        kayip = 0.0 olsun
+        i = 0'dan (n_sinif - 1)'e kadar {
+            p = vektor_al(tahmin, i) olsun
+            y = 0.0 olsun
+            i = gercek_sinif ise { y = 1.0 olsun }
+            vektor_ata(grad, i, p - y) olsun
+            // cross-entropy: -log(p[gercek_sinif])
+            i = gercek_sinif ise {
+                eps = 1e-7 olsun
+                p_safe = klamp(p, eps, 1.0 - eps) olsun
+                kayip = -1.0 * güvenli_ln(p_safe) olsun
+            }
+        }
+        kendisi.geri_yayil(grad, ogrenme_hizi) olsun
+        kayip'i döndür
+    }
+
     // Model kaydet — ağırlıkları JSON formatında dosyaya yazar
     kaydet fonksiyon olsun yol alsın {
         model_sozluk = {} olsun

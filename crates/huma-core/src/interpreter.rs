@@ -4307,6 +4307,108 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
         }),
     );
 
+    // matris_carp_vektor(M, v) → Vektör [M.satirlar]
+    // Matris-vektör çarpımı: y = M * v (sinir ağı ileri geçişi için temel)
+    globals.insert(
+        "matris_carp_vektor".to_string(),
+        Deger::DahiliFonksiyon(|args| {
+            let [matrix, vector] = args.as_slice() else {
+                return if args.len() == 2 {
+                    Deger::Hata(
+                        "matris_carp_vektor: matris ve vektör gerekir".to_string(),
+                    )
+                } else {
+                    Deger::Hata(format!(
+                        "matris_carp_vektor: tam olarak 2 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            let (rows, cols, mat_vals) = match value_to_finite_matrix(matrix, "matris_carp_vektor") {
+                Ok(m) => m,
+                Err(e) => return Deger::Hata(e),
+            };
+            let vec_vals = match value_to_finite_vector(vector, "matris_carp_vektor") {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            if cols != vec_vals.len() {
+                return Deger::Hata(format!(
+                    "matris_carp_vektor: matris sütun sayısı ({}) vektör boyutu ({}) ile eşleşmeli",
+                    cols,
+                    vec_vals.len()
+                ));
+            }
+            let _ = match eleman_sayisi_dogrula(rows, cols, "matris_carp_vektor") {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            let mut result = Vec::with_capacity(rows);
+            for r in 0..rows {
+                let mut sum = 0.0f64;
+                for c in 0..cols {
+                    sum += mat_vals[r * cols + c] * vec_vals[c];
+                }
+                if !sum.is_finite() {
+                    return Deger::Hata(
+                        "matris_carp_vektor: sonlu olmayan sonuç".to_string(),
+                    );
+                }
+                result.push(sum);
+            }
+            Deger::Vektor(Rc::new(RefCell::new(result)))
+        }),
+    );
+
+    // matris_transpoz_carp_vektor(M, v) → Vektör [M.sutunlar]
+    // Transpoz matris-vektör çarpımı: y = Mᵀ * v (geri yayılım δ gradyanı için)
+    globals.insert(
+        "matris_transpoz_carp_vektor".to_string(),
+        Deger::DahiliFonksiyon(|args| {
+            let [matrix, vector] = args.as_slice() else {
+                return if args.len() == 2 {
+                    Deger::Hata(
+                        "matris_transpoz_carp_vektor: matris ve vektör gerekir".to_string(),
+                    )
+                } else {
+                    Deger::Hata(format!(
+                        "matris_transpoz_carp_vektor: tam olarak 2 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            let (rows, cols, mat_vals) =
+                match value_to_finite_matrix(matrix, "matris_transpoz_carp_vektor") {
+                    Ok(m) => m,
+                    Err(e) => return Deger::Hata(e),
+                };
+            let vec_vals = match value_to_finite_vector(vector, "matris_transpoz_carp_vektor") {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            if rows != vec_vals.len() {
+                return Deger::Hata(format!(
+                    "matris_transpoz_carp_vektor: matris satır sayısı ({}) vektör boyutu ({}) ile eşleşmeli",
+                    rows,
+                    vec_vals.len()
+                ));
+            }
+            // Mᵀv[c] = Σ_r M[r,c] * v[r]
+            let mut result = vec![0.0f64; cols];
+            for r in 0..rows {
+                for c in 0..cols {
+                    result[c] += mat_vals[r * cols + c] * vec_vals[r];
+                }
+            }
+            if result.iter().any(|v| !v.is_finite()) {
+                return Deger::Hata(
+                    "matris_transpoz_carp_vektor: sonlu olmayan sonuç".to_string(),
+                );
+            }
+            Deger::Vektor(Rc::new(RefCell::new(result)))
+        }),
+    );
+
     globals.insert(
         "matris_satir_al".to_string(),
         Deger::DahiliFonksiyon(|args| match args.as_slice() {
@@ -6335,6 +6437,830 @@ pub fn varsayilan_global_degiskenler() -> HashMap<String, Deger> {
                 "perplexity: tam olarak 1 argüman bekleniyordu; {} geldi",
                 args.len()
             )),
+        }),
+    );
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // ML HIZI — Rust-native matris ilklendirme ve rastgele matris üretme
+    // Bu built-in'ler Hüma döngüsü OLMADAN çalışır; büyük ağ katmanlarında
+    // (512×256 vb.) He/Xavier init'i 10-100× hızlandırır.
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // matris_he_ilklendir_builtin(satirlar, sutunlar)
+    // He başlangıcı: N(0, sqrt(2/fan_in)), ReLU katmanları için önerilen
+    globals.insert(
+        "matris_he_ilklendir_builtin".to_string(),
+        Deger::DahiliFonksiyon(|args| {
+            let [Deger::Sayi(rows_f), Deger::Sayi(cols_f)] = args.as_slice() else {
+                return if args.len() == 2 {
+                    Deger::Hata(
+                        "matris_he_ilklendir_builtin: iki sayı (satır, sütun) gerekir".to_string(),
+                    )
+                } else {
+                    Deger::Hata(format!(
+                        "matris_he_ilklendir_builtin: tam olarak 2 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            let rows = match boyut_dogrula(*rows_f, "matris_he_ilklendir_builtin", false) {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            let cols = match boyut_dogrula(*cols_f, "matris_he_ilklendir_builtin", false) {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            let total = match eleman_sayisi_dogrula(rows, cols, "matris_he_ilklendir_builtin") {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            let std_dev = (2.0f64 / rows as f64).sqrt();
+            // Box-Muller Normal dağılım — RNG thread_local ile
+            thread_local! {
+                static HE_RNG: RefCell<SmallRng> = RefCell::new(SmallRng::from_entropy());
+            }
+            let mut result = Vec::with_capacity(total);
+            let ok = HE_RNG.with(|rng| {
+                match rng.try_borrow_mut() {
+                    Ok(mut rng) => {
+                        let mut i = 0usize;
+                        while i < total {
+                            let u1 = (rng.gen::<f64>()).max(1e-10);
+                            let u2 = rng.gen::<f64>();
+                            let r = (-2.0 * u1.ln()).sqrt();
+                            let theta = 2.0 * std::f64::consts::PI * u2;
+                            let z0 = r * theta.cos() * std_dev;
+                            let z1 = r * theta.sin() * std_dev;
+                            result.push(z0);
+                            if i + 1 < total {
+                                result.push(z1);
+                            }
+                            i += 2;
+                        }
+                        true
+                    }
+                    Err(_) => false,
+                }
+            });
+            if !ok {
+                return Deger::Hata(
+                    "matris_he_ilklendir_builtin: rastgele sayı üreteci kullanımda".to_string(),
+                );
+            }
+            if result.iter().any(|v| !v.is_finite()) {
+                return Deger::Hata(
+                    "matris_he_ilklendir_builtin: sonlu olmayan değer üretildi".to_string(),
+                );
+            }
+            Deger::Matris {
+                satirlar: rows,
+                sutunlar: cols,
+                veri: Rc::new(RefCell::new(result)),
+            }
+        }),
+    );
+
+    // matris_xavier_ilklendir_builtin(satirlar, sutunlar)
+    // Xavier başlangıcı: U(-sqrt(6/(fan_in+fan_out)), +sqrt(6/(fan_in+fan_out)))
+    // Sigmoid/Tanh katmanları için önerilen
+    globals.insert(
+        "matris_xavier_ilklendir_builtin".to_string(),
+        Deger::DahiliFonksiyon(|args| {
+            let [Deger::Sayi(rows_f), Deger::Sayi(cols_f)] = args.as_slice() else {
+                return if args.len() == 2 {
+                    Deger::Hata(
+                        "matris_xavier_ilklendir_builtin: iki sayı (satır, sütun) gerekir"
+                            .to_string(),
+                    )
+                } else {
+                    Deger::Hata(format!(
+                        "matris_xavier_ilklendir_builtin: tam olarak 2 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            let rows = match boyut_dogrula(*rows_f, "matris_xavier_ilklendir_builtin", false) {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            let cols = match boyut_dogrula(*cols_f, "matris_xavier_ilklendir_builtin", false) {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            let total = match eleman_sayisi_dogrula(rows, cols, "matris_xavier_ilklendir_builtin") {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            let limit = (6.0f64 / (rows + cols) as f64).sqrt();
+            thread_local! {
+                static XAV_RNG: RefCell<SmallRng> = RefCell::new(SmallRng::from_entropy());
+            }
+            let mut result = Vec::with_capacity(total);
+            let ok = XAV_RNG.with(|rng| match rng.try_borrow_mut() {
+                Ok(mut rng) => {
+                    for _ in 0..total {
+                        let v = -limit + rng.gen::<f64>() * 2.0 * limit;
+                        result.push(v);
+                    }
+                    true
+                }
+                Err(_) => false,
+            });
+            if !ok {
+                return Deger::Hata(
+                    "matris_xavier_ilklendir_builtin: rastgele sayı üreteci kullanımda".to_string(),
+                );
+            }
+            if result.iter().any(|v| !v.is_finite()) {
+                return Deger::Hata(
+                    "matris_xavier_ilklendir_builtin: sonlu olmayan değer üretildi".to_string(),
+                );
+            }
+            Deger::Matris {
+                satirlar: rows,
+                sutunlar: cols,
+                veri: Rc::new(RefCell::new(result)),
+            }
+        }),
+    );
+
+    // matris_normal_rastgele(satirlar, sutunlar, ortalama, std_sapma)
+    // Belirtilen normal dağılımdan matris üret (Gaussian noise, weight init vb.)
+    globals.insert(
+        "matris_normal_rastgele".to_string(),
+        Deger::DahiliFonksiyon(|args| {
+            let [Deger::Sayi(rows_f), Deger::Sayi(cols_f), Deger::Sayi(mean), Deger::Sayi(std_dev)] =
+                args.as_slice()
+            else {
+                return if args.len() == 4 {
+                    Deger::Hata(
+                        "matris_normal_rastgele: satır, sütun, ortalama, std_sapma sayı olmalı"
+                            .to_string(),
+                    )
+                } else {
+                    Deger::Hata(format!(
+                        "matris_normal_rastgele: tam olarak 4 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            if !mean.is_finite() || !std_dev.is_finite() || *std_dev < 0.0 {
+                return Deger::Hata(
+                    "matris_normal_rastgele: ortalama sonlu, std_sapma ≥ 0 olmalı".to_string(),
+                );
+            }
+            let rows = match boyut_dogrula(*rows_f, "matris_normal_rastgele", false) {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            let cols = match boyut_dogrula(*cols_f, "matris_normal_rastgele", false) {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            let total = match eleman_sayisi_dogrula(rows, cols, "matris_normal_rastgele") {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            thread_local! {
+                static NRM_RNG: RefCell<SmallRng> = RefCell::new(SmallRng::from_entropy());
+            }
+            let mut result = Vec::with_capacity(total);
+            let ok = NRM_RNG.with(|rng| match rng.try_borrow_mut() {
+                Ok(mut rng) => {
+                    let mut i = 0usize;
+                    while i < total {
+                        let u1 = (rng.gen::<f64>()).max(1e-10);
+                        let u2 = rng.gen::<f64>();
+                        let r = (-2.0 * u1.ln()).sqrt();
+                        let theta = 2.0 * std::f64::consts::PI * u2;
+                        let z0 = mean + std_dev * r * theta.cos();
+                        let z1 = mean + std_dev * r * theta.sin();
+                        result.push(z0);
+                        if i + 1 < total {
+                            result.push(z1);
+                        }
+                        i += 2;
+                    }
+                    true
+                }
+                Err(_) => false,
+            });
+            if !ok {
+                return Deger::Hata(
+                    "matris_normal_rastgele: rastgele sayı üreteci kullanımda".to_string(),
+                );
+            }
+            if result.iter().any(|v| !v.is_finite()) {
+                return Deger::Hata(
+                    "matris_normal_rastgele: sonlu olmayan değer üretildi".to_string(),
+                );
+            }
+            Deger::Matris {
+                satirlar: rows,
+                sutunlar: cols,
+                veri: Rc::new(RefCell::new(result)),
+            }
+        }),
+    );
+
+    // matris_uniform_rastgele(satirlar, sutunlar, alt, ust)
+    // Uniform dağılımdan matris üret
+    globals.insert(
+        "matris_uniform_rastgele".to_string(),
+        Deger::DahiliFonksiyon(|args| {
+            let [Deger::Sayi(rows_f), Deger::Sayi(cols_f), Deger::Sayi(low), Deger::Sayi(high)] =
+                args.as_slice()
+            else {
+                return if args.len() == 4 {
+                    Deger::Hata(
+                        "matris_uniform_rastgele: satır, sütun, alt, üst sayı olmalı".to_string(),
+                    )
+                } else {
+                    Deger::Hata(format!(
+                        "matris_uniform_rastgele: tam olarak 4 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            if !low.is_finite() || !high.is_finite() || low >= high {
+                return Deger::Hata(
+                    "matris_uniform_rastgele: sonlu alt sınır üst sınırdan küçük olmalıdır"
+                        .to_string(),
+                );
+            }
+            let rows = match boyut_dogrula(*rows_f, "matris_uniform_rastgele", false) {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            let cols = match boyut_dogrula(*cols_f, "matris_uniform_rastgele", false) {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            let total = match eleman_sayisi_dogrula(rows, cols, "matris_uniform_rastgele") {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            thread_local! {
+                static UNI_RNG: RefCell<SmallRng> = RefCell::new(SmallRng::from_entropy());
+            }
+            let mut result = Vec::with_capacity(total);
+            let ok = UNI_RNG.with(|rng| match rng.try_borrow_mut() {
+                Ok(mut rng) => {
+                    for _ in 0..total {
+                        let v = low + rng.gen::<f64>() * (high - low);
+                        result.push(v);
+                    }
+                    true
+                }
+                Err(_) => false,
+            });
+            if !ok {
+                return Deger::Hata(
+                    "matris_uniform_rastgele: rastgele sayı üreteci kullanımda".to_string(),
+                );
+            }
+            if result.iter().any(|v| !v.is_finite()) {
+                return Deger::Hata(
+                    "matris_uniform_rastgele: sonlu olmayan değer üretildi".to_string(),
+                );
+            }
+            Deger::Matris {
+                satirlar: rows,
+                sutunlar: cols,
+                veri: Rc::new(RefCell::new(result)),
+            }
+        }),
+    );
+
+    // matris_satir_maksimum(M) → Vektor: her satırın maksimum değeri
+    // Sayısal kararlı softmax ve log-sum-exp için kritik
+    globals.insert(
+        "matris_satir_maksimum".to_string(),
+        Deger::DahiliFonksiyon(|args| {
+            let [matrix] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "matris_satir_maksimum: tam olarak 1 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            };
+            let (rows, columns, values) =
+                match value_to_finite_matrix(matrix, "matris_satir_maksimum") {
+                    Ok(m) => m,
+                    Err(e) => return Deger::Hata(e),
+                };
+            if columns == 0 {
+                return Deger::Hata(
+                    "matris_satir_maksimum: matrisin en az 1 sütunu olmalıdır".to_string(),
+                );
+            }
+            let result: Vec<f64> = (0..rows)
+                .map(|r| {
+                    values[r * columns..(r + 1) * columns]
+                        .iter()
+                        .copied()
+                        .fold(f64::NEG_INFINITY, f64::max)
+                })
+                .collect();
+            if result.iter().any(|v| !v.is_finite()) {
+                return Deger::Hata(
+                    "matris_satir_maksimum: sonlu olmayan sonuç".to_string(),
+                );
+            }
+            Deger::Vektor(Rc::new(RefCell::new(result)))
+        }),
+    );
+
+    // matris_satir_ortalamalar(M) → Vektor: her satırın ortalaması (batch norm vb.)
+    globals.insert(
+        "matris_satir_ortalamalar".to_string(),
+        Deger::DahiliFonksiyon(|args| {
+            let [matrix] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "matris_satir_ortalamalar: tam olarak 1 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            };
+            let (rows, columns, values) =
+                match value_to_finite_matrix(matrix, "matris_satir_ortalamalar") {
+                    Ok(m) => m,
+                    Err(e) => return Deger::Hata(e),
+                };
+            if columns == 0 {
+                return Deger::Hata(
+                    "matris_satir_ortalamalar: matrisin en az 1 sütunu olmalıdır".to_string(),
+                );
+            }
+            let result: Vec<f64> = (0..rows)
+                .map(|r| {
+                    let sum: f64 = values[r * columns..(r + 1) * columns].iter().sum();
+                    sum / columns as f64
+                })
+                .collect();
+            if result.iter().any(|v| !v.is_finite()) {
+                return Deger::Hata("matris_satir_ortalamalar: sonlu olmayan sonuç".to_string());
+            }
+            Deger::Vektor(Rc::new(RefCell::new(result)))
+        }),
+    );
+
+    // matris_satir_varyanslar(M) → Vektor: her satırın varyansı (batch norm için)
+    globals.insert(
+        "matris_satir_varyanslar".to_string(),
+        Deger::DahiliFonksiyon(|args| {
+            let [matrix] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "matris_satir_varyanslar: tam olarak 1 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            };
+            let (rows, columns, values) =
+                match value_to_finite_matrix(matrix, "matris_satir_varyanslar") {
+                    Ok(m) => m,
+                    Err(e) => return Deger::Hata(e),
+                };
+            if columns == 0 {
+                return Deger::Hata(
+                    "matris_satir_varyanslar: matrisin en az 1 sütunu olmalıdır".to_string(),
+                );
+            }
+            let result: Vec<f64> = (0..rows)
+                .map(|r| {
+                    let row = &values[r * columns..(r + 1) * columns];
+                    let mean = row.iter().sum::<f64>() / columns as f64;
+                    let var = row.iter().map(|v| (v - mean) * (v - mean)).sum::<f64>()
+                        / columns as f64;
+                    var
+                })
+                .collect();
+            if result.iter().any(|v| !v.is_finite()) {
+                return Deger::Hata("matris_satir_varyanslar: sonlu olmayan sonuç".to_string());
+            }
+            Deger::Vektor(Rc::new(RefCell::new(result)))
+        }),
+    );
+
+    // vektor_dropout(v, oran, egitim_modu) → yeni Vektör
+    // Dropout: eğitim modunda rastgele elemanları sıfırla ve inverted scaling uygula
+    globals.insert(
+        "vektor_dropout".to_string(),
+        Deger::DahiliFonksiyon(|args| {
+            let [vector, Deger::Sayi(rate), Deger::Sayi(training)] = args.as_slice() else {
+                return if args.len() == 3 {
+                    Deger::Hata(
+                        "vektor_dropout: vektör, oran (0-1), eğitim_modu (0/1) gerekir"
+                            .to_string(),
+                    )
+                } else {
+                    Deger::Hata(format!(
+                        "vektor_dropout: tam olarak 3 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            if !rate.is_finite() || *rate < 0.0 || *rate >= 1.0 {
+                return Deger::Hata(
+                    "vektor_dropout: oran [0, 1) aralığında olmalıdır".to_string(),
+                );
+            }
+            let values = match value_to_finite_vector(vector, "vektor_dropout") {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            // inference modda identity
+            if *training == 0.0 {
+                return Deger::Vektor(Rc::new(RefCell::new(values)));
+            }
+            thread_local! {
+                static DROP_RNG: RefCell<SmallRng> = RefCell::new(SmallRng::from_entropy());
+            }
+            let keep_prob = 1.0 - rate;
+            let scale = if keep_prob > 0.0 { 1.0 / keep_prob } else { 0.0 };
+            let mut result = Vec::with_capacity(values.len());
+            let ok = DROP_RNG.with(|rng| match rng.try_borrow_mut() {
+                Ok(mut rng) => {
+                    for v in &values {
+                        if rng.gen::<f64>() < *rate {
+                            result.push(0.0);
+                        } else {
+                            result.push(v * scale);
+                        }
+                    }
+                    true
+                }
+                Err(_) => false,
+            });
+            if !ok {
+                return Deger::Hata(
+                    "vektor_dropout: rastgele sayı üreteci kullanımda".to_string(),
+                );
+            }
+            Deger::Vektor(Rc::new(RefCell::new(result)))
+        }),
+    );
+
+    // matris_dropout(M, oran, egitim_modu) → yeni Matris
+    globals.insert(
+        "matris_dropout".to_string(),
+        Deger::DahiliFonksiyon(|args| {
+            let [matrix, Deger::Sayi(rate), Deger::Sayi(training)] = args.as_slice() else {
+                return if args.len() == 3 {
+                    Deger::Hata(
+                        "matris_dropout: matris, oran (0-1), eğitim_modu (0/1) gerekir"
+                            .to_string(),
+                    )
+                } else {
+                    Deger::Hata(format!(
+                        "matris_dropout: tam olarak 3 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            if !rate.is_finite() || *rate < 0.0 || *rate >= 1.0 {
+                return Deger::Hata(
+                    "matris_dropout: oran [0, 1) aralığında olmalıdır".to_string(),
+                );
+            }
+            let (rows, cols, values) = match value_to_finite_matrix(matrix, "matris_dropout") {
+                Ok(m) => m,
+                Err(e) => return Deger::Hata(e),
+            };
+            if *training == 0.0 {
+                return Deger::Matris {
+                    satirlar: rows,
+                    sutunlar: cols,
+                    veri: Rc::new(RefCell::new(values)),
+                };
+            }
+            thread_local! {
+                static MDRP_RNG: RefCell<SmallRng> = RefCell::new(SmallRng::from_entropy());
+            }
+            let keep_prob = 1.0 - rate;
+            let scale = if keep_prob > 0.0 { 1.0 / keep_prob } else { 0.0 };
+            let mut result = Vec::with_capacity(values.len());
+            let ok = MDRP_RNG.with(|rng| match rng.try_borrow_mut() {
+                Ok(mut rng) => {
+                    for v in &values {
+                        if rng.gen::<f64>() < *rate {
+                            result.push(0.0);
+                        } else {
+                            result.push(v * scale);
+                        }
+                    }
+                    true
+                }
+                Err(_) => false,
+            });
+            if !ok {
+                return Deger::Hata(
+                    "matris_dropout: rastgele sayı üreteci kullanımda".to_string(),
+                );
+            }
+            Deger::Matris {
+                satirlar: rows,
+                sutunlar: cols,
+                veri: Rc::new(RefCell::new(result)),
+            }
+        }),
+    );
+
+    // matris_batch_norm(M, gamma_v, beta_v, epsilon) → normalize edilmiş Matris
+    // Batch Normalization: her sütun bazında normalize et, gamma ile ölçekle, beta ekle
+    globals.insert(
+        "matris_batch_norm".to_string(),
+        Deger::DahiliFonksiyon(|args| {
+            let [matrix, gamma, beta, Deger::Sayi(epsilon)] = args.as_slice() else {
+                return if args.len() == 4 {
+                    Deger::Hata(
+                        "matris_batch_norm: matris, gamma_vektör, beta_vektör, epsilon gerekir"
+                            .to_string(),
+                    )
+                } else {
+                    Deger::Hata(format!(
+                        "matris_batch_norm: tam olarak 4 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            if !epsilon.is_finite() || *epsilon <= 0.0 {
+                return Deger::Hata(
+                    "matris_batch_norm: epsilon pozitif ve sonlu olmalıdır".to_string(),
+                );
+            }
+            let (rows, cols, values) = match value_to_finite_matrix(matrix, "matris_batch_norm") {
+                Ok(m) => m,
+                Err(e) => return Deger::Hata(e),
+            };
+            let gamma_vals = match value_to_finite_vector(gamma, "matris_batch_norm") {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            let beta_vals = match value_to_finite_vector(beta, "matris_batch_norm") {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            if gamma_vals.len() != cols || beta_vals.len() != cols {
+                return Deger::Hata(format!(
+                    "matris_batch_norm: gamma ve beta sütun sayısı ({}) ile eşleşmeli",
+                    cols
+                ));
+            }
+            // Sütun bazında mean ve variance
+            let mut col_means = vec![0.0f64; cols];
+            let mut col_vars = vec![0.0f64; cols];
+            for c in 0..cols {
+                let sum: f64 = (0..rows).map(|r| values[r * cols + c]).sum();
+                col_means[c] = sum / rows as f64;
+            }
+            for c in 0..cols {
+                let var: f64 = (0..rows)
+                    .map(|r| {
+                        let d = values[r * cols + c] - col_means[c];
+                        d * d
+                    })
+                    .sum::<f64>()
+                    / rows as f64;
+                col_vars[c] = var;
+            }
+            let mut result = Vec::with_capacity(rows * cols);
+            for r in 0..rows {
+                for c in 0..cols {
+                    let x_hat =
+                        (values[r * cols + c] - col_means[c]) / (col_vars[c] + epsilon).sqrt();
+                    let y = gamma_vals[c] * x_hat + beta_vals[c];
+                    if !y.is_finite() {
+                        return Deger::Hata(
+                            "matris_batch_norm: sonlu olmayan sonuç".to_string(),
+                        );
+                    }
+                    result.push(y);
+                }
+            }
+            Deger::Matris {
+                satirlar: rows,
+                sutunlar: cols,
+                veri: Rc::new(RefCell::new(result)),
+            }
+        }),
+    );
+
+    // matris_duzenle(M, yeni_satirlar, yeni_sutunlar) → yeniden şekillendir
+    // Toplam eleman sayısı korunur. Flatten (1, N) dahil.
+    globals.insert(
+        "matris_duzenle".to_string(),
+        Deger::DahiliFonksiyon(|args| {
+            let [matrix, Deger::Sayi(new_rows_f), Deger::Sayi(new_cols_f)] = args.as_slice()
+            else {
+                return if args.len() == 3 {
+                    Deger::Hata(
+                        "matris_duzenle: matris, yeni_satır_sayısı, yeni_sütun_sayısı gerekir"
+                            .to_string(),
+                    )
+                } else {
+                    Deger::Hata(format!(
+                        "matris_duzenle: tam olarak 3 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            let (_, _, values) = match value_to_finite_matrix(matrix, "matris_duzenle") {
+                Ok(m) => m,
+                Err(e) => return Deger::Hata(e),
+            };
+            let new_rows = match boyut_dogrula(*new_rows_f, "matris_duzenle", false) {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            let new_cols = match boyut_dogrula(*new_cols_f, "matris_duzenle", false) {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            let new_total = match eleman_sayisi_dogrula(new_rows, new_cols, "matris_duzenle") {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            if new_total != values.len() {
+                return Deger::Hata(format!(
+                    "matris_duzenle: toplam eleman sayısı değişemez ({} → {})",
+                    values.len(),
+                    new_total
+                ));
+            }
+            Deger::Matris {
+                satirlar: new_rows,
+                sutunlar: new_cols,
+                veri: Rc::new(RefCell::new(values)),
+            }
+        }),
+    );
+
+    // vektor_tekrarla(v, n) → v vektörünü n kez yan yana koyarak Matris [n × uzunluk]
+    // Mini-batch bias yayımı için kullanışlı
+    globals.insert(
+        "vektor_tekrarla".to_string(),
+        Deger::DahiliFonksiyon(|args| {
+            let [vector, Deger::Sayi(n_f)] = args.as_slice() else {
+                return if args.len() == 2 {
+                    Deger::Hata(
+                        "vektor_tekrarla: vektör ve tekrar sayısı gerekir".to_string(),
+                    )
+                } else {
+                    Deger::Hata(format!(
+                        "vektor_tekrarla: tam olarak 2 argüman bekleniyordu; {} geldi",
+                        args.len()
+                    ))
+                };
+            };
+            let n = match boyut_dogrula(*n_f, "vektor_tekrarla", false) {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            let values = match value_to_finite_vector(vector, "vektor_tekrarla") {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            let cols = values.len();
+            let _ = match eleman_sayisi_dogrula(n, cols, "vektor_tekrarla") {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            let result: Vec<f64> = values.iter().copied().cycle().take(n * cols).collect();
+            Deger::Matris {
+                satirlar: n,
+                sutunlar: cols,
+                veri: Rc::new(RefCell::new(result)),
+            }
+        }),
+    );
+
+    // ─── Öklit Mesafesi ────────────────────────────────────────────────────
+    // oklid_mesafe(v1, v2) → iki vektör arasındaki L2 mesafesi (k-NN için)
+    globals.insert(
+        "oklid_mesafe".to_string(),
+        Deger::DahiliFonksiyon(|args| {
+            let [v1, v2] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "oklid_mesafe: tam olarak 2 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            };
+            let a = match value_to_finite_vector(v1, "oklid_mesafe") {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            let b = match value_to_finite_vector(v2, "oklid_mesafe") {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            if a.len() != b.len() {
+                return Deger::Hata(format!(
+                    "oklid_mesafe: vektör boyutları eşit olmalı; {} ve {} geldi",
+                    a.len(),
+                    b.len()
+                ));
+            }
+            let dist = a
+                .iter()
+                .zip(b.iter())
+                .map(|(x, y)| (x - y) * (x - y))
+                .sum::<f64>()
+                .sqrt();
+            if dist.is_finite() {
+                Deger::Sayi(dist)
+            } else {
+                Deger::Hata("oklid_mesafe: sonlu olmayan sonuç".to_string())
+            }
+        }),
+    );
+
+    // ─── Argmax / Argmin ───────────────────────────────────────────────────
+    // vektor_argmax(v) → en büyük elemanın indeksi (tahmin sınıfı için)
+    globals.insert(
+        "vektor_argmax".to_string(),
+        Deger::DahiliFonksiyon(|args| {
+            let [vector] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "vektor_argmax: tam olarak 1 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            };
+            let values = match value_to_finite_vector(vector, "vektor_argmax") {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            if values.is_empty() {
+                return Deger::Hata("vektor_argmax: boş vektör".to_string());
+            }
+            let idx = values
+                .iter()
+                .enumerate()
+                .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+                .map(|(i, _)| i)
+                .unwrap_or(0);
+            Deger::Sayi(idx as f64)
+        }),
+    );
+
+    // vektor_argmin(v) → en küçük elemanın indeksi
+    globals.insert(
+        "vektor_argmin".to_string(),
+        Deger::DahiliFonksiyon(|args| {
+            let [vector] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "vektor_argmin: tam olarak 1 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            };
+            let values = match value_to_finite_vector(vector, "vektor_argmin") {
+                Ok(v) => v,
+                Err(e) => return Deger::Hata(e),
+            };
+            if values.is_empty() {
+                return Deger::Hata("vektor_argmin: boş vektör".to_string());
+            }
+            let idx = values
+                .iter()
+                .enumerate()
+                .min_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+                .map(|(i, _)| i)
+                .unwrap_or(0);
+            Deger::Sayi(idx as f64)
+        }),
+    );
+
+    // matris_satir_argmax(M) → Vektor: her satırın argmax'ı (çok-sınıflı tahmin)
+    globals.insert(
+        "matris_satir_argmax".to_string(),
+        Deger::DahiliFonksiyon(|args| {
+            let [matrix] = args.as_slice() else {
+                return Deger::Hata(format!(
+                    "matris_satir_argmax: tam olarak 1 argüman bekleniyordu; {} geldi",
+                    args.len()
+                ));
+            };
+            let (rows, cols, values) =
+                match value_to_finite_matrix(matrix, "matris_satir_argmax") {
+                    Ok(m) => m,
+                    Err(e) => return Deger::Hata(e),
+                };
+            if cols == 0 {
+                return Deger::Hata(
+                    "matris_satir_argmax: matrisin en az 1 sütunu olmalıdır".to_string(),
+                );
+            }
+            let result: Vec<f64> = (0..rows)
+                .map(|r| {
+                    let row = &values[r * cols..(r + 1) * cols];
+                    row.iter()
+                        .enumerate()
+                        .max_by(|a, b| {
+                            a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal)
+                        })
+                        .map(|(i, _)| i as f64)
+                        .unwrap_or(0.0)
+                })
+                .collect();
+            Deger::Vektor(Rc::new(RefCell::new(result)))
         }),
     );
 

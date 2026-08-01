@@ -179,27 +179,15 @@ he_ilklendir fonksiyon olsun giris_n alsın {
 }
 
 // Matris için Xavier ilklendirmesi
+// sigmoid/tanh katmanlar için: U(-sqrt(6/(fan_in+fan_out)), +sqrt(6/(fan_in+fan_out)))
+// Rust built-in üzerinden çalışır — Hüma döngüsü yok, büyük ağlarda hızlı.
 matris_xavier_ilklendir fonksiyon olsun satirlar, sutunlar alsın {
-    M = matris_olustur(satirlar, sutunlar) olsun
-    sinir = karekök(6.0 / (satirlar + sutunlar)) olsun
-    i = 0'dan (satirlar - 1)'e kadar {
-        j = 0'dan (sutunlar - 1)'e kadar {
-            val = uniform_rastgele(-sinir, sinir) olsun
-            matris_ata(M, i, j, val) olsun
-        }
-    }
-    M'yi döndür
+    matris_xavier_ilklendir_builtin(satirlar, sutunlar)'yi döndür
 }
 
 // Matris için He ilklendirmesi
+// ReLU katmanlar için: N(0, sqrt(2/fan_in))
+// Rust built-in üzerinden çalışır — Hüma döngüsü yok, büyük ağlarda hızlı.
 matris_he_ilklendir fonksiyon olsun satirlar, sutunlar alsın {
-    M = matris_olustur(satirlar, sutunlar) olsun
-    std = karekök(2.0 / satirlar) olsun
-    i = 0'dan (satirlar - 1)'e kadar {
-        j = 0'dan (sutunlar - 1)'e kadar {
-            val = normal_rastgele(0.0, std) olsun
-            matris_ata(M, i, j, val) olsun
-        }
-    }
-    M'yi döndür
+    matris_he_ilklendir_builtin(satirlar, sutunlar)'yi döndür
 }

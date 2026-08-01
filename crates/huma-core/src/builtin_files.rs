@@ -13,8 +13,17 @@ pub fn get_lib_files() -> Vec<(&'static str, &'static str)> {
             "yapay_zeka_temel.hb",
             include_str!("../../../lib/yapay_zeka_temel.hb"),
         ),
+        (
+            "derin_ogrenme.hb",
+            include_str!("../../../lib/derin_ogrenme.hb"),
+        ),
+        (
+            "makine_ogrenimi.hb",
+            include_str!("../../../lib/makine_ogrenimi.hb"),
+        ),
     ]
 }
+
 
 pub fn get_example_files() -> Vec<(&'static str, &'static str)> {
     vec![
