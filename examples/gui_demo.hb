@@ -1,19 +1,26 @@
 yükle "gui.hb";
 
-// Sürüm kontrolü
-gui_ver = gui_sürüm_al()
+// Hüma Native GUI v1.0.0 tanıtım uygulaması — Dear ImGui tabanlı
+// Kişiselleştirme (tema), yeni bileşenler ve gerçek sekme çubuğu gösterimi.
+
+gui_ver = gui_sürüm_al() olsun
 ("Kullanılan GUI Sürümü: " + gui_ver)'i yazdır
 
 // Global durum değişkenleri
-aktif_sekme = 1 olsun
 isim = "Hüma Geliştiricisi" olsun
 yaş = 20 olsun
 onay_verdi_mi = 0 olsun
 sayaç = 0 olsun
 pencere_acik = 0 olsun
+ilerleme = 0.35 olsun
+secili_tema_indeks = 0 olsun
+temalar = tema_listele() olsun
+renk = [168, 85, 247] olsun
+secili_meyve = 0 olsun
+meyveler = ["Elma", "Armut", "Muz", "Çilek"] olsun
 
 // ===================
-// SEKME 1 (Ana Sayfa)
+// SAYFA 1 (Profil)
 // ===================
 
 yas_bilgisi fonksiyon olsun {
@@ -23,109 +30,95 @@ yas_bilgisi fonksiyon olsun {
     }
 }
 
-sekme1_icerik fonksiyon olsun {
+profil_sayfasi fonksiyon olsun {
     yazı_ekle("PROFİL BİLGİLERİ", "başlık")
     boşluk_bırak(8.0)
-    
-    // Genişliği 300px olarak sabitlenmiş metin kutusu
+
     isim = metin_kutusu_ekle(isim, 300.0)
-    
+
     boşluk_bırak(5.0)
     yazı_ekle("Merhaba " + isim + "!", 0, 150, 255)
-    
+
     boşluk_bırak(5.0)
     ayraç_çiz()
     boşluk_bırak(5.0)
-    
+
     yaş = kaydırıcı_ekle(yaş, 0, 100)
     yan_yana_diz(yas_bilgisi)
+
+    boşluk_bırak(10.0)
+    bağlantı_ekle("Hüma projesini GitHub'da görüntüle", "https://github.com/VastSea0/huma-lang")
 }
 
 // ===================
-// SEKME 2 (Ayarlar)
+// SAYFA 2 (Kişiselleştirme)
+// ===================
+
+tema_secici fonksiyon olsun {
+    secili_tema_indeks = açılır_liste_ekle(secili_tema_indeks, temalar)
+    boşluk_bırak(8.0)
+    buton_ekle("Bu Temayı Uygula", 140.0, 32.0) ise {
+        tema_ayarla(temalar[secili_tema_indeks])
+    }
+}
+
+ozel_tema_uygula fonksiyon olsun {
+    renk = renk_seçici_ekle(renk[0], renk[1], renk[2])
+    boşluk_bırak(8.0)
+    buton_ekle("Özel Temayı Uygula", 160.0, 32.0) ise {
+        ozel_tema = tema_olustur(1, renk[0], renk[1], renk[2], 10.0, 8.0) olsun
+        tema_ayarla(ozel_tema)
+    }
+}
+
+kisisellestirme_sayfasi fonksiyon olsun {
+    yazı_ekle("HAZIR TEMALAR", "başlık")
+    boşluk_bırak(6.0)
+    ağaç_düğümü_ekle("Hazır temalardan seç", tema_secici)
+
+    boşluk_bırak(10.0)
+    ağaç_düğümü_ekle("Kendi temanı oluştur", ozel_tema_uygula)
+
+    boşluk_bırak(12.0)
+    onay_verdi_mi = onay_kutusu_ekle(onay_verdi_mi, "Geliştirici İstatistiklerine İzin Ver")
+    onay_verdi_mi == 1 ise {
+        yazı_ekle("Teşekkürler, anonim veriler arka planda toplanıyor.", "eğik")
+    }
+}
+
+// ===================
+// SAYFA 3 (Bileşenler)
 // ===================
 
 buton_islemleri fonksiyon olsun {
-    // Yeşik Büyük Buton: buton_ekle(metin, r, g, b, w, h)
     buton_ekle("Sayacı Artır", 50, 200, 50, 150.0, 40.0) ise {
         sayaç = sayaç + 1
+        ilerleme = ilerleme + 0.05
+        ilerleme > 1.0 ise { ilerleme = 0.0 }
     }
-    // Kırmızı Büyük Buton
     buton_ekle("Sıfırla", 255, 100, 100, 100.0, 40.0) ise {
         sayaç = 0
+        ilerleme = 0.0
     }
-    boşluk_bırak(10.0)
+}
+
+bilesenler_sayfasi fonksiyon olsun {
+    yazı_ekle("YENİ BİLEŞENLER", "başlık")
+    boşluk_bırak(8.0)
+
+    kart_ekle(buton_islemleri)
+    boşluk_bırak(8.0)
     yazı_ekle("Sayaç: " + sayaç, "kalın")
-}
+    ilerleme_çubuğu_ekle(ilerleme)
 
-tema_ayarlari fonksiyon olsun {
-    buton_ekle("Koyu Tema 🌙") ise {
-        tema_degistir("koyu")
-    }
-    buton_ekle("Açık Tema ☀️") ise {
-        tema_degistir("açık")
-    }
-}
+    boşluk_bırak(12.0)
+    secili_meyve = açılır_liste_ekle(secili_meyve, meyveler)
+    yazı_ekle("Seçilen meyve: " + meyveler[secili_meyve])
 
-sekme2_icerik fonksiyon olsun {
-    yazı_ekle("UYGULAMA AYARLARI", "başlık")
-    boşluk_bırak(8.0)
-    
-    yan_yana_diz(buton_islemleri)
-    
-    boşluk_bırak(8.0)
-    yazı_ekle("Görünüm Ayarları:")
-    yan_yana_diz(tema_ayarlari)
-    
-    boşluk_bırak(5.0)
-    ayraç_çiz()
-    boşluk_bırak(5.0)
-    
-    onay_verdi_mi = onay_kutusu_ekle(onay_verdi_mi, "Geliştirici İstatistiklerine İzin Ver")
-    
-    onay_verdi_mi == 1 ise {
-        boşluk_bırak(5.0)
-        yazı_ekle("Teşekkürler, anonim veriler arkaplanda toplanıyor.", "eğik")
-    }
-    
     boşluk_bırak(10.0)
     buton_ekle("Yüzen Pencereyi Aç", 200, 40) ise {
         pencere_acik = 1
     }
-}
-
-// ===================
-// SEKME 3 (Tablo ve Veriler)
-// ===================
-
-tablo_verileri fonksiyon olsun {
-    yazı_ekle("ID", "kalın")
-    yazı_ekle("Öğe Adı", "kalın")
-    yazı_ekle("Durum", "kalın")
-    yeni_satır_ekle()
-    
-    yazı_ekle("1")
-    yazı_ekle("Hüma Derleyicisi")
-    yazı_ekle("Aktif", 50, 200, 50)
-    yeni_satır_ekle()
-    
-    yazı_ekle("2")
-    yazı_ekle("Gelişmiş GUI")
-    yazı_ekle("Tamamlanıyor", 255, 150, 0)
-    yeni_satır_ekle()
-}
-
-tablo_sarma fonksiyon olsun {
-    grid_ekle("demo_grid_1", tablo_verileri)
-}
-
-sekme3_icerik fonksiyon olsun {
-    yazı_ekle("GRID (Izgara) Layout Görünümü", "başlık")
-    boşluk_bırak(8.0)
-    
-    yazı_ekle("egui native grid altyapısı ScrollBox ile birlikte:")
-    boşluk_bırak(5.0)
-    kaydırılabilir_liste_ekle("kaydirilan_tablo", tablo_sarma)
 }
 
 // ===================
@@ -136,20 +129,19 @@ pencere_icerigi fonksiyon olsun {
     yazı_ekle("Dikkat!", "başlık")
     yazı_ekle("Ben bir yüzen (floating) pencereyim!", 255, 100, 100)
     yazı_ekle("Mevcut Sayaç: " + sayaç)
-    
+
     buton_ekle("Beni Kapat") ise {
         pencere_acik = 0
     }
 }
 
 // ===================
-// ÜST MENÜ VE ÇERÇEVE
+// ÜST MENÜ
 // ===================
 
 dosya_menusu fonksiyon olsun {
+    menü_ögesi_ekle("Kaydet") ise {
         "Kaydet'e tıklandı."'nı yazdır
-    buton_ekle("Ayarlar") ise {
-        aktif_sekme = 2
     }
 }
 
@@ -157,47 +149,25 @@ ust_menu fonksiyon olsun {
     açılır_menü_ekle("Dosya", dosya_menusu)
 }
 
-sekme_cubugu_fks fonksiyon olsun {
-    sekme_ekle(aktif_sekme == 1, "Profil") == 1 ise {
-        aktif_sekme = 1
-    }
-    sekme_ekle(aktif_sekme == 2, "Ayarlar") == 1 ise {
-        aktif_sekme = 2
-    }
-    sekme_ekle(aktif_sekme == 3, "Grid Mimarisi") == 1 ise {
-        aktif_sekme = 3
-    }
-}
+// ===================
+// ANA ÇİZİM DÖNGÜSÜ (gerçek sekme çubuğu ile)
+// ===================
 
-// ===================
-// ANA ÇİZİM DÖNGÜSÜ
-// ===================
+sekmeler_fks fonksiyon olsun {
+    sekme_sayfası_ekle("Profil", profil_sayfasi)
+    sekme_sayfası_ekle("Kişiselleştirme", kisisellestirme_sayfasi)
+    sekme_sayfası_ekle("Bileşenler", bilesenler_sayfasi)
+}
 
 çizim_fks fonksiyon olsun {
     menü_çubuğu_ekle(ust_menu)
     boşluk_bırak(5.0)
-    
-    yan_yana_diz(sekme_cubugu_fks)
-    
-    ayraç_çiz()
-    boşluk_bırak(8.0)
-    
-    aktif_sekme == 1 ise {
-        grup_kutusu_ekle("Profil Özellikleri", sekme1_icerik)
-    }
-    
-    aktif_sekme == 2 ise {
-        grup_kutusu_ekle("Sistem Ayarları", sekme2_icerik)
-    }
-    
-    aktif_sekme == 3 ise {
-        grup_kutusu_ekle("Veri Tablosu", sekme3_icerik)
-    }
-    
-    // Yüzen Pencere Durumu
+
+    "huma_ana_sekmeler" ile sekmeler_fks'ı sekme_grubu_ekle
+
     pencere_acik == 1 ise {
         pencere_acik = yüzen_pencere_ekle("Uyarı Ekranı", pencere_acik, pencere_icerigi)
     }
 }
 
-pencere_oluştur("Hüma Zengin GUI v2.6", 600.0, 500.0, çizim_fks)
+pencere_oluştur("Hüma Native GUI v1.0.0", 640.0, 520.0, çizim_fks)

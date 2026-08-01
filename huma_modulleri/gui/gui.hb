@@ -1,7 +1,8 @@
-// Hüma Native GUI Kütüphanesi — v0.5.0
-// egui tabanlı yerel arayüz oluşturma araçları
+// Hüma Native GUI Kütüphanesi — v1.0.0
+// Dear ImGui (dear-imgui-rs) tabanlı, hızlı ve hafif yerel arayüz oluşturma araçları.
+// Kişiselleştirme için bkz: tema_ayarla, tema_olustur, tema_listele.
 
-GUI_SÜRÜM = "0.5.0" olsun
+GUI_SÜRÜM = "1.0.0" olsun
 
 gui_sürüm_al fonksiyon olsun {
     GUI_SÜRÜM'ü döndür
@@ -128,4 +129,83 @@ kaydırılabilir_liste_ekle fonksiyon olsun id, fks alsın {
 
 alan_ayır_ekle fonksiyon olsun w, h, fks alsın {
     w ile h ve fks'ı alan_ayır
+}
+
+// ===================================================================
+// KİŞİSELLEŞTİRME (TEMA)
+// ===================================================================
+// tema_ayarla("gece_mavisi")               -> hazır tema uygula
+// tema_ayarla(tema_olustur(1,168,85,247,10.0,8.0)) -> özel tema uygula
+// tema_listele()                            -> hazır tema adları listesi
+// Hazır temalar: koyu, açık, gece_mavisi, mor_alacakaranlık, orman,
+//                gün_batımı, okyanus, kiraz, mono
+
+// ===================================================================
+// EK BİLEŞENLER (v1.0.0)
+// ===================================================================
+
+// İlerleme çubuğu ekler (değer 0.0-1.0 arası)
+// Kullanım: ilerleme_çubuğu_ekle(0.42)
+// Kullanım (etiketli): ilerleme_çubuğu_ekle(0.42, "%42")
+ilerleme_çubuğu_ekle fonksiyon olsun değer, etiket alsın {
+    etiket == boş ise {
+        ilerleme_çubuğu(değer) döndür
+    } yoksa {
+        ilerleme_çubuğu(değer, etiket) döndür
+    }
+}
+
+// Radyo düğmesi ekler; tıklanırsa 1 döner
+// Kullanım: radyo_düğmesi_ekle(seçim, "Seçenek A")
+radyo_düğmesi_ekle fonksiyon olsun seçili_mi, metin alsın {
+    radyo_düğmesi(seçili_mi, metin) döndür
+}
+
+// Açılır liste (combo box) ekler; güncel seçili indeksi döndürür
+// Kullanım: açılır_liste_ekle(secili_indeks, ["Kırmızı","Yeşil","Mavi"])
+açılır_liste_ekle fonksiyon olsun seçili_indeks, seçenekler alsın {
+    açılır_liste(seçili_indeks, seçenekler) döndür
+}
+
+// Renk seçici ekler; [r,g,b] listesi döndürür
+// Kullanım: renk_seçici_ekle(renk[0], renk[1], renk[2])
+renk_seçici_ekle fonksiyon olsun r, g, b alsın {
+    renk_seçici(r, g, b) döndür
+}
+
+// Tıklanabilir bağlantı ekler; tarayıcıda hedef adresi açar
+// Kullanım: bağlantı_ekle("Hüma'yı GitHub'da gör", "https://github.com/...")
+bağlantı_ekle fonksiyon olsun metin, adres alsın {
+    bağlantı(metin, adres) döndür
+}
+
+// Native menü öğesi ekler (açılır_menü_ekle içinde kullanılır)
+menü_ögesi_ekle fonksiyon olsun metin alsın {
+    menü_ögesi(metin) döndür
+}
+
+// Katlanabilir/açılabilir ağaç düğümü (collapsing header) ekler
+ağaç_düğümü_ekle fonksiyon olsun başlık, fks alsın {
+    ağaç_düğümü(başlık, fks) döndür
+}
+
+// Kenarlıklı, başlıksız "kart" paneli ekler (görsel gruplama için)
+kart_ekle fonksiyon olsun fks alsın {
+    kart(fks) döndür
+}
+
+// Gerçek (native) sekme çubuğu oluşturur; içinde sekme_sayfası_ekle çağrıları olmalı
+// Kullanım:
+//   içerik fonksiyon olsun {
+//       sekme_sayfası_ekle("Sayfa 1", sayfa1_fks)
+//       sekme_sayfası_ekle("Sayfa 2", sayfa2_fks)
+//   }
+//   sekme_grubu_ekle("ana_sekmeler", içerik)
+sekme_grubu_ekle fonksiyon olsun id, fks alsın {
+    sekme_grubu(id, fks) döndür
+}
+
+// sekme_grubu_ekle içinde bir sekme sayfası tanımlar; yalnızca aktifken fks çalışır
+sekme_sayfası_ekle fonksiyon olsun başlık, fks alsın {
+    sekme_sayfası(başlık, fks) döndür
 }

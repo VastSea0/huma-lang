@@ -8452,6 +8452,13 @@ impl Yorumlayici {
                     bulunan_yol = Some(hb_yol);
                     break;
                 }
+            } else if let Some(temel_ad) = dosya_adı.strip_suffix(".hb") {
+                // "yükle "paket.hb";" biçimi de modul/modul.hb paket düzenini bulabilsin
+                let paket_yol_uzantili = temel.join(temel_ad).join(dosya_adı);
+                if paket_yol_uzantili.is_file() {
+                    bulunan_yol = Some(paket_yol_uzantili);
+                    break;
+                }
             }
         }
 
