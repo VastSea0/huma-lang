@@ -118,7 +118,8 @@ sinir_agi sınıf olsun {
             tahmin = kendisi.tahmin_et(giris_v) olsun
             // En yüksek aktivasyonlu çıkış sınıfı
             tahmin_sinif = vektor_argmax(tahmin) olsun
-            tahmin_sinif = etiketler[i] ise { dogru = dogru + 1 olsun }
+            gercek_sinif = etiketler[i] olsun
+            tahmin_sinif = gercek_sinif ise { dogru = dogru + 1 olsun }
         }
         dogru / n'yi döndür
     }
@@ -130,23 +131,25 @@ sinir_agi sınıf olsun {
         vektor_argmax(t)'ı döndür
     }
 
-    // Tek örnek üzerinde cross-entropy + softmax eğitim adımı
+    // Tek örnek üzerinde cross-entropy eğitim adımı (softmax son katman)
     // gercek_sinif: 0-tabanlı sınıf indeksi (skaler)
     egitim_adimi_ce fonksiyon olsun giris, gercek_sinif, ogrenme_hizi alsın {
         tahmin = kendisi.tahmin_et(giris) olsun
         n_sinif = vektor_uzunluk(tahmin) olsun
 
-        // Kategorik cross-entropy gradyanı: (softmax_cikis - tek_sicak)
-        // Not: softmax aktivasyon son katmanda olduğunda: grad = p - y
+        // Kategorik cross-entropy gradyanı: (p_i - y_i)
+        // gercek sınıf için: grad = p - 1, diğerleri için: grad = p - 0
         grad = vektor_olustur(n_sinif, 0.0) olsun
         kayip = 0.0 olsun
-        i = 0'dan (n_sinif - 1)'e kadar {
-            p = vektor_al(tahmin, i) olsun
+        j = 0'dan (n_sinif - 1)'e kadar {
+            p = vektor_al(tahmin, j) olsun
+            j_kopya = j + 0 olsun      // döngü değişkenini kopyala
             y = 0.0 olsun
-            i = gercek_sinif ise { y = 1.0 olsun }
-            vektor_ata(grad, i, p - y) olsun
-            // cross-entropy: -log(p[gercek_sinif])
-            i = gercek_sinif ise {
+            j_kopya = gercek_sinif ise { y = 1.0 olsun }
+            grad_j = p - y olsun
+            vektor_ata(grad, j, grad_j) olsun
+            // Sadece gercek_sinif'teki kayıp hesaplanır
+            j_kopya = gercek_sinif ise {
                 eps = 1e-7 olsun
                 p_safe = klamp(p, eps, 1.0 - eps) olsun
                 kayip = -1.0 * güvenli_ln(p_safe) olsun
