@@ -1,6 +1,15 @@
-# Hüma 0.6 Kütüphaneleri
+# Hüma 0.6 Deneysel Kütüphane Envanteri
 
-Bu belge depodaki çalışan giriş noktalarını listeler. Tam imza için ilgili `.hb` kaynağı ve Rust yerleşik kayıtları esas alınır.
+Bu belge yalnız depodaki mevcut deneysel giriş noktalarını listeler. Bunlar
+kararlı kamu API'si değildir, gelecekteki kütüphane mimarisini belirlemez ve
+çekirdek zemin kurulurken yeniden yazılabilir veya kaldırılabilir. Projenin
+odağı yeni alan kütüphanesi eklemek değil [Mühendislik
+Anayasası](docs/MUHENDISLIK_ANAYASASI.md) kapsamındaki genel amaçlı zemini
+tamamlamaktır.
+
+Mevcut `.hb` modülleri hâlâ deneysel envanterdir. Yeni native/haricî paketlerin
+makinece okunabilir imza, etki ve hata kataloğu [HMI v1](docs/HMI.md) ile
+tanımlanır; `huma paket api-kontrol` kırıcı değişiklikleri SemVer'e karşı sınar.
 
 ## Gömülü `lib/` kütüphaneleri
 
@@ -24,8 +33,10 @@ Bu dosyalar binary içine gömülür ve her dizinden yüklenebilir:
 | `yapay_zeka_temel.hb` | vektör/matris yardımcıları, aktivasyonlar, kayıplar, başlatıcılar, metrikler |
 
 Yaygın Rust yerleşikleri arasında `uzunluk`, `listeye_ekle`, `içeriyor`,
-`kırp`, `böl`, `birleştir`, `küçük_harf`, `büyük_harf`, JSON, dosya, ağ,
-SQLite, vektör/matris ve tensor işlevleri bulunur. Kayıtlı yerleşikler argüman
+`kırp`, `böl`, `birleştir`, `küçük_harf`, `büyük_harf` ve JSON bulunur.
+Dosya/CSV/JSONL (`huma-stdlib-file`) ile tensor/BPE (`huma-stdlib-ai`) fiziksel
+olarak ayrı deneysel adaptörlerdir; ağ, süreç, SQLite, GUI ve native sınırları da
+ayrı crate'lerde yaşar. Kayıtlı yerleşikler argüman
 sayısını/türünü, sayısal sonluluğu ve işlemine uygun boyut sınırlarını doğrular;
 geçersiz girdi yakalanabilir `Hata` üretir. Koleksiyon veya dış kaynak
 kullanılan kod yine de bu hatayı ele almalıdır.
@@ -69,14 +80,22 @@ Yoğun katman, MSE tabanlı geri yayılım, Adam güncellemesi, gradyan kırpma 
 - `ag_istekleri`: HTTP istemci sarmalayıcıları
 - `huma_sunucu`: HTTP sunucu sarmalayıcıları
 - `huma_sqlite`: SQLite bağlantı/sorgu API’si
-- `gui`: egui tabanlı masaüstü arayüz API’si
+- `gui`: eski aynı-süreç masaüstü prototipi. Bakımı bırakılmış transitive font
+  ayrıştırıcısı nedeniyle varsayılan workspace ve CLI'dan karantinadadır;
+  kararlı GUI yolu değildir.
 
 Bu modüller ilgili CLI yeteneği verilmeden dış kaynağa erişemez. Yetenek adları:
 `dosya-okuma`, `dosya-yazma`, `ağ-istemci`, `ağ-sunucu`, `süreç`, `ffi`,
-`veritabanı` ve `gui`. Bu model en az ayrıcalık denetimidir; işletim sistemi
+`veritabanı` ve gelecekteki GUI adaptörleri için `gui`. Bu model en az ayrıcalık denetimidir; işletim sistemi
 sandbox’ı değildir.
 
-FFI yalnız açık `f64()`, `f64(f64)` ve `f64(f64,f64)` imzalarını kabul eder.
-`ffi_yükle`, `ffi_çağır` ve `ffi_boşalt` ile yaşam döngüsü yönetilir. Yanlış
-haricî ABI ev sahibi süreci çökertebileceğinden FFI yalnız güvenilen
-kitaplıklarda kullanılmalıdır.
+Açılan yaşam döngülü kaynaklar açıkça kapatılmalıdır: SQLite bağlantıları
+`dahili_sql_kapat`, HTTP sunucuları `dahili_sunucu_kapat`, HMI modülleri
+`hmi_kapat`, güvenilir süreç içi FFI kitaplıkları `ffi_boşalt` kullanır. Sunucu,
+bağlantı ve modül tabloları ayrıca sabit eşzamanlı kaynak sınırlarına sahiptir.
+
+Genel native kütüphane yolu `hmi_başlat`, `hmi_çağır` ve `hmi_kapat` ile ayrı
+süreçte çalışan HMI'dır. Eski süreç içi FFI yalnız açık `f64()`, `f64(f64)` ve
+`f64(f64,f64)` imzalarını kabul eder; varsayılan kayıtlı değildir ve hem `ffi`
+yeteneği hem `--güvenilir-süreç-içi-ffi` gerektirir. Yanlış ABI ev sahibi süreci
+çökertebildiğinden dağıtılan kütüphaneler bu yolu kullanmamalıdır.
