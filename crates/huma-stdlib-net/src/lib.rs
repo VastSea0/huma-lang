@@ -9,6 +9,7 @@ use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server};
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
+use std::net::TcpListener;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
@@ -400,15 +401,22 @@ fn server_start(args: Vec<Deger>) -> Deger {
         Ok(id) => id,
         Err(error) => return Deger::Hata(format!("dahili_sunucu_baslat: {error}")),
     };
-    let address = ([0, 0, 0, 0], port).into();
-    let server = match Server::try_bind(&address) {
-        Ok(server) => server,
+    let address: std::net::SocketAddr = ([0, 0, 0, 0], port).into();
+    // Dinleyiciyi eşzamanlı olarak ayır; Hyper sunucusunu ise Tokio geleceği
+    // ilk kez poll edildiğinde çalışma zamanı bağlamı içinde oluştur.
+    let listener = match TcpListener::bind(address) {
+        Ok(listener) => listener,
         Err(error) => {
             return Deger::Hata(format!(
                 "dahili_sunucu_baslat: {port} portu dinlenemedi: {error}"
             ))
         }
     };
+    if let Err(error) = listener.set_nonblocking(true) {
+        return Deger::Hata(format!(
+            "dahili_sunucu_baslat: {port} dinleyicisi asenkron moda alınamadı: {error}"
+        ));
+    }
     let (sender, receiver) = mpsc::channel(1_024);
     let (shutdown_sender, shutdown_receiver) = oneshot::channel();
     let mut servers = match SERVERS.lock() {
@@ -443,6 +451,19 @@ fn server_start(args: Vec<Deger>) -> Deger {
         }
     });
     if let Err(error) = spawn_background(async move {
+        let server = match Server::from_tcp(listener) {
+            Ok(server) => server,
+            Err(_) => {
+                if let Ok(mut servers) = SERVERS.lock() {
+                    servers.remove(&server_id);
+                }
+                SERVER_RECEIVERS.lock().await.remove(&server_id);
+                if let Ok(mut shutdowns) = SERVER_SHUTDOWNS.lock() {
+                    shutdowns.remove(&server_id);
+                }
+                return;
+            }
+        };
         let _ = server
             .serve(service)
             .with_graceful_shutdown(async move {
@@ -772,5 +793,26 @@ mod tests {
             server_close(vec![Deger::Sayi(f64::NAN)]),
             Deger::Hata(_)
         ));
+    }
+
+    #[test]
+    fn sunucu_tokio_baglami_disinda_guvenle_hazirlanir() {
+        let guard = capability::install(
+            capability::CapabilitySet::deny_all().allow(Capability::NetworkServer),
+        )
+        .expect("Ağ sunucusu yeteneği kurulmalı");
+        let probe = TcpListener::bind("127.0.0.1:0").expect("Boş port bulunmalı");
+        let port = probe.local_addr().expect("Yerel adres okunmalı").port();
+        drop(probe);
+
+        let started = server_start(vec![Deger::Sayi(f64::from(port))]);
+        let Deger::Sayi(server_id) = started else {
+            panic!("Sunucu güvenle hazırlanmalı: {started}");
+        };
+        assert!(matches!(
+            server_close(vec![Deger::Sayi(server_id)]),
+            Deger::Sayi(1.0)
+        ));
+        drop(guard);
     }
 }
