@@ -16,11 +16,11 @@ use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
 use cranelift_module::{FuncId, Linkage, Module};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 
-use huma_core::ast::{Ifade, Komut};
-use huma_core::error::{HumaError, HumaResult};
-use huma_core::lexer::Lexer;
-use huma_core::parser::Parser;
-use huma_core::token::Token;
+use huma_syntax::ast::{Ifade, Komut};
+use huma_syntax::error::{HumaError, HumaResult};
+use huma_syntax::lexer::Lexer;
+use huma_syntax::parser::Parser;
+use huma_syntax::token::Token;
 use wait_timeout::ChildExt;
 
 static AOT_BACKUP_SEQUENCE: AtomicU64 = AtomicU64::new(1);

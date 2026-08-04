@@ -1,0 +1,14 @@
+[package]
+name = "huma-vm"
+version = "0.6.0"
+description = "Experimental Hüma bytecode VM; stable only after interpreter differential parity."
+authors = ["VastSea0 <vastseaoffical0@outlook.com>"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.94.1"
+
+[dependencies]
+huma-syntax = { path = "../huma-syntax" }
+huma-bytecode = { path = "../huma-bytecode" }
+huma-runtime = { path = "../huma-runtime" }
+

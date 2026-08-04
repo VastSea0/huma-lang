@@ -1,0 +1,9 @@
+[package]
+name = "huma-stdlib"
+version = "0.6.0"
+description = "Embedded Hüma standard-library and example source inventory."
+authors = ["VastSea0 <vastseaoffical0@outlook.com>"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.94.1"
+
