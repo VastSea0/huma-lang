@@ -1,7 +1,7 @@
 use anyhow::Result;
-use huma_core::lexer::Lexer;
-use huma_core::parser::Parser;
-use huma_core::HumaError;
+use huma_syntax::lexer::Lexer;
+use huma_syntax::parser::Parser;
+use huma_syntax::HumaError;
 use regex::Regex;
 use std::collections::HashMap;
 use std::io::Read;
@@ -193,7 +193,7 @@ impl Backend {
                 .ok();
         let mut out = Vec::new();
         if let Some(re) = re {
-            for (_name, content) in huma_core::builtin_files::get_lib_files() {
+            for (_name, content) in huma_stdlib::get_lib_files() {
                 for cap in re.captures_iter(content) {
                     if let Some(m) = cap.get(1) {
                         out.push(m.as_str().to_string());

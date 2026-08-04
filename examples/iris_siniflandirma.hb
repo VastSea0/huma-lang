@@ -95,7 +95,7 @@ kayip_gecmisi = [] olsun
 // Eğitim döngüsü
 e = 1'den epoch_sayisi'ye kadar {
     toplam_kayip = 0.0 olsun
-    dogru = 0 olsun
+    dogru_sayisi = 0 olsun
 
     i = 0'dan (n - 1)'e kadar {
         x = veri[i] olsun
@@ -125,7 +125,7 @@ e = 1'den epoch_sayisi'ye kadar {
 
         // Tahmin doğruluğu
         pred = vektor_argmax(a3) olsun
-        pred = gercek ise { dogru = dogru + 1 olsun }
+        pred = gercek ise { dogru_sayisi = dogru_sayisi + 1 olsun }
 
         // Geri yayılım — Katman 3 gradyanı (softmax + CE birleşik)
         dz3 = vektor_olustur(3, 0.0) olsun
@@ -211,7 +211,7 @@ e = 1'den epoch_sayisi'ye kadar {
     }
 
     ort_kayip = toplam_kayip / n olsun
-    ort_dogr = dogru / n olsun
+    ort_dogr = dogru_sayisi / n olsun
     kayip_gecmisi = listeye_ekle(kayip_gecmisi, ort_kayip) olsun
 
     (e % 20 = 0) ise {

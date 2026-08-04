@@ -4,25 +4,107 @@
 //! tokens, AST definitions, lexer, parser, values, bytecode,
 //! bytecode compiler, virtual machine, and tree-walking interpreter.
 
-pub mod ast;
-pub mod autograd;
-pub mod builtin_files;
-pub mod bytecode;
-pub mod capability;
-pub mod compiler;
-pub mod error;
-pub mod ffi;
-pub mod gui;
-pub mod interpreter;
-pub mod lexer;
-pub mod limits;
-pub mod morphology;
-pub mod parser;
-pub mod semantics;
-pub mod token;
-pub mod tokenizer;
-pub mod value;
-pub mod vm;
+pub mod compiler {
+    pub use huma_compiler::Derleyici;
+}
+pub mod autograd {
+    pub use huma_stdlib_ai::autograd::*;
+}
+
+pub mod ai {
+    pub use huma_stdlib_ai::*;
+}
+
+pub mod capability {
+    pub use huma_runtime::capability::*;
+}
+
+pub mod ffi {
+    pub use huma_stdlib_native::*;
+}
+
+pub mod file {
+    pub use huma_stdlib_file::*;
+}
+
+pub mod sqlite {
+    pub use huma_stdlib_sqlite::*;
+}
+
+pub mod net {
+    pub use huma_stdlib_net::*;
+}
+
+pub mod process {
+    pub use huma_stdlib_process::*;
+}
+
+pub mod gc {
+    pub use huma_runtime::gc::*;
+}
+
+pub mod interpreter {
+    pub use huma_runtime::interpreter::*;
+}
+
+pub mod limits {
+    pub use huma_runtime::limits::*;
+}
+
+pub mod semantics {
+    pub use huma_runtime::semantics::*;
+}
+
+pub mod tokenizer {
+    pub use huma_stdlib_ai::tokenizer::*;
+}
+
+pub mod value {
+    pub use huma_runtime::value::*;
+}
+
+pub mod vm {
+    pub use huma_vm::*;
+}
+
+/// 0.6 geçiş uyumluluğu: alan bağımsız kaynak dili artık `huma-syntax`
+/// paketindedir. Bu modüller eski Rust çağıranlarını kırmadan aynı tipleri
+/// yeniden dışa aktarır.
+pub mod ast {
+    pub use huma_syntax::ast::*;
+}
+
+pub mod lexer {
+    pub use huma_syntax::lexer::*;
+}
+
+pub mod morphology {
+    pub use huma_syntax::morphology::*;
+}
+
+pub mod parser {
+    pub use huma_syntax::parser::*;
+}
+
+pub mod token {
+    pub use huma_syntax::token::*;
+}
+
+pub mod error {
+    pub use huma_syntax::error::*;
+}
+
+pub mod bytecode {
+    pub use huma_bytecode::*;
+}
+
+pub mod hmi {
+    pub use huma_hmi::*;
+}
+
+pub mod builtin_files {
+    pub use huma_stdlib::*;
+}
 
 /// Re-export most-used items at the crate root for convenience.
 pub use error::{HumaError, HumaResult, RuntimeDiagnostic, SourceSpan, StackFrame};
@@ -40,6 +122,12 @@ mod tests {
     fn eval(kod: &str) -> String {
         let buf = Rc::new(RefCell::new(String::new()));
         let mut yorumlayici = interpreter::Yorumlayici::new().with_output_buffer(Rc::clone(&buf));
+        file::kayit_et(&mut yorumlayici.global_degiskenler);
+        ffi::kayit_et(&mut yorumlayici.global_degiskenler);
+        ai::kayit_et(&mut yorumlayici.global_degiskenler);
+        sqlite::kayit_et(&mut yorumlayici.global_degiskenler);
+        net::yorumlayiciyi_yapilandir(&mut yorumlayici);
+        process::kayit_et(&mut yorumlayici.global_degiskenler);
         let lx = lexer::Lexer::new(kod);
         let mut p = parser::Parser::new(lx);
         let (prog, diagnostics) = p.parse_program_with_diagnostics();
@@ -57,6 +145,12 @@ mod tests {
 
     fn eval_hatasi(kod: &str) -> String {
         let mut yorumlayici = interpreter::Yorumlayici::new();
+        file::kayit_et(&mut yorumlayici.global_degiskenler);
+        ffi::kayit_et(&mut yorumlayici.global_degiskenler);
+        ai::kayit_et(&mut yorumlayici.global_degiskenler);
+        sqlite::kayit_et(&mut yorumlayici.global_degiskenler);
+        net::yorumlayiciyi_yapilandir(&mut yorumlayici);
+        process::kayit_et(&mut yorumlayici.global_degiskenler);
         let mut parser = parser::Parser::new(lexer::Lexer::new(kod));
         let (program, diagnostics) = parser.parse_program_with_diagnostics();
         assert!(
@@ -114,9 +208,9 @@ mod tests {
         assert!(eval_hatasi("zaman(1)").contains("argüman beklenmiyordu"));
         assert!(eval_hatasi("rastgele(1)").contains("argüman beklenmiyordu"));
         assert!(eval_hatasi("sistem(42)").contains("metin komutu"));
-        assert!(eval_hatasi("ffi_yükle(1, 2)").contains("2 metin"));
-        assert!(eval_hatasi("ffi_çağır(1, 2)").contains("açık ABI imzası"));
-        assert!(eval_hatasi("ffi_boşalt(1)").contains("kütüphane adı metni"));
+        assert!(eval_hatasi("hmi_başlat(1, 2)").contains("2 metin"));
+        assert!(eval_hatasi("hmi_çağır(1, 2)").contains("en az 2 metin"));
+        assert!(eval_hatasi("hmi_kapat(1)").contains("modül adı"));
         assert!(eval_hatasi("küçük_harf(1)").contains("metin bekleniyordu"));
         assert!(eval_hatasi(r#"böl("a")"#).contains("tam olarak 2"));
         assert!(eval_hatasi("birleştir([1])").contains("yalnızca metin"));
@@ -204,16 +298,6 @@ mod tests {
         );
         assert!(eval_hatasi(r#"csv_yaz("x", [], "ğ")"#).contains("tek baytlık ASCII"));
         assert!(eval_hatasi(r#"csv_yaz("x", [[[]]])"#).contains("metin, sayı veya boş"));
-    }
-
-    #[test]
-    fn gui_yerlesikleri_baglam_disini_ve_gecersiz_boyutu_reddeder() {
-        let _guard = capability::install(
-            capability::CapabilitySet::deny_all().allow(capability::Capability::Gui),
-        )
-        .expect("GUI yeteneği kurulmalı");
-        assert!(eval_hatasi(r#"buton("Düğme")"#).contains("çizim fonksiyonu içinde"));
-        assert!(eval_hatasi(r#"buton("Düğme", -1, 10)"#).contains("pozitif"));
     }
 
     #[test]
@@ -342,10 +426,10 @@ mod tests {
             .expect_err("sonsuz sayı JSON'a dönüşmemeli")
             .contains("sonlu"));
 
-        let liste = Rc::new(RefCell::new(Vec::new()));
+        let liste = gc::Gc::new(Vec::new());
         liste
             .borrow_mut()
-            .push(value::Deger::Liste(Rc::clone(&liste)));
+            .push(value::Deger::Liste(gc::Gc::clone(&liste)));
         assert!(value::Deger::Liste(liste)
             .to_json_checked()
             .expect_err("döngüsel liste JSON'a dönüşmemeli")

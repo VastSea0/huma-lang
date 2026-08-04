@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use colored::Colorize;
+use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -39,6 +40,9 @@ pub struct PaketMetadata {
     /// Hüma 0.6 bu kodu derlemez veya çalıştırmaz.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub yerleşik_rust: Option<String>,
+    /// Süreç dışı native/haricî modül için sürümlü HMI sözleşmesi.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hmi: Option<huma_hmi::PackageContract>,
     /// Paketin GitHub kaynak URL'si (lock dosyasında izlenebilmesi için)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kaynak: Option<String>,
@@ -67,6 +71,34 @@ pub struct KilitBilgisi {
     /// Paketin kaynağı (GitHub URL, builtin, vb.)
     #[serde(default)]
     pub kaynak: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub imza: Option<PaketImzasi>,
+}
+
+/// Paket içeriğine bağlı, taşınabilir Ed25519 imza zarfı.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PaketImzasi {
+    pub sema_surumu: u16,
+    pub algoritma: String,
+    pub paket: String,
+    pub surum: String,
+    pub sha256: String,
+    pub anahtar_kimligi: String,
+    pub acik_anahtar: String,
+    pub imza: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct DagitimImzasi {
+    pub sema_surumu: u16,
+    pub algoritma: String,
+    pub dosya: String,
+    pub sha256: String,
+    pub anahtar_kimligi: String,
+    pub acik_anahtar: String,
+    pub imza: String,
 }
 
 // ─── Sabitler ───────────────────────────────────────────────────────────────
@@ -74,6 +106,9 @@ pub struct KilitBilgisi {
 const PACKAGE_DIR: &str = "huma_modulleri";
 const LOCK_FILE: &str = "huma.lock";
 const PROJECT_FILE: &str = "huma.json";
+const SIGNATURE_FILE: &str = "huma.sig";
+const SIGNATURE_DOMAIN: &[u8] = b"HUMA-PACKAGE-SIGNATURE-V1\0";
+const ARTIFACT_SIGNATURE_DOMAIN: &[u8] = b"HUMA-ARTIFACT-SIGNATURE-V1\0";
 const CURRENT_HUMA_VER: &str = env!("CARGO_PKG_VERSION");
 const MAX_METADATA_BYTES: usize = 1024 * 1024;
 const MAX_PACKAGE_FILES: usize = 10_000;
@@ -241,6 +276,11 @@ fn validate_package_metadata(meta: &PaketMetadata, expected_name: Option<&str>) 
             })?;
         }
     }
+    if let Some(contract) = &meta.hmi {
+        contract
+            .validate()
+            .map_err(|error| anyhow!("Geçersiz HMI sözleşmesi: {error}"))?;
+    }
     for (field, value) in [
         ("kaynak", meta.kaynak.as_deref()),
         ("github", meta.github.as_deref()),
@@ -322,11 +362,17 @@ fn check_native_code_safety(meta: &PaketMetadata, _trusted: bool) -> Result<()> 
         .as_ref()
         .is_some_and(|d| !d.is_empty());
 
+    if (has_native_rust || has_crate_deps) && meta.hmi.is_some() {
+        return Err(anyhow!(
+            "'{}' paketi eski native Rust alanlarıyla HMI sözleşmesini birlikte kullanamaz.",
+            meta.ad
+        ));
+    }
     if has_native_rust || has_crate_deps {
         return Err(anyhow!(
-            "'{}' paketi native Rust alanları içeriyor. Hüma 0.6 sürümlü ve doğrulanabilir \
-             bir native paket ABI'si tanımlamadığı için bu paket kurulamaz; '--güvenilir' bu \
-             yapısal güvenlik koşulunu atlamaz.",
+            "'{}' paketi süreç içi native Rust alanları içeriyor. Bu paket kurulamaz; \
+             süreç dışı 'hmi' sözleşmesini kullanın. '--güvenilir' bu yapısal \
+             güvenlik koşulunu atlamaz.",
             meta.ad
         ));
     }
@@ -381,7 +427,7 @@ fn calculate_package_hash(package_path: &Path, meta: &PaketMetadata) -> Result<S
             } else if path.parent() != Some(root)
                 || !matches!(
                     path.file_name().and_then(|name| name.to_str()),
-                    Some("huma.json" | "paket.json")
+                    Some("huma.json" | "paket.json" | SIGNATURE_FILE)
                 )
             {
                 files.push(path);
@@ -441,6 +487,376 @@ fn calculate_package_hash(package_path: &Path, meta: &PaketMetadata) -> Result<S
         hasher.update(content);
     }
     Ok(hex::encode(hasher.finalize()))
+}
+
+fn package_signature_message(meta: &PaketMetadata, hash: &str) -> Result<Vec<u8>> {
+    let digest = hex::decode(hash).with_context(|| "Paket SHA-256 özeti hex olarak okunamadı")?;
+    if digest.len() != 32 {
+        return Err(anyhow!("Paket SHA-256 özeti 32 bayt olmalıdır."));
+    }
+    let mut message = Vec::with_capacity(
+        SIGNATURE_DOMAIN.len() + meta.ad.len() + meta.surum.len() + digest.len() + 16,
+    );
+    message.extend_from_slice(SIGNATURE_DOMAIN);
+    message.extend_from_slice(&(meta.ad.len() as u64).to_be_bytes());
+    message.extend_from_slice(meta.ad.as_bytes());
+    message.extend_from_slice(&(meta.surum.len() as u64).to_be_bytes());
+    message.extend_from_slice(meta.surum.as_bytes());
+    message.extend_from_slice(&digest);
+    Ok(message)
+}
+
+fn read_signing_key(path: &Path) -> Result<SigningKey> {
+    let metadata = fs::symlink_metadata(path)
+        .with_context(|| format!("Ed25519 anahtar dosyası bulunamadı: {}", path.display()))?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err(anyhow!(
+            "Ed25519 anahtarı sembolik bağlantı olmayan normal dosya olmalıdır: {}",
+            path.display()
+        ));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if metadata.permissions().mode() & 0o077 != 0 {
+            return Err(anyhow!(
+                "Ed25519 anahtar dosyası grup/diğer kullanıcı izinlerine açık; chmod 600 uygulayın: {}",
+                path.display()
+            ));
+        }
+    }
+    let text = read_text_limited(path, 4_096, "Ed25519 anahtarı")?;
+    let bytes = hex::decode(text.trim())
+        .with_context(|| "Ed25519 anahtarı 32 baytlık küçük harfli hex tohum olmalıdır")?;
+    let bytes: [u8; 32] = bytes
+        .try_into()
+        .map_err(|_| anyhow!("Ed25519 anahtarı tam olarak 32 bayt olmalıdır."))?;
+    Ok(SigningKey::from_bytes(&bytes))
+}
+
+fn artifact_hash(path: &Path) -> Result<String> {
+    let metadata = fs::symlink_metadata(path)
+        .with_context(|| format!("Dağıtım dosyası bulunamadı: {}", path.display()))?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err(anyhow!(
+            "Dağıtım girdisi sembolik bağlantı olmayan normal dosya olmalıdır: {}",
+            path.display()
+        ));
+    }
+    let mut file = fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+    }
+    Ok(hex::encode(hasher.finalize()))
+}
+
+fn artifact_signature_message(file_name: &str, hash: &str) -> Result<Vec<u8>> {
+    if file_name.is_empty() || file_name.len() > 4_096 || file_name.contains('\0') {
+        return Err(anyhow!("Dağıtım dosya etiketi geçersiz."));
+    }
+    let digest = hex::decode(hash).with_context(|| "Dağıtım SHA-256 özeti geçerli hex değil")?;
+    if digest.len() != 32 {
+        return Err(anyhow!("Dağıtım SHA-256 özeti 32 bayt olmalıdır."));
+    }
+    let mut message =
+        Vec::with_capacity(ARTIFACT_SIGNATURE_DOMAIN.len() + file_name.len() + digest.len() + 8);
+    message.extend_from_slice(ARTIFACT_SIGNATURE_DOMAIN);
+    message.extend_from_slice(&(file_name.len() as u64).to_be_bytes());
+    message.extend_from_slice(file_name.as_bytes());
+    message.extend_from_slice(&digest);
+    Ok(message)
+}
+
+pub fn sign_distribution_artifact(input: &Path, key_path: &Path, output: &Path) -> Result<()> {
+    let file_name = input
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| anyhow!("Dağıtım dosya adı geçerli UTF-8 olmalıdır."))?;
+    let hash = artifact_hash(input)?;
+    let signing_key = read_signing_key(key_path)?;
+    let public_key = signing_key.verifying_key().to_bytes();
+    let signature = signing_key.sign(&artifact_signature_message(file_name, &hash)?);
+    let envelope = DagitimImzasi {
+        sema_surumu: 1,
+        algoritma: "Ed25519".to_string(),
+        dosya: file_name.to_string(),
+        sha256: hash,
+        anahtar_kimligi: hex::encode(&Sha256::digest(public_key)[..8]),
+        acik_anahtar: hex::encode(public_key),
+        imza: hex::encode(signature.to_bytes()),
+    };
+    atomic_write(output, &canonical_json_pretty_bytes(&envelope)?)?;
+    println!(
+        "{} {} → {} (anahtar {}).",
+        "Dağıtım imzalandı:".bright_green(),
+        input.display(),
+        output.display(),
+        envelope.anahtar_kimligi
+    );
+    Ok(())
+}
+
+pub fn verify_distribution_artifact(input: &Path, signature_path: &Path) -> Result<()> {
+    let content = read_text_limited(signature_path, MAX_METADATA_BYTES, "Dağıtım imza zarfı")?;
+    let envelope: DagitimImzasi =
+        serde_json::from_str(&content).with_context(|| "Dağıtım imza zarfı geçerli JSON değil")?;
+    if envelope.sema_surumu != 1 || envelope.algoritma != "Ed25519" {
+        return Err(anyhow!("Desteklenmeyen dağıtım imza zarfı."));
+    }
+    let file_name = input
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| anyhow!("Dağıtım dosya adı geçerli UTF-8 olmalıdır."))?;
+    let hash = artifact_hash(input)?;
+    if envelope.dosya != file_name || envelope.sha256 != hash {
+        return Err(anyhow!(
+            "Dağıtım imzası dosya adı veya SHA-256 özetiyle uyuşmuyor."
+        ));
+    }
+    let public_key: [u8; 32] = hex::decode(&envelope.acik_anahtar)
+        .with_context(|| "Dağıtım açık anahtarı geçerli hex değil")?
+        .try_into()
+        .map_err(|_| anyhow!("Ed25519 açık anahtarı 32 bayt olmalıdır."))?;
+    let verifying_key = VerifyingKey::from_bytes(&public_key)
+        .with_context(|| "Dağıtım Ed25519 açık anahtarı geçersiz")?;
+    if verifying_key.is_weak() {
+        return Err(anyhow!("Zayıf Ed25519 açık anahtarı reddedildi."));
+    }
+    if envelope.anahtar_kimligi != hex::encode(&Sha256::digest(public_key)[..8]) {
+        return Err(anyhow!("Dağıtım anahtar kimliği uyuşmuyor."));
+    }
+    let signature: [u8; 64] = hex::decode(&envelope.imza)
+        .with_context(|| "Dağıtım Ed25519 imzası geçerli hex değil")?
+        .try_into()
+        .map_err(|_| anyhow!("Ed25519 imzası 64 bayt olmalıdır."))?;
+    verifying_key
+        .verify_strict(
+            &artifact_signature_message(file_name, &hash)?,
+            &Signature::from_bytes(&signature),
+        )
+        .with_context(|| "Dağıtım Ed25519 imzası doğrulanamadı")?;
+    println!(
+        "{} {} (anahtar {}).",
+        "Dağıtım doğrulandı:".bright_green(),
+        input.display(),
+        envelope.anahtar_kimligi
+    );
+    Ok(())
+}
+
+fn create_package_signature(
+    meta: &PaketMetadata,
+    hash: &str,
+    signing_key: &SigningKey,
+) -> Result<PaketImzasi> {
+    let message = package_signature_message(meta, hash)?;
+    let signature = signing_key.sign(&message);
+    let public_key = signing_key.verifying_key().to_bytes();
+    let key_digest = Sha256::digest(public_key);
+    Ok(PaketImzasi {
+        sema_surumu: 1,
+        algoritma: "Ed25519".to_string(),
+        paket: meta.ad.clone(),
+        surum: meta.surum.clone(),
+        sha256: hash.to_string(),
+        anahtar_kimligi: hex::encode(&key_digest[..8]),
+        acik_anahtar: hex::encode(public_key),
+        imza: hex::encode(signature.to_bytes()),
+    })
+}
+
+fn verify_package_signature(
+    meta: &PaketMetadata,
+    hash: &str,
+    envelope: &PaketImzasi,
+) -> Result<()> {
+    if envelope.sema_surumu != 1 || envelope.algoritma != "Ed25519" {
+        return Err(anyhow!(
+            "Desteklenmeyen paket imza zarfı: şema {}, algoritma '{}'.",
+            envelope.sema_surumu,
+            envelope.algoritma
+        ));
+    }
+    if envelope.paket != meta.ad || envelope.surum != meta.surum || envelope.sha256 != hash {
+        return Err(anyhow!(
+            "Paket imzası ad, sürüm veya SHA-256 özetiyle uyuşmuyor."
+        ));
+    }
+    let public_key = hex::decode(&envelope.acik_anahtar)
+        .with_context(|| "Paket imzasındaki açık anahtar geçerli hex değil")?;
+    let public_key: [u8; 32] = public_key
+        .try_into()
+        .map_err(|_| anyhow!("Ed25519 açık anahtarı 32 bayt olmalıdır."))?;
+    let verifying_key =
+        VerifyingKey::from_bytes(&public_key).with_context(|| "Ed25519 açık anahtarı geçersiz")?;
+    if verifying_key.is_weak() {
+        return Err(anyhow!("Zayıf Ed25519 açık anahtarı reddedildi."));
+    }
+    let expected_key_id = hex::encode(&Sha256::digest(public_key)[..8]);
+    if envelope.anahtar_kimligi != expected_key_id {
+        return Err(anyhow!("Paket imzası anahtar kimliğiyle uyuşmuyor."));
+    }
+    let signature =
+        hex::decode(&envelope.imza).with_context(|| "Paket Ed25519 imzası geçerli hex değil")?;
+    let signature: [u8; 64] = signature
+        .try_into()
+        .map_err(|_| anyhow!("Ed25519 imzası 64 bayt olmalıdır."))?;
+    let signature = Signature::from_bytes(&signature);
+    verifying_key
+        .verify_strict(&package_signature_message(meta, hash)?, &signature)
+        .with_context(|| "Paket Ed25519 imzası doğrulanamadı")
+}
+
+fn read_package_signature(package_root: &Path) -> Result<Option<PaketImzasi>> {
+    let path = package_root.join(SIGNATURE_FILE);
+    if !path.exists() {
+        return Ok(None);
+    }
+    let metadata = fs::symlink_metadata(&path)?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err(anyhow!(
+            "Paket imza zarfı normal dosya olmalıdır: {}",
+            path.display()
+        ));
+    }
+    let content = read_text_limited(&path, MAX_METADATA_BYTES, "Paket imza zarfı")?;
+    serde_json::from_str(&content)
+        .with_context(|| format!("Paket imza zarfı geçersiz: {}", path.display()))
+        .map(Some)
+}
+
+pub fn sign_current_package(key_path: &Path) -> Result<()> {
+    let root = std::env::current_dir()?;
+    let metadata_text = read_text_limited(
+        &root.join(PROJECT_FILE),
+        MAX_METADATA_BYTES,
+        "Proje metadata'sı",
+    )?;
+    let meta: PaketMetadata =
+        serde_json::from_str(&metadata_text).with_context(|| "huma.json parse edilemedi")?;
+    validate_package_metadata(&meta, None)?;
+    validate_package_tree(&root, &meta)?;
+    let hash = calculate_package_hash(&root, &meta)?;
+    let signing_key = read_signing_key(key_path)?;
+    let envelope = create_package_signature(&meta, &hash, &signing_key)?;
+    atomic_write(
+        &root.join(SIGNATURE_FILE),
+        &canonical_json_pretty_bytes(&envelope)?,
+    )?;
+    println!(
+        "{} Paket '{}' v{} anahtar {} ile imzalandı.",
+        "İmzalandı:".bright_green(),
+        meta.ad,
+        meta.surum,
+        envelope.anahtar_kimligi
+    );
+    Ok(())
+}
+
+pub fn verify_current_package_signature() -> Result<()> {
+    let root = std::env::current_dir()?;
+    let metadata_text = read_text_limited(
+        &root.join(PROJECT_FILE),
+        MAX_METADATA_BYTES,
+        "Proje metadata'sı",
+    )?;
+    let meta: PaketMetadata = serde_json::from_str(&metadata_text)?;
+    validate_package_metadata(&meta, None)?;
+    let hash = calculate_package_hash(&root, &meta)?;
+    let envelope = read_package_signature(&root)?
+        .ok_or_else(|| anyhow!("Paket imza zarfı bulunamadı: {SIGNATURE_FILE}"))?;
+    verify_package_signature(&meta, &hash, &envelope)?;
+    println!(
+        "{} Paket '{}' v{} için Ed25519 imzası geçerli (anahtar {}).",
+        "Doğrulandı:".bright_green(),
+        meta.ad,
+        meta.surum,
+        envelope.anahtar_kimligi
+    );
+    Ok(())
+}
+
+/// İki paket sürümünün makinece okunabilir HMI sözleşmesini SemVer ile birlikte
+/// denetler. Kırıcı değişiklik yalnız yeni bir ana paket sürümünde kabul edilir.
+pub fn check_api_compatibility(previous_path: &Path, current_path: &Path) -> Result<()> {
+    let previous_text = read_text_limited(
+        previous_path,
+        MAX_METADATA_BYTES,
+        "Önceki paket metadata'sı",
+    )?;
+    let current_text =
+        read_text_limited(current_path, MAX_METADATA_BYTES, "Yeni paket metadata'sı")?;
+    let previous: PaketMetadata = serde_json::from_str(&previous_text)
+        .with_context(|| "Önceki paket metadata'sı geçerli JSON değil")?;
+    let current: PaketMetadata = serde_json::from_str(&current_text)
+        .with_context(|| "Yeni paket metadata'sı geçerli JSON değil")?;
+    validate_package_metadata(&previous, None)?;
+    validate_package_metadata(&current, None)?;
+    if previous.ad != current.ad {
+        return Err(anyhow!(
+            "API karşılaştırması aynı paket adını gerektirir: '{}' != '{}'",
+            previous.ad,
+            current.ad
+        ));
+    }
+    let previous_version = Version::parse(&previous.surum)?;
+    let current_version = Version::parse(&current.surum)?;
+    if current_version <= previous_version {
+        return Err(anyhow!(
+            "Yeni paket sürümü eskisinden büyük olmalıdır: {} <= {}",
+            current_version,
+            previous_version
+        ));
+    }
+
+    let compatibility = match (&previous.hmi, &current.hmi) {
+        (None, _) => Ok(()),
+        (Some(_), None) => Err(huma_hmi::HmiError::IncompatibleInterface(
+            "paketin HMI sözleşmesi kaldırıldı".to_string(),
+        )),
+        (Some(previous), Some(current)) => {
+            if previous.protocol.major != current.protocol.major {
+                Err(huma_hmi::HmiError::IncompatibleInterface(format!(
+                    "HMI protokol ana sürümü değişti: {} -> {}",
+                    previous.protocol.major, current.protocol.major
+                )))
+            } else {
+                current
+                    .interface
+                    .check_backward_compatible_with(&previous.interface)
+            }
+        }
+    };
+
+    match compatibility {
+        Ok(()) => {
+            println!(
+                "{} {} {} → {} geriye uyumlu.",
+                "API doğrulandı:".bright_green(),
+                current.ad,
+                previous_version,
+                current_version
+            );
+            Ok(())
+        }
+        Err(error) if current_version.major > previous_version.major => {
+            println!(
+                "{} kırıcı değişiklik yeni ana sürümle kapsandı: {}",
+                "API doğrulandı:".bright_green(),
+                error
+            );
+            Ok(())
+        }
+        Err(error) => Err(anyhow!(
+            "Kırıcı HMI/API değişikliği ana sürüm artırılmadan yayımlanamaz: {error}"
+        )),
+    }
 }
 
 // ─── [5] Atomik Dosya Yazımı ───────────────────────────────────────────────
@@ -614,6 +1030,7 @@ pub fn create_package(name: &str) -> Result<()> {
         betikler: Some(betikler),
         crate_bagimliliklari: None,
         yerleşik_rust: None,
+        hmi: None,
         kaynak: None,
         github: None,
         lisans: Some("MIT".to_string()),
@@ -663,8 +1080,8 @@ pub fn create_package(name: &str) -> Result<()> {
 }
 
 /// Bir paketi kurar ve kilit dosyasına ekler.
-/// `trusted`, eski CLI çağrılarıyla uyumluluk için tutulur. Hüma 0.6 sürümlü
-/// bir native paket ABI'si tanımlamadığından bu bayrak native kodu etkinleştirmez.
+/// `trusted`, yalnız yerel geliştirme sırasında imzasız pakete açık onay verir.
+/// Hüma 0.6 süreç içi native paket ABI'si tanımlamadığından native kodu açmaz.
 pub fn install_package(input: Option<&str>, trusted: bool) -> Result<()> {
     if !Path::new(PROJECT_FILE).exists() {
         return Err(anyhow!(
@@ -730,7 +1147,7 @@ pub fn install_package(input: Option<&str>, trusted: bool) -> Result<()> {
             .get_or_insert_with(HashMap::new)
             .insert(root_name, format!("^{}", root.meta.surum));
     }
-    install_resolved_transaction(resolved, project, &project_bytes)
+    install_resolved_transaction(resolved, project, &project_bytes, trusted)
 }
 
 /// [4] Yerel workspace'te paketi arar (mono-repo senaryosu)
@@ -827,6 +1244,34 @@ fn validate_package_tree(package_path: &Path, meta: &PaketMetadata) -> Result<()
             "Paket giriş dosyası kaynak dizininin dışına çıkıyor: {}",
             entry_path.display()
         ));
+    }
+    if let Some(contract) = &meta.hmi {
+        let executable = package_path.join(&contract.executable);
+        let executable_metadata = fs::symlink_metadata(&executable)
+            .with_context(|| format!("HMI yürütülebiliri bulunamadı: {}", executable.display()))?;
+        if executable_metadata.file_type().is_symlink() || !executable_metadata.is_file() {
+            return Err(anyhow!(
+                "HMI yürütülebiliri sembolik bağlantı olmayan normal dosya olmalıdır: {}",
+                executable.display()
+            ));
+        }
+        let canonical_executable = executable.canonicalize()?;
+        if !canonical_executable.starts_with(&canonical_root) {
+            return Err(anyhow!(
+                "HMI yürütülebiliri paket dizininin dışına çıkıyor: {}",
+                executable.display()
+            ));
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if executable_metadata.permissions().mode() & 0o111 == 0 {
+                return Err(anyhow!(
+                    "HMI yürütülebilirinde çalıştırma izni yok: {}",
+                    executable.display()
+                ));
+            }
+        }
     }
     read_text_limited(&entry_path, MAX_PACKAGE_FILE_BYTES, "Paket giriş dosyası")?;
     calculate_package_hash(package_path, meta)?;
@@ -966,6 +1411,7 @@ struct PreparedPackage {
     target: PathBuf,
     staged: Option<PathBuf>,
     hash: String,
+    signature: Option<PaketImzasi>,
 }
 
 fn cleanup_stages(packages: &mut [PreparedPackage]) {
@@ -982,7 +1428,10 @@ fn cleanup_stages(packages: &mut [PreparedPackage]) {
     }
 }
 
-fn prepare_packages(resolved: Vec<ResolvedPackage>) -> Result<Vec<PreparedPackage>> {
+fn prepare_packages(
+    resolved: Vec<ResolvedPackage>,
+    allow_unsigned_local: bool,
+) -> Result<Vec<PreparedPackage>> {
     let package_root = PathBuf::from(PACKAGE_DIR);
     fs::create_dir_all(&package_root)?;
     let canonical_root = package_root.canonicalize().with_context(|| {
@@ -1030,11 +1479,44 @@ fn prepare_packages(resolved: Vec<ResolvedPackage>) -> Result<Vec<PreparedPackag
                 return Err(error);
             }
         };
+        let signature = match read_package_signature(hash_root) {
+            Ok(Some(signature)) => {
+                if let Err(error) = verify_package_signature(&package.meta, &hash, &signature) {
+                    if let Some(stage) = &staged {
+                        let _ = fs::remove_dir_all(stage);
+                    }
+                    cleanup_stages(&mut prepared);
+                    return Err(
+                        error.context(format!("'{}' paketinin imzası geçersiz", package.meta.ad))
+                    );
+                }
+                Some(signature)
+            }
+            Ok(None) if allow_unsigned_local => None,
+            Ok(None) => {
+                if let Some(stage) = &staged {
+                    let _ = fs::remove_dir_all(stage);
+                }
+                cleanup_stages(&mut prepared);
+                return Err(anyhow!(
+                    "'{}' paketi Ed25519 imzası taşımıyor. Güvenli kurulum varsayılanı \n+                     imza ister; yalnız denetlediğiniz yerel geliştirme kaynağı için \n+                     açıkça '--güvenilir' verin.",
+                    package.meta.ad
+                ));
+            }
+            Err(error) => {
+                if let Some(stage) = &staged {
+                    let _ = fs::remove_dir_all(stage);
+                }
+                cleanup_stages(&mut prepared);
+                return Err(error);
+            }
+        };
         prepared.push(PreparedPackage {
             meta: package.meta,
             target,
             staged,
             hash,
+            signature,
         });
     }
     Ok(prepared)
@@ -1071,8 +1553,9 @@ fn install_resolved_transaction(
     resolved: Vec<ResolvedPackage>,
     project: PaketMetadata,
     original_project: &[u8],
+    allow_unsigned_local: bool,
 ) -> Result<()> {
-    let mut prepared = prepare_packages(resolved)?;
+    let mut prepared = prepare_packages(resolved, allow_unsigned_local)?;
     let mut lock = read_lock_or_default(Path::new(LOCK_FILE))?;
     for package in &prepared {
         lock.paketler.insert(
@@ -1080,7 +1563,12 @@ fn install_resolved_transaction(
             KilitBilgisi {
                 surum: package.meta.surum.clone(),
                 hash: package.hash.clone(),
-                kaynak: Some("yerel".to_string()),
+                kaynak: Some(if package.signature.is_some() {
+                    "yerel-imzalı".to_string()
+                } else {
+                    "yerel-imzasız-güvenilir".to_string()
+                }),
+                imza: package.signature.clone(),
             },
         );
     }
@@ -1484,6 +1972,40 @@ pub fn verify_package() -> Result<()> {
                 &computed_hash[..16]
             ));
         }
+        let signature_on_disk = read_package_signature(&package_dir)?;
+        match (&lock_info.imza, signature_on_disk) {
+            (Some(locked), Some(on_disk)) => {
+                if locked != &on_disk {
+                    return Err(anyhow!(
+                        "Bütünlük hatası: '{}' paketinin imza zarfı kilitle uyuşmuyor.",
+                        package_name
+                    ));
+                }
+                verify_package_signature(&package_meta, &computed_hash, &on_disk).with_context(
+                    || format!("'{}' paketinin Ed25519 imzası geçersiz", package_name),
+                )?;
+            }
+            (Some(_), None) => {
+                return Err(anyhow!(
+                    "Bütünlük hatası: '{}' paketinin kilitli imza zarfı kayıp.",
+                    package_name
+                ));
+            }
+            (None, Some(_)) => {
+                return Err(anyhow!(
+                    "Bütünlük hatası: '{}' paketinde kilitlenmemiş imza zarfı var.",
+                    package_name
+                ));
+            }
+            (None, None) => {
+                if lock_info.kaynak.as_deref() != Some("yerel-imzasız-güvenilir") {
+                    return Err(anyhow!(
+                        "Paket '{}' doğrulanmış Ed25519 imzası veya açık yerel-imzasız provenansı taşımıyor.",
+                        package_name
+                    ));
+                }
+            }
+        }
         if lock_info.surum != package_meta.surum {
             return Err(anyhow!(
                 "Sürüm uyuşmazlığı: lock '{}' için {} diyor, paket metadata {}.",
@@ -1516,6 +2038,12 @@ pub fn verify_package() -> Result<()> {
                 ));
             }
         }
+    }
+
+    if let Some(signature) = read_package_signature(&project_root)? {
+        let project_hash = calculate_package_hash(&project_root, &meta)?;
+        verify_package_signature(&meta, &project_hash, &signature)
+            .with_context(|| "Proje Ed25519 imzası geçersiz")?;
     }
 
     println!(
@@ -1689,6 +2217,7 @@ pub fn init_project() -> Result<()> {
         betikler: Some(betikler),
         crate_bagimliliklari: None,
         yerleşik_rust: None,
+        hmi: None,
         kaynak: None,
         github: None,
         lisans: Some("MIT".to_string()),
@@ -1846,10 +2375,13 @@ pub fn run_script(name: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{
-        calculate_package_hash, check_native_code_safety, read_lock_or_default,
-        sanitize_package_name, uzak_paket_girdisi_mi, validate_package_metadata,
-        verify_dependency_version_at, PaketMetadata,
+        calculate_package_hash, check_api_compatibility, check_native_code_safety,
+        create_package_signature, read_lock_or_default, rollback_directory_swaps,
+        sanitize_package_name, sign_distribution_artifact, uzak_paket_girdisi_mi,
+        validate_package_metadata, verify_dependency_version_at, verify_distribution_artifact,
+        verify_package_signature, DirectorySwap, PaketMetadata, SIGNATURE_FILE,
     };
+    use ed25519_dalek::SigningKey;
     use std::collections::HashMap;
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -1949,6 +2481,37 @@ mod tests {
     }
 
     #[test]
+    fn dizin_degisimleri_hata_enjeksiyonunda_onceki_surumu_geri_yukler() {
+        let benzersiz = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Sistem saati Unix epoch sonrasında olmalı")
+            .as_nanos();
+        let kok = std::env::temp_dir().join(format!(
+            "huma_rollback_test_{}_{}",
+            std::process::id(),
+            benzersiz
+        ));
+        let target = kok.join("paket");
+        let backup = kok.join("paket.backup");
+        fs::create_dir_all(&target).expect("Yeni paket dizini oluşturulmalı");
+        fs::create_dir_all(&backup).expect("Yedek paket dizini oluşturulmalı");
+        fs::write(target.join("surum"), "yeni").expect("Yeni sürüm yazılmalı");
+        fs::write(backup.join("surum"), "eski").expect("Eski sürüm yazılmalı");
+
+        let mut swaps = vec![DirectorySwap {
+            target: target.clone(),
+            backup: Some(backup.clone()),
+        }];
+        let errors = rollback_directory_swaps(&mut swaps);
+
+        assert!(errors.is_empty(), "geri alma hataları: {errors:?}");
+        assert_eq!(fs::read_to_string(target.join("surum")).unwrap(), "eski");
+        assert!(!backup.exists());
+        assert!(swaps.is_empty());
+        fs::remove_dir_all(kok).expect("Geçici rollback dizini temizlenmeli");
+    }
+
+    #[test]
     fn metadata_semver_giris_ve_native_abi_sozlesmelerini_dogrular() {
         let mut meta: PaketMetadata = serde_json::from_value(serde_json::json!({
             "ad": "ornek",
@@ -2001,6 +2564,7 @@ mod tests {
             betikler: None,
             crate_bagimliliklari: None,
             yerleşik_rust: None,
+            hmi: None,
             kaynak: None,
             github: None,
             lisans: None,
@@ -2011,5 +2575,142 @@ mod tests {
             .expect("İkinci özet hesaplanmalı");
         fs::remove_dir_all(&kok).expect("Geçici paket dizini temizlenmeli");
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn ed25519_imzasi_paket_kimligi_ve_ozetine_baglanir() {
+        let benzersiz = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Sistem saati Unix epoch sonrasında olmalı")
+            .as_nanos();
+        let kok = std::env::temp_dir().join(format!(
+            "huma_imza_test_{}_{}",
+            std::process::id(),
+            benzersiz
+        ));
+        fs::create_dir_all(&kok).expect("Geçici paket dizini oluşturulmalı");
+        fs::write(kok.join("ana.hb"), "\"tamam\"'ı yazdır").expect("Giriş yazılmalı");
+        let meta: PaketMetadata = serde_json::from_value(serde_json::json!({
+            "ad": "ornek",
+            "surum": "1.0.0",
+            "aciklama": "test",
+            "yazar": "test",
+            "giris": "ana.hb"
+        }))
+        .expect("Test metadata'sı geçerli olmalı");
+        let hash = calculate_package_hash(&kok, &meta).expect("Özet hesaplanmalı");
+        let key = SigningKey::from_bytes(&[7_u8; 32]);
+        let envelope = create_package_signature(&meta, &hash, &key).expect("Paket imzalanmalı");
+        verify_package_signature(&meta, &hash, &envelope).expect("İmza doğrulanmalı");
+
+        fs::write(
+            kok.join(SIGNATURE_FILE),
+            serde_json::to_vec(&envelope).expect("Zarf serileştirilmeli"),
+        )
+        .expect("Zarf yazılmalı");
+        assert_eq!(
+            calculate_package_hash(&kok, &meta).expect("İmza sonrası özet hesaplanmalı"),
+            hash,
+            "imza zarfı kendi imzaladığı özeti değiştirmemeli"
+        );
+
+        let mut tampered = envelope;
+        tampered.surum = "1.0.1".to_string();
+        assert!(verify_package_signature(&meta, &hash, &tampered).is_err());
+        fs::remove_dir_all(&kok).expect("Geçici paket dizini temizlenmeli");
+    }
+
+    #[test]
+    fn kirici_hmi_degisiminde_ana_surum_artisi_zorunludur() {
+        let benzersiz = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Sistem saati Unix epoch sonrasında olmalı")
+            .as_nanos();
+        let kok = std::env::temp_dir().join(format!(
+            "huma_api_test_{}_{}",
+            std::process::id(),
+            benzersiz
+        ));
+        fs::create_dir_all(&kok).unwrap();
+        let metadata = |version: &str, return_type: &str| {
+            serde_json::json!({
+                "ad": "ornek",
+                "surum": version,
+                "aciklama": "test",
+                "yazar": "test",
+                "giris": "ana.hb",
+                "hmi": {
+                    "protocol": { "major": 1, "minor": 0 },
+                    "transport": "stdio-json-v1",
+                    "executable": "ornek-host",
+                    "interface": {
+                        "schema_version": 1,
+                        "module": "ornek",
+                        "huma_version_requirement": ">=0.6,<1.0",
+                        "functions": [{
+                            "name": "topla",
+                            "parameters": [{
+                                "name": "deger",
+                                "value_type": "number"
+                            }],
+                            "return_type": return_type
+                        }]
+                    }
+                }
+            })
+        };
+        let previous = kok.join("onceki.json");
+        let minor = kok.join("minor.json");
+        let major = kok.join("major.json");
+        fs::write(
+            &previous,
+            serde_json::to_vec(&metadata("1.0.0", "number")).unwrap(),
+        )
+        .unwrap();
+        fs::write(
+            &minor,
+            serde_json::to_vec(&metadata("1.1.0", "text")).unwrap(),
+        )
+        .unwrap();
+        fs::write(
+            &major,
+            serde_json::to_vec(&metadata("2.0.0", "text")).unwrap(),
+        )
+        .unwrap();
+
+        assert!(check_api_compatibility(&previous, &minor).is_err());
+        check_api_compatibility(&previous, &major)
+            .expect("ana sürüm artışı kırıcı HMI değişikliğini kapsamalı");
+        fs::remove_dir_all(kok).unwrap();
+    }
+
+    #[test]
+    fn dagitim_imzasi_dosya_adini_ve_icerigini_baglar() {
+        let benzersiz = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Sistem saati Unix epoch sonrasında olmalı")
+            .as_nanos();
+        let kok = std::env::temp_dir().join(format!(
+            "huma_dagitim_imza_test_{}_{}",
+            std::process::id(),
+            benzersiz
+        ));
+        fs::create_dir_all(&kok).unwrap();
+        let artifact = kok.join("SHA256SUMS");
+        let key = kok.join("release.key");
+        let signature = kok.join("SHA256SUMS.sig");
+        fs::write(&artifact, "abc  huma-linux\n").unwrap();
+        fs::write(&key, hex::encode([9_u8; 32])).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&key, fs::Permissions::from_mode(0o600)).unwrap();
+        }
+
+        sign_distribution_artifact(&artifact, &key, &signature).unwrap();
+        verify_distribution_artifact(&artifact, &signature).unwrap();
+        fs::write(&artifact, "değiştirildi\n").unwrap();
+        assert!(verify_distribution_artifact(&artifact, &signature).is_err());
+        fs::remove_dir_all(kok).unwrap();
     }
 }

@@ -4,14 +4,18 @@
 //! plus the explicitly limited Cranelift AOT path.
 
 pub mod aot;
+pub mod backend;
+mod bytecode_compiler;
 pub mod pipeline;
+
+pub use bytecode_compiler::Derleyici;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use huma_core::{
-        compiler::Derleyici, interpreter::Yorumlayici, lexer::Lexer, parser::Parser, vm::VM,
-    };
+    use huma_runtime::interpreter::Yorumlayici;
+    use huma_syntax::{lexer::Lexer, parser::Parser};
+    use huma_vm::VM;
     use std::{cell::RefCell, rc::Rc};
 
     fn compile_and_run(kod: &str) {
@@ -214,6 +218,47 @@ mod tests {
             r#"{1: "geçersiz"}'i yazdır"#,
             r#""2" * 3'ü yazdır"#,
             r#"1e308 * 1e308'i yazdır"#,
+        ] {
+            arka_uclar_esit(kod);
+        }
+    }
+
+    #[test]
+    fn uretilen_sayisal_ifadeler_yorumlayici_ve_vmde_esittir() {
+        for left in 0..12 {
+            for right in 1..12 {
+                for operator in ["+", "-", "*", "/", "%", "<", "<=", ">", ">=", "==", "!="] {
+                    arka_uclar_esit(&format!("{left} {operator} {right}'i yazdır"));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn kontrol_akisi_koleksiyon_ve_closure_diferansiyel_korpusu() {
+        for kod in [
+            r#"toplam = 0 olsun
+               i = 0 olsun
+               i < 20 olduğu sürece { toplam = toplam + i olsun i = i + 1 olsun }
+               toplam'ı yazdır"#,
+            r#"0 ise { "yanlış"'ı yazdır } yoksa { "doğru"'yu yazdır }"#,
+            r#"liste = [1, 2, 3] olsun
+               uzunluk(liste)'yi yazdır
+               liste[1]'i yazdır"#,
+            r#"kimlik fonksiyon olsun x alsın { x'i döndür }
+               kimlik("Türkçe")'yi yazdır"#,
+            r#"fibonacci fonksiyon olsun n alsın {
+                   n <= 1 ise { n'i döndür }
+                   fibonacci(n - 1) + fibonacci(n - 2)'yi döndür
+               }
+               fibonacci(9)'u yazdır"#,
+            r#"uret fonksiyon olsun taban alsın {
+                   ekle = fonksiyon olsun x alsın { taban + x'i döndür } olsun
+                   ekle'yi döndür
+               }
+               uret(40)(2)'yi yazdır"#,
+            r#"0 ve (1 / 0)'ı yazdır
+               1 veya (1 / 0)'ı yazdır"#,
         ] {
             arka_uclar_esit(kod);
         }

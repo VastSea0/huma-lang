@@ -41,7 +41,14 @@ fn gecisli_paket_kurulum_dogrulama_ve_kaldirma_uctan_uca_calisir() {
     let initialize = run_huma(&project, &["ilkle"]);
     assert_success(&initialize, "Proje ilkleme");
 
-    let install = run_huma(&project, &["kur", "nlp_ileri"]);
+    let unsigned = run_huma(&project, &["kur", "nlp_ileri"]);
+    assert!(
+        !unsigned.status.success(),
+        "İmzasız paket açık güven onayı olmadan kurulmamalı"
+    );
+    assert!(String::from_utf8_lossy(&unsigned.stderr).contains("Ed25519 imzası taşımıyor"));
+
+    let install = run_huma(&project, &["kur", "nlp_ileri", "--güvenilir"]);
     assert_success(&install, "Geçişli paket kurulumu");
     assert!(project.join("huma_modulleri/nlp_temel").is_dir());
     assert!(project.join("huma_modulleri/nlp_ileri").is_dir());
@@ -55,6 +62,7 @@ fn gecisli_paket_kurulum_dogrulama_ve_kaldirma_uctan_uca_calisir() {
         .expect("Kilit paket haritası taşımalı");
     assert!(packages.contains_key("nlp_temel"));
     assert!(packages.contains_key("nlp_ileri"));
+    assert_eq!(packages["nlp_ileri"]["kaynak"], "yerel-imzasız-güvenilir");
 
     let verify = run_huma(&project, &["paket", "doğrula"]);
     assert_success(&verify, "Paket doğrulama");

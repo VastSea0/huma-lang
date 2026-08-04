@@ -57,6 +57,14 @@ struct Cli {
     /// Tüm dış dünya yeteneklerini ver (yalnızca güvenilen kod için)
     #[arg(long = "tüm-izinler", alias = "allow-all", global = true)]
     allow_all: bool,
+
+    /// Süreç içi FFI'yi ayrıca etkinleştir (yalnız güvenilen native kod)
+    #[arg(
+        long = "güvenilir-süreç-içi-ffi",
+        alias = "trusted-in-process-ffi",
+        global = true
+    )]
+    trusted_in_process_ffi: bool,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -162,6 +170,13 @@ enum Commands {
         action: PackageAction,
     },
 
+    /// Sürüm checksum/ikili dosyalarını Ed25519 ile imzala veya doğrula
+    #[command(name = "dağıtım", alias = "artifact")]
+    Dagitim {
+        #[command(subcommand)]
+        action: DistributionAction,
+    },
+
     /// Sürüm bilgisini göster
     #[command(alias = "sürüm")]
     Version,
@@ -172,7 +187,7 @@ enum Commands {
         /// Paketin adı
         name: Option<String>,
 
-        /// Ayrılmış uyumluluk bayrağı; doğrulanmamış native ABI'yi etkinleştirmez
+        /// Yalnız yerel geliştirmede imzasız pakete açık onay verir; native ABI'yi etkinleştirmez
         #[arg(long = "güvenilir", alias = "trusted")]
         trusted: bool,
     },
@@ -191,6 +206,25 @@ enum Commands {
     /// Mevcut dizini ilklendirir (Kısa yol)
     #[command(name = "ilkle", alias = "init")]
     İlkle,
+}
+
+#[derive(Subcommand)]
+enum DistributionAction {
+    /// Bir dağıtım dosyasını imzala
+    #[command(name = "imzala", alias = "sign")]
+    Imzala {
+        input: std::path::PathBuf,
+        #[arg(long = "anahtar", alias = "key")]
+        key: std::path::PathBuf,
+        #[arg(short, long)]
+        output: std::path::PathBuf,
+    },
+    /// Bir dağıtım dosyası ve imza zarfını doğrula
+    #[command(name = "doğrula", alias = "verify")]
+    Dogrula {
+        input: std::path::PathBuf,
+        signature: std::path::PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -226,6 +260,24 @@ pub enum PackageAction {
     /// Projenin yayınlanmaya hazır olup olmadığını kontrol eder
     #[command(alias = "verify")]
     Doğrula,
+    /// Mevcut paketin kanonik özetini Ed25519 ile imzalar
+    #[command(name = "imzala", alias = "sign")]
+    Imzala {
+        /// 32 baytlık küçük harfli hex Ed25519 tohumunu içeren, izinleri 0600 dosya
+        #[arg(long = "anahtar", alias = "key")]
+        key: std::path::PathBuf,
+    },
+    /// Mevcut paketin huma.sig Ed25519 zarfını doğrular
+    #[command(name = "imza-doğrula", alias = "verify-signature")]
+    ImzaDogrula,
+    /// İki paket metadata'sı arasında HMI/API geriye uyumluluğunu denetler
+    #[command(name = "api-kontrol", alias = "check-api")]
+    ApiKontrol {
+        /// Önceki sürümün huma.json veya paket.json dosyası
+        previous: std::path::PathBuf,
+        /// Yeni sürümün huma.json veya paket.json dosyası
+        current: std::path::PathBuf,
+    },
     /// Projedeki bir betiği çalıştırır (npm run gibi)
     #[command(alias = "çalıştır", alias = "betik")]
     Run {
@@ -254,6 +306,7 @@ fn main() {
 }
 
 fn run(cli: Cli) -> i32 {
+    let trusted_in_process_ffi = cli.trusted_in_process_ffi;
     let capability_set = if cli.allow_all {
         huma_core::capability::CapabilitySet::allow_all()
     } else {
@@ -271,14 +324,13 @@ fn run(cli: Cli) -> i32 {
     };
     let result = match cli.command {
         Some(Commands::Run { target, vm }) => {
-            let runner = if vm {
-                commands::run_vm_file
-            } else {
-                commands::run_file
-            };
             if let Some(t) = target {
                 if std::path::Path::new(&t).is_file() {
-                    runner(&t)
+                    if vm {
+                        commands::run_vm_file(&t, trusted_in_process_ffi)
+                    } else {
+                        commands::run_file(&t, trusted_in_process_ffi)
+                    }
                 } else {
                     match package_manager::has_local_script(&t) {
                         Ok(true) => package_manager::run_script(&t),
@@ -305,7 +357,11 @@ fn run(cli: Cli) -> i32 {
                         {
                             package_manager::run_script("start")
                         } else {
-                            runner(&meta.giris)
+                            if vm {
+                                commands::run_vm_file(&meta.giris, trusted_in_process_ffi)
+                            } else {
+                                commands::run_file(&meta.giris, trusted_in_process_ffi)
+                            }
                         }
                     }
                     Err(error) => Err(error.context(
@@ -315,13 +371,13 @@ fn run(cli: Cli) -> i32 {
             }
         }
         Some(Commands::Build { file, output, json }) => commands::build_file(&file, &output, json),
-        Some(Commands::Exec { file }) => commands::exec_bytecode(&file),
+        Some(Commands::Exec { file }) => commands::exec_bytecode(&file, trusted_in_process_ffi),
         Some(Commands::Aot {
             file,
             output,
             opt_level,
         }) => commands::compile_aot(&file, &output, opt_level),
-        Some(Commands::Repl) => commands::start_repl(),
+        Some(Commands::Repl) => commands::start_repl(trusted_in_process_ffi),
 
         Some(Commands::Test { target }) => commands::run_tests(target.as_deref()),
         Some(Commands::Paket { action }) => match action {
@@ -333,7 +389,20 @@ fn run(cli: Cli) -> i32 {
             PackageAction::İlkle => package_manager::init_project(),
             PackageAction::Liste => package_manager::list_packages(),
             PackageAction::Doğrula => package_manager::verify_package(),
+            PackageAction::Imzala { key } => package_manager::sign_current_package(&key),
+            PackageAction::ImzaDogrula => package_manager::verify_current_package_signature(),
+            PackageAction::ApiKontrol { previous, current } => {
+                package_manager::check_api_compatibility(&previous, &current)
+            }
             PackageAction::Run { name } => package_manager::run_script(&name),
+        },
+        Some(Commands::Dagitim { action }) => match action {
+            DistributionAction::Imzala { input, key, output } => {
+                package_manager::sign_distribution_artifact(&input, &key, &output)
+            }
+            DistributionAction::Dogrula { input, signature } => {
+                package_manager::verify_distribution_artifact(&input, &signature)
+            }
         },
 
         Some(Commands::Kur { name, trusted }) => {
@@ -357,7 +426,7 @@ fn run(cli: Cli) -> i32 {
         None => {
             if let Some(file) = cli.file {
                 if std::path::Path::new(&file).is_file() {
-                    commands::run_file(&file)
+                    commands::run_file(&file, trusted_in_process_ffi)
                 } else {
                     match package_manager::has_local_script(&file) {
                         Ok(true) => package_manager::run_script(&file),
@@ -374,7 +443,7 @@ fn run(cli: Cli) -> i32 {
                 }
             } else {
                 // Default: start the REPL
-                commands::start_repl()
+                commands::start_repl(trusted_in_process_ffi)
             }
         }
     };

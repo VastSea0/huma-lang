@@ -5,10 +5,13 @@ description = "Hüma versioned bytecode compiler and validated Cranelift AOT uti
 authors = ["VastSea0 <vastseaoffical0@outlook.com>"]
 license = "MIT"
 edition = "2021"
-rust-version = "1.92"
+rust-version = "1.94.1"
 
 [dependencies]
-huma-core    = { path = "../huma-core" }
+huma-syntax  = { path = "../huma-syntax" }
+huma-bytecode = { path = "../huma-bytecode" }
+huma-runtime = { path = "../huma-runtime" }
+huma-vm      = { path = "../huma-vm" }
 serde        = { version = "1.0", features = ["derive"] }
 serde_json   = "1.0"
 thiserror    = "2"

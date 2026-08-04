@@ -274,11 +274,11 @@ knn_siniflandirici sınıf olsun {
 dogruluk_hesapla fonksiyon olsun tahminler, gercekler alsın {
     n = uzunluk(tahminler) olsun
     n = 0 ise { 0.0'ı döndür }
-    dogru = 0 olsun
+    dogru_sayisi = 0 olsun
     i = 0'dan (n - 1)'e kadar {
-        tahminler[i] = gercekler[i] ise { dogru = dogru + 1 olsun }
+        tahminler[i] = gercekler[i] ise { dogru_sayisi = dogru_sayisi + 1 olsun }
     }
-    dogru / n'yi döndür
+    dogru_sayisi / n'yi döndür
 }
 
 // Kesinlik (Precision) — ikili sınıflandırma, pozitif sınıf=1

@@ -112,16 +112,16 @@ sinir_agi sınıf olsun {
     dogruluk_cok_sinif fonksiyon olsun veri, etiketler alsın {
         n = uzunluk(veri) olsun
         n = 0 ise { 0.0'ı döndür }
-        dogru = 0 olsun
+        dogru_sayisi = 0 olsun
         i = 0'dan (n - 1)'e kadar {
             giris_v = listeye_vektor(veri[i]) olsun
             tahmin = kendisi.tahmin_et(giris_v) olsun
             // En yüksek aktivasyonlu çıkış sınıfı
             tahmin_sinif = vektor_argmax(tahmin) olsun
             gercek_sinif = etiketler[i] olsun
-            tahmin_sinif = gercek_sinif ise { dogru = dogru + 1 olsun }
+            tahmin_sinif = gercek_sinif ise { dogru_sayisi = dogru_sayisi + 1 olsun }
         }
-        dogru / n'yi döndür
+        dogru_sayisi / n'yi döndür
     }
 
     // argmax_tahmin(giris) → tahmin edilen sınıf indeksi (skaler)

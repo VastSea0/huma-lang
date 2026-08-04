@@ -17,24 +17,28 @@ const MAX_REPL_INPUT_BYTES: usize = 1024 * 1024;
 const MAX_TEST_FILES: usize = 10_000;
 
 /// Run a `.hb` source file through the tree-walking interpreter.
-pub fn run_file(path: &str) -> Result<()> {
+pub fn run_file(path: &str, trusted_in_process_ffi: bool) -> Result<()> {
     let source = huma_compiler::pipeline::read_source_file(path)
         .with_context(|| format!("'{}' dosyası okunamadı", path))?;
 
-    let interp = Yorumlayici::new();
-    let mut interp = interp;
-    execute_source(&source, &mut interp)?;
-
-    // GUI isteği var mı kontrol et
-    if huma_core::gui::gui_istegi_var_mi().map_err(anyhow::Error::msg)? {
-        huma_core::gui::gui_calistir(interp).map_err(anyhow::Error::msg)?;
+    let mut interp = Yorumlayici::new();
+    huma_stdlib_ai::kayit_et(&mut interp.global_degiskenler);
+    huma_stdlib_file::kayit_et(&mut interp.global_degiskenler);
+    huma_stdlib_native::kayit_et(&mut interp.global_degiskenler);
+    if trusted_in_process_ffi {
+        huma_stdlib_native::guvenilir_ffi_kayit_et(&mut interp.global_degiskenler);
     }
+    huma_stdlib_net::yorumlayiciyi_yapilandir(&mut interp);
+    huma_stdlib_process::kayit_et(&mut interp.global_degiskenler);
+    huma_stdlib_sqlite::kayit_et(&mut interp.global_degiskenler);
+    execute_source(&source, &mut interp)?;
 
     Ok(())
 }
 
 /// Run a `.hb` source file by compiling to Bytecode and executing in Bytecode VM.
-pub fn run_vm_file(path: &str) -> Result<()> {
+pub fn run_vm_file(path: &str, trusted_in_process_ffi: bool) -> Result<()> {
+    eprintln!("Uyarı: Hüma VM deneysel bir backend'dir; normatif backend yorumlayıcıdır.");
     let source = huma_compiler::pipeline::read_source_file(path)
         .with_context(|| format!("'{}' dosyası okunamadı", path))?;
 
@@ -50,7 +54,10 @@ pub fn run_vm_file(path: &str) -> Result<()> {
         .derle_kontrollu(program_ast)
         .map_err(huma_core::HumaError::CompileError)?;
 
-    let mut vm = VM::new(bytecode_prog);
+    let mut vm = VM::new(bytecode_prog).with_task_host(huma_stdlib_net::vm_task_host());
+    if trusted_in_process_ffi {
+        vm = vm.with_native_call_host(huma_stdlib_native::vm_call_host());
+    }
     vm.run_checked()?;
     Ok(())
 }
@@ -75,17 +82,22 @@ pub fn build_file(input: &str, output: &str, json_output: bool) -> Result<()> {
 }
 
 /// Execute a pre-compiled `.hbc` bytecode file in the VM.
-pub fn exec_bytecode(path: &str) -> Result<()> {
+pub fn exec_bytecode(path: &str, trusted_in_process_ffi: bool) -> Result<()> {
+    eprintln!("Uyarı: Hüma VM deneysel bir backend'dir; normatif backend yorumlayıcıdır.");
     let program = huma_compiler::pipeline::load_bytecode(path)
         .with_context(|| format!("'{}' bytecode dosyası yüklenirken hata oluştu", path))?;
 
-    let mut vm = VM::new(program);
+    let mut vm = VM::new(program).with_task_host(huma_stdlib_net::vm_task_host());
+    if trusted_in_process_ffi {
+        vm = vm.with_native_call_host(huma_stdlib_native::vm_call_host());
+    }
     vm.run_checked()?;
     Ok(())
 }
 
 /// Compile a `.hb` file to a native machine code binary using Cranelift AOT.
 pub fn compile_aot(input: &str, output_name: &str, opt_level: u8) -> Result<()> {
+    eprintln!("Uyarı: AOT yalnız deneysel sayısal alt kümeyi destekler.");
     let source = huma_compiler::pipeline::read_source_file(input)
         .with_context(|| format!("'{}' dosyası okunamadı", input))?;
 
@@ -107,7 +119,7 @@ pub fn compile_aot(input: &str, output_name: &str, opt_level: u8) -> Result<()> 
 }
 
 /// Start the interactive REPL.
-pub fn start_repl() -> Result<()> {
+pub fn start_repl(trusted_in_process_ffi: bool) -> Result<()> {
     println!(
         "\n{}  {}",
         "🌙 Hüma Programlama Dili".bright_cyan().bold(),
@@ -120,6 +132,15 @@ pub fn start_repl() -> Result<()> {
     println!();
 
     let mut interp = Yorumlayici::new();
+    huma_stdlib_ai::kayit_et(&mut interp.global_degiskenler);
+    huma_stdlib_file::kayit_et(&mut interp.global_degiskenler);
+    huma_stdlib_native::kayit_et(&mut interp.global_degiskenler);
+    if trusted_in_process_ffi {
+        huma_stdlib_native::guvenilir_ffi_kayit_et(&mut interp.global_degiskenler);
+    }
+    huma_stdlib_net::yorumlayiciyi_yapilandir(&mut interp);
+    huma_stdlib_process::kayit_et(&mut interp.global_degiskenler);
+    huma_stdlib_sqlite::kayit_et(&mut interp.global_degiskenler);
     let mut input = String::new();
     let stdin = io::stdin();
     let mut stdin = stdin.lock();

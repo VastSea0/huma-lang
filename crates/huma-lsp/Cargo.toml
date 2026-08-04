@@ -2,7 +2,7 @@
 name = "huma-lsp"
 version = "0.6.0"
 edition = "2021"
-rust-version = "1.92"
+rust-version = "1.94.1"
 license = "MIT"
 description = "Language Server Protocol (LSP) server for the Hüma programming language."
 
@@ -11,10 +11,10 @@ name = "huma-lsp"
 path = "src/main.rs"
 
 [dependencies]
-huma-core = { path = "../huma-core" }
+huma-syntax = { path = "../huma-syntax" }
+huma-stdlib = { path = "../huma-stdlib" }
 anyhow = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-std"] }
 tower-lsp = "0.20"
 walkdir = "2"
 regex = "1"
-serde_json = "1"

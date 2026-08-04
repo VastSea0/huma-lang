@@ -1,8 +1,22 @@
 [workspace]
 resolver = "2"
 members = [
+    "crates/huma-syntax",
+    "crates/huma-bytecode",
+    "crates/huma-hmi",
+    "crates/huma-stdlib",
+    "crates/huma-stdlib-ai",
+    "crates/huma-stdlib-file",
+    "crates/huma-runtime",
+    "crates/huma-stdlib-native",
+    "crates/huma-stdlib-net",
+    "crates/huma-stdlib-process",
+    "crates/huma-stdlib-sqlite",
+    "crates/huma-vm",
     "crates/huma-core",
     "crates/huma-compiler",
     "crates/huma-cli",
     "crates/huma-lsp",
+    "crates/huma-perf",
 ]
+exclude = ["crates/huma-stdlib-gui"]

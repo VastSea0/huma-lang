@@ -16,6 +16,7 @@ fn eval(kod: &str) -> String {
         .expect("Test yetenekleri kurulmalı");
     let buffer = Rc::new(RefCell::new(String::new()));
     let mut yorumlayici = Yorumlayici::new().with_output_buffer(Rc::clone(&buffer));
+    huma::net::yorumlayiciyi_yapilandir(&mut yorumlayici);
 
     let lexer = Lexer::new(kod);
     let mut parser = Parser::new(lexer);

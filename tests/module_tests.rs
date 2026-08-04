@@ -31,6 +31,9 @@ fn eval_with_paths(kod: &str, extra_yollar: Vec<String>) -> (String, bool) {
         .expect("Test yetenekleri kurulmalı");
     let buf = Rc::new(RefCell::new(String::new()));
     let mut yorumlayici = Yorumlayici::new().with_output_buffer(Rc::clone(&buf));
+    huma::ai::kayit_et(&mut yorumlayici.global_degiskenler);
+    huma::file::kayit_et(&mut yorumlayici.global_degiskenler);
+    huma::sqlite::kayit_et(&mut yorumlayici.global_degiskenler);
     for yol in extra_yollar {
         yorumlayici.arama_yolları.insert(0, yol);
     }

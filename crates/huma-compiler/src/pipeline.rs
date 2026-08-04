@@ -2,11 +2,11 @@
 //!
 //! Orchestrates: source text → Lexer → Parser → Bytecode Compiler → versioned `.hbc`.
 
-use huma_core::bytecode::{validate_program, Program};
-use huma_core::compiler::Derleyici;
-use huma_core::error::{HumaError, HumaResult};
-use huma_core::lexer::Lexer;
-use huma_core::parser::Parser;
+use crate::Derleyici;
+use huma_bytecode::{validate_program, Program};
+use huma_syntax::error::{HumaError, HumaResult};
+use huma_syntax::lexer::Lexer;
+use huma_syntax::parser::Parser;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::{Read, Write};
@@ -313,7 +313,7 @@ mod tests {
         compile_source, decode_bytecode, encode_bytecode, read_source_file,
         BYTECODE_FORMAT_VERSION, BYTECODE_MAGIC, MAX_SOURCE_BYTES,
     };
-    use huma_core::bytecode::{OpCode, Program};
+    use huma_bytecode::{OpCode, Program};
     use std::fs::File;
 
     #[test]
