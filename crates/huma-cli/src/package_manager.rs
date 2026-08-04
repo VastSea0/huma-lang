@@ -107,6 +107,7 @@ const PACKAGE_DIR: &str = "huma_modulleri";
 const LOCK_FILE: &str = "huma.lock";
 const PROJECT_FILE: &str = "huma.json";
 const SIGNATURE_FILE: &str = "huma.sig";
+const MANAGED_RUN_ROOT_ENV: &str = "HUMA_MANAGED_RUN_ROOT";
 const SIGNATURE_DOMAIN: &[u8] = b"HUMA-PACKAGE-SIGNATURE-V1\0";
 const ARTIFACT_SIGNATURE_DOMAIN: &[u8] = b"HUMA-ARTIFACT-SIGNATURE-V1\0";
 const CURRENT_HUMA_VER: &str = env!("CARGO_PKG_VERSION");
@@ -1017,6 +1018,7 @@ pub fn create_package(name: &str) -> Result<()> {
 
     let mut betikler = HashMap::new();
     betikler.insert("baslat".to_string(), format!("huma run {}.hb", name));
+    betikler.insert("start".to_string(), format!("huma run {}.hb", name));
     betikler.insert("test".to_string(), "huma run tests/test.hb".to_string());
 
     let meta = PaketMetadata {
@@ -2204,6 +2206,7 @@ pub fn init_project() -> Result<()> {
         "baslat".to_string(),
         format!("huma run {}.hb", default_name),
     );
+    betikler.insert("start".to_string(), format!("huma run {}.hb", default_name));
     betikler.insert("test".to_string(), "huma run tests/test.hb".to_string());
 
     let meta = PaketMetadata {
@@ -2305,6 +2308,66 @@ pub fn get_local_metadata() -> Result<PaketMetadata> {
     Ok(meta)
 }
 
+/// Bir Hüma programının yalnız paket yöneticisi betiği içinden ve paket
+/// kökünün dışına taşmadan çalıştırıldığını doğrular.
+pub fn require_managed_run(target: &Path) -> Result<()> {
+    let project_root = std::env::current_dir()?
+        .canonicalize()
+        .with_context(|| "Hüma proje kökü çözümlenemedi")?;
+    let managed_root = std::env::var_os(MANAGED_RUN_ROOT_ENV).ok_or_else(|| {
+        anyhow!(
+            "Hüma programları yalnız paket yöneticisiyle çalıştırılır. Önce huma.json içinde bir betik tanımlayın, ardından 'huma paket run <betik>' kullanın."
+        )
+    })?;
+    if PathBuf::from(managed_root) != project_root {
+        return Err(anyhow!(
+            "Paket yöneticisi çalışma kökü mevcut proje köküyle uyuşmuyor."
+        ));
+    }
+
+    let metadata = get_local_metadata()?;
+    if !Path::new(LOCK_FILE).is_file() {
+        return Err(anyhow!(
+            "Yönetilen çalıştırma için huma.lock zorunludur. 'huma paket kur' çalıştırın."
+        ));
+    }
+    let lock = read_lock_or_default(Path::new(LOCK_FILE))?;
+    for (dependency, requirement) in metadata.bagimliliklar.as_ref().into_iter().flatten() {
+        let locked = lock.paketler.get(dependency).ok_or_else(|| {
+            anyhow!(
+                "Bağımlılık '{}' manifestte var fakat huma.lock içinde kilitli değil.",
+                dependency
+            )
+        })?;
+        let requirement = VersionReq::parse(requirement)?;
+        let version = Version::parse(&locked.surum)?;
+        if !requirement.matches(&version) {
+            return Err(anyhow!(
+                "Bağımlılık '{}' için kilitli {} sürümü {} kısıtını karşılamıyor.",
+                dependency,
+                version,
+                requirement
+            ));
+        }
+    }
+
+    let candidate = if target.is_absolute() {
+        target.to_path_buf()
+    } else {
+        project_root.join(target)
+    };
+    let canonical_target = candidate
+        .canonicalize()
+        .with_context(|| format!("Program yolu bulunamadı: {}", target.display()))?;
+    if !canonical_target.starts_with(&project_root) {
+        return Err(anyhow!(
+            "Paket betiği proje kökünün dışındaki bir programı çalıştıramaz: {}",
+            target.display()
+        ));
+    }
+    Ok(())
+}
+
 /// Proje metadata'sında adı verilen bir betik bulunup bulunmadığını döndürür.
 ///
 /// Metadata'nın bulunmaması veya geçersiz olması `false` değil hatadır; böylece
@@ -2344,6 +2407,16 @@ pub fn run_script(name: &str) -> Result<()> {
             } else {
                 std::process::Command::new(program)
             };
+            if program == "huma" {
+                process.env(
+                    MANAGED_RUN_ROOT_ENV,
+                    std::env::current_dir()?
+                        .canonicalize()
+                        .with_context(|| "Paket betiği proje kökü çözümlenemedi")?,
+                );
+            } else {
+                process.env_remove(MANAGED_RUN_ROOT_ENV);
+            }
             let mut child = process
                 .args(arguments)
                 .spawn()

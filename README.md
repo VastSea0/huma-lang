@@ -56,6 +56,17 @@ Eski web sitesi yaklaşan sıfırdan tasarım öncesinde kaldırılmıştır; ka
 
 ## İlk program
 
+Her Hüma programı paket yöneticisiyle oluşturulur ve `huma.json` içindeki bir
+paket betiği üzerinden çalıştırılır. Gevşek `.hb` dosyalarının doğrudan
+yürütülmesi kapalıdır:
+
+```bash
+huma paket yeni fibonacci_uygulamasi
+cd fibonacci_uygulamasi
+```
+
+Paket yöneticisinin oluşturduğu giriş dosyasını aşağıdaki içerikle düzenleyin:
+
 ```huma
 fibonacci fonksiyon olsun n alsın {
     n <= 1 ise { n'i döndür }
@@ -68,8 +79,7 @@ i = 0'dan 9'a kadar {
 ```
 
 ```bash
-huma run examples/fibonacci.hb
-huma run examples/fibonacci.hb --vm
+huma paket run baslat
 ```
 
 Yorumlayıcı tam dil için varsayılan yürütme yoludur. VM veya AOT bir yapıyı desteklemiyorsa derleme başarısız olur; başka bir değer üreterek devam etmez.
@@ -111,7 +121,9 @@ Grameri](docs/DIL_GRAMERI.ebnf) dosyasına bakın.
 Dış dünya yetenekleri varsayılan olarak kapalıdır:
 
 ```bash
-huma run uygulama.hb --izin dosya-okuma --izin ağ-istemci
+# huma.json içindeki örnek betik:
+# "veri": "huma run uygulama.hb --izin dosya-okuma --izin ağ-istemci"
+huma paket run veri
 ```
 
 Dosya yazma, ağ sunucusu, süreç, HMI/FFI, veritabanı ve GUI ayrı izinlerdir.

@@ -49,6 +49,16 @@ cargo run --locked -p huma-cli -- test tests
 
 ## Example
 
+Every Hüma program is created with the package manager and executed through a
+script in `huma.json`. Direct execution of loose `.hb` files is disabled:
+
+```bash
+huma package new fibonacci_app
+cd fibonacci_app
+```
+
+Edit the generated entry file with the following program:
+
 ```huma
 fibonacci fonksiyon olsun n alsın {
     n <= 1 ise { n'i döndür }
@@ -61,8 +71,7 @@ i = 0'dan 9'a kadar {
 ```
 
 ```bash
-huma run examples/fibonacci.hb
-huma run examples/fibonacci.hb --vm
+huma package run start
 ```
 
 The interpreter is the default full-language backend. VM and AOT compilation reject unsupported constructs instead of producing placeholder values.

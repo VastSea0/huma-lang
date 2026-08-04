@@ -326,11 +326,13 @@ fn run(cli: Cli) -> i32 {
         Some(Commands::Run { target, vm }) => {
             if let Some(t) = target {
                 if std::path::Path::new(&t).is_file() {
-                    if vm {
-                        commands::run_vm_file(&t, trusted_in_process_ffi)
-                    } else {
-                        commands::run_file(&t, trusted_in_process_ffi)
-                    }
+                    package_manager::require_managed_run(std::path::Path::new(&t)).and_then(|()| {
+                        if vm {
+                            commands::run_vm_file(&t, trusted_in_process_ffi)
+                        } else {
+                            commands::run_file(&t, trusted_in_process_ffi)
+                        }
+                    })
                 } else {
                     match package_manager::has_local_script(&t) {
                         Ok(true) => package_manager::run_script(&t),
@@ -357,11 +359,9 @@ fn run(cli: Cli) -> i32 {
                         {
                             package_manager::run_script("start")
                         } else {
-                            if vm {
-                                commands::run_vm_file(&meta.giris, trusted_in_process_ffi)
-                            } else {
-                                commands::run_file(&meta.giris, trusted_in_process_ffi)
-                            }
+                            Err(anyhow!(
+                                "Paketin 'baslat' veya 'start' betiği yok. Hüma programları yalnız 'huma paket run <betik>' üzerinden çalıştırılır; huma.json içine bir betik ekleyin."
+                            ))
                         }
                     }
                     Err(error) => Err(error.context(
@@ -370,13 +370,20 @@ fn run(cli: Cli) -> i32 {
                 }
             }
         }
-        Some(Commands::Build { file, output, json }) => commands::build_file(&file, &output, json),
-        Some(Commands::Exec { file }) => commands::exec_bytecode(&file, trusted_in_process_ffi),
+        Some(Commands::Build { file, output, json }) => {
+            package_manager::require_managed_run(std::path::Path::new(&file))
+                .and_then(|()| commands::build_file(&file, &output, json))
+        }
+        Some(Commands::Exec { file }) => {
+            package_manager::require_managed_run(std::path::Path::new(&file))
+                .and_then(|()| commands::exec_bytecode(&file, trusted_in_process_ffi))
+        }
         Some(Commands::Aot {
             file,
             output,
             opt_level,
-        }) => commands::compile_aot(&file, &output, opt_level),
+        }) => package_manager::require_managed_run(std::path::Path::new(&file))
+            .and_then(|()| commands::compile_aot(&file, &output, opt_level)),
         Some(Commands::Repl) => commands::start_repl(trusted_in_process_ffi),
 
         Some(Commands::Test { target }) => commands::run_tests(target.as_deref()),
@@ -426,7 +433,8 @@ fn run(cli: Cli) -> i32 {
         None => {
             if let Some(file) = cli.file {
                 if std::path::Path::new(&file).is_file() {
-                    commands::run_file(&file, trusted_in_process_ffi)
+                    package_manager::require_managed_run(std::path::Path::new(&file))
+                        .and_then(|()| commands::run_file(&file, trusted_in_process_ffi))
                 } else {
                     match package_manager::has_local_script(&file) {
                         Ok(true) => package_manager::run_script(&file),

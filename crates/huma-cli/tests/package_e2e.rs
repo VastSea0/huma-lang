@@ -129,3 +129,44 @@ fn run_komutu_bulunan_betigin_calisma_hatasini_ortmez() {
 
     fs::remove_dir_all(&project).expect("Geçici proje temizlenmeli");
 }
+
+#[test]
+fn program_yalniz_paket_yoneticisi_betigiyle_calistirilir() {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Sistem saati Unix epoch sonrasında olmalı")
+        .as_nanos();
+    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|path| path.parent())
+        .expect("Workspace kökü bulunmalı")
+        .to_path_buf();
+    let project = workspace.join("target").join(format!(
+        "huma_managed_run_e2e_{}_{}",
+        std::process::id(),
+        nonce
+    ));
+    fs::create_dir_all(&project).expect("Geçici proje dizini oluşturulmalı");
+    assert_success(&run_huma(&project, &["ilkle"]), "Proje ilkleme");
+
+    let entry = project
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| format!("{name}.hb"))
+        .expect("Giriş adı üretilebilmeli");
+    let direct = run_huma(&project, &["run", &entry]);
+    assert!(
+        !direct.status.success(),
+        "Doğrudan dosya çalıştırma kapanmalı"
+    );
+    assert!(
+        String::from_utf8_lossy(&direct.stderr).contains("yalnız paket yöneticisiyle"),
+        "Hata paket yöneticisi kullanımını açıklamalı"
+    );
+
+    assert_success(
+        &run_huma(&project, &["paket", "run", "baslat"]),
+        "Yönetilen paket betiği",
+    );
+    fs::remove_dir_all(&project).expect("Geçici proje temizlenmeli");
+}
