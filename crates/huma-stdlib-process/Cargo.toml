@@ -1,0 +1,12 @@
+[package]
+name = "huma-stdlib-process"
+version = "0.6.0"
+description = "Optional bounded subprocess adapter for Hüma."
+authors = ["VastSea0 <vastseaoffical0@outlook.com>"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.94.1"
+
+[dependencies]
+huma-runtime = { path = "../huma-runtime" }
+wait-timeout = "0.2"

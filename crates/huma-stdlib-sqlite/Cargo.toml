@@ -1,0 +1,13 @@
+[package]
+name = "huma-stdlib-sqlite"
+version = "0.6.0"
+description = "Optional SQLite adapter for Hüma."
+authors = ["VastSea0 <vastseaoffical0@outlook.com>"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.94.1"
+
+[dependencies]
+huma-runtime = { path = "../huma-runtime" }
+once_cell = "1.19"
+rusqlite = { version = "0.31", features = ["bundled"] }

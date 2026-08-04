@@ -1,0 +1,17 @@
+[package]
+name = "huma-stdlib-gui"
+version = "0.6.0"
+description = "Optional native GUI adapter for the Hüma runtime."
+authors = ["VastSea0 <vastseaoffical0@outlook.com>"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.94.1"
+
+[dependencies]
+huma-runtime = { path = "../huma-runtime" }
+dear-imgui-rs = "0.15"
+dear-app = "0.15"
+
+# Bu deneysel adaptör, varsayılan Hüma çalışma alanından güvenlik nedeniyle
+# karantinadadır ve bağımsız olarak değerlendirilir/derlenir.
+[workspace]
