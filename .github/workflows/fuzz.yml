@@ -6,17 +6,23 @@ on:
   workflow_dispatch:
 
 jobs:
-  lexer-parser:
+  fuzz:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [lexer_parser, hmi_frame, bytecode_verifier]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Install pinned Rust nightly
+        uses: dtolnay/rust-toolchain@4fd1da8b0805d2d2e936788875a7d65dbd677dc2 # nightly action
+        with:
+          toolchain: nightly-2026-07-26
 
       - name: Install cargo-fuzz
-        uses: taiki-e/install-action@cargo-fuzz
+        uses: taiki-e/install-action@82fc405565b9cf90abfe700ba43b4751ce2fe422 # cargo-fuzz
 
-      - name: Fuzz lexer and parser
-        run: cargo fuzz run lexer_parser -- -max_total_time=300 -max_len=65536
+      - name: Fuzz ${{ matrix.target }}
+        run: cargo fuzz run ${{ matrix.target }} --locked -- -max_total_time=300 -max_len=65536

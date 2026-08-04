@@ -9,11 +9,28 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-huma-core = { path = "../crates/huma-core" }
+huma-bytecode = { path = "../crates/huma-bytecode" }
+huma-hmi = { path = "../crates/huma-hmi" }
+huma-syntax = { path = "../crates/huma-syntax" }
+serde_json = "1.0"
 
 [[bin]]
 name = "lexer_parser"
 path = "fuzz_targets/lexer_parser.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "hmi_frame"
+path = "fuzz_targets/hmi_frame.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "bytecode_verifier"
+path = "fuzz_targets/bytecode_verifier.rs"
 test = false
 doc = false
 bench = false

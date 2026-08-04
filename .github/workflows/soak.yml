@@ -1,0 +1,35 @@
+name: Soak and Fault Injection
+
+on:
+  schedule:
+    - cron: "43 1 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  soak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@e43eeffd51aefeea929f4ea14e09fd077153e788 # 1.94.1
+
+      - name: Cache cargo artifacts
+        uses: swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+
+      - name: Run heap and isolate soak tests
+        run: cargo test --locked -p huma-runtime --test soak -- --ignored --test-threads=1
+
+      - name: Inject HMI timeout and protocol faults
+        run: cargo test --locked -p huma-hmi --test process_client -- --test-threads=1
+
+      - name: Exercise transactional package path
+        run: cargo test --locked -p huma-cli --all-targets package_manager::tests::dizin_degisimleri_hata_enjeksiyonunda_onceki_surumu_geri_yukler -- --test-threads=1
+
+      - name: Exercise package end-to-end path
+        run: cargo test --locked -p huma-cli --test package_e2e -- --test-threads=1

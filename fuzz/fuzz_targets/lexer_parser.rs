@@ -1,7 +1,7 @@
 #![no_main]
 
-use huma_core::lexer::Lexer;
-use huma_core::parser::Parser;
+use huma_syntax::lexer::Lexer;
+use huma_syntax::parser::Parser;
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {

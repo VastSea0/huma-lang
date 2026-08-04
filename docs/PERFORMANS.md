@@ -34,12 +34,39 @@ Sonuçlar `target/criterion/` altında saklanır. Karşılaştırma ancak aynı 
 aynı Rust araç zinciri, aynı güç/ısı koşulu ve aynı Criterion ayarlarıyla
 yapılmalıdır.
 
+## Otomatik gerileme kapısı
+
+`huma-perf` aşağıdaki zemin iş yüklerini ısınma sonrası çoklu örnekle ölçer;
+medyan, p95 ve süreç RSS değerlerini sürümlü JSON rapora yazar:
+
+- lexer+parser ve boş yorumlayıcı başlangıcı,
+- sayısal döngü ve VM karşılığı,
+- 1.000 fonksiyon çağrısı ve 1.000 closure çağrısı,
+- liste büyütme, sözlük yazma ve Unicode metin birleştirme,
+- küçük bir dosya modülünün çözülmesi/ayrıştırılması/yüklenmesi,
+- 1.000 canlı genç nesnede minor GC,
+- 1.000 erişilemez çevrimde major GC.
+
+```bash
+cargo run --release --locked -p huma-perf -- measure rapor.json
+cargo run --release --locked -p huma-perf -- check taban.json aday.json
+```
+
+Adanmış `huma-perf` runner'ındaki PR kapısı, aynı makinede taban ve aday
+revizyonları yeniden derler. Her suite için medyan sürede %5, p95 veya RSS'te
+%10'dan büyük gerileme işi başarısız yapar. Paylaşımlı GitHub runner sonuçları
+donanım gürültüsü nedeniyle normatif karşılaştırma değildir.
+
+Yerel ilk doğrulamada 10.000 yinelemeli iş yükünde VM'nin yorumlayıcıdan yavaş
+olduğu da görünürdür. Bu nedenle VM hız iddiası taşımaz; performans ve semantik
+eşlik kanıtlanana kadar deneysel kalır.
+
 ## Dış süreç ve tepe bellek
 
 Önce sürüm ikilisini üretin:
 
 ```bash
-cargo build --release -p huma-cli
+cargo build --release --locked -p huma-cli
 ```
 
 macOS:
