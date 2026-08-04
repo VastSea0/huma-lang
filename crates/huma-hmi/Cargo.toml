@@ -1,0 +1,20 @@
+[package]
+name = "huma-hmi"
+version = "0.6.0"
+description = "Versioned out-of-process Host Module Interface contracts for Hüma."
+authors = ["VastSea0 <vastseaoffical0@outlook.com>"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.94.1"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2"
+unicode-normalization = "0.1"
+
+[[bin]]
+name = "hmi-test-module"
+path = "tests/fixtures/hmi_test_module.rs"
+test = false
+bench = false
