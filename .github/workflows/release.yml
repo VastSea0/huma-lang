@@ -1,0 +1,123 @@
+name: Signed Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.artifact }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: huma-linux-x86_64
+            extension: ""
+          - os: macos-14
+            artifact: huma-macos-arm64
+            extension: ""
+          - os: windows-latest
+            artifact: huma-windows-x86_64.exe
+            extension: ".exe"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@e43eeffd51aefeea929f4ea14e09fd077153e788 # 1.94.1
+
+      - name: Cache cargo artifacts
+        uses: swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+
+      - name: Fix reproducible build inputs
+        shell: bash
+        run: |
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --pretty=%ct)" >> "$GITHUB_ENV"
+          echo "CARGO_INCREMENTAL=0" >> "$GITHUB_ENV"
+
+      - name: Build locked release CLI
+        run: cargo build --release --locked -p huma-cli
+
+      - name: Name release binary
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp "target/release/huma${{ matrix.extension }}" "dist/${{ matrix.artifact }}"
+
+      - name: Upload release binary
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}
+          if-no-files-found: error
+
+  sign-and-publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@e43eeffd51aefeea929f4ea14e09fd077153e788 # 1.94.1
+
+      - name: Download release binaries
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: ${{ runner.temp }}/release
+          merge-multiple: true
+
+      - name: Create dependency inventory and checksums
+        shell: bash
+        run: |
+          cargo tree --locked --workspace --edges normal,build > "$RUNNER_TEMP/release/DEPENDENCIES.txt"
+          cd "$RUNNER_TEMP/release"
+          sha256sum DEPENDENCIES.txt huma-* > SHA256SUMS
+
+      - name: Sign checksum manifest with Ed25519
+        shell: bash
+        env:
+          HUMA_RELEASE_KEY: ${{ secrets.HUMA_RELEASE_ED25519_SEED_HEX }}
+        run: |
+          if [[ -z "$HUMA_RELEASE_KEY" ]]; then
+            echo "HUMA_RELEASE_ED25519_SEED_HEX secret is required; unsigned releases are forbidden." >&2
+            exit 1
+          fi
+          install -m 600 /dev/null "$RUNNER_TEMP/huma-release.key"
+          printf '%s\n' "$HUMA_RELEASE_KEY" > "$RUNNER_TEMP/huma-release.key"
+          cargo run --release --locked -p huma-cli -- artifact sign \
+            "$RUNNER_TEMP/release/SHA256SUMS" \
+            --key "$RUNNER_TEMP/huma-release.key" \
+            --output "$RUNNER_TEMP/release/SHA256SUMS.sig"
+          cargo run --release --locked -p huma-cli -- artifact verify \
+            "$RUNNER_TEMP/release/SHA256SUMS" \
+            "$RUNNER_TEMP/release/SHA256SUMS.sig"
+
+      - name: Attest release artifacts
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: ${{ runner.temp }}/release/*
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP/release/"* --verify-tag --generate-notes
+
+      - name: Preserve manually built artifacts
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: signed-release
+          path: ${{ runner.temp }}/release/*
+          if-no-files-found: error

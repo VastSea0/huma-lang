@@ -1,5 +1,43 @@
 # Değişim Günlüğü
 
+## Yayımlanmamış — zemin mühendisliği
+
+- Hüma'nın AI-öncelikli değil, Türkçe dilbilgisini koruyan genel amaçlı
+  kütüphane zemini olduğu kanonik mühendislik anayasasıyla tanımlandı.
+- Rust araç zinciri 1.94.1'e sabitlendi; CI bağımlılık değiştiren bütün Cargo
+  işlemlerini `--locked` çalıştıracak biçimde sertleştirildi.
+- Yapısal ayrılma/yönelme ekli aralık ayrıştırması düzeltildi ve bütün izlenen
+  Hüma kaynaklarının ayrıştırılabilirliği yeniden yeşile getirildi.
+- Eski web sitesi yaklaşan sıfırdan tasarım öncesinde kaynak ağacından çıkarıldı.
+- Monolit; syntax, bytecode, runtime, VM, compiler, HMI, saf stdlib ve yetkili
+  alan adaptörlerine ayrıldı. AI/tensor/BPE ile dosya/CSV/JSONL kodu çekirdekten
+  fiziksel olarak çıkarıldı; adaptör değerleri genel `HostObject` sınırını kullanıyor.
+- Kararlı `Gc` tutamaçları, genç/eskimiş nesiller, yazma bariyeri, minor/major
+  çevrim toplama ve paylaşılmayan heap'li isolate yürütmesi eklendi.
+- `DiagnosticEnvelope` kararlı hata kodu, konum, çağrı izi, güvenli ayrıntılar
+  ve sınırlı neden zinciri taşıyacak biçimde sürümlendi.
+- Yorumlayıcı normatif; VM ve AOT deneysel olarak sürümlü destek tablosuna
+  bağlandı. Üretilmiş ve örnek havuzlu diferansiyel testler eklendi.
+- HMI v1; imza/etki/hata sözleşmesi, sürüm pazarlığı, boyut sınırlı stdio
+  çerçevesi, zaman aşımı ve fail-closed çocuk süreç yaşam döngüsüyle eklendi.
+  Süreç içi FFI ayrıca açık güven bayrağı olmadan kaydedilmiyor.
+- Paket API farkı SemVer'e bağlandı; paket ve dağıtım artefaktı Ed25519
+  imzaları, checksum ve build-provenance üreten çoklu platform yayın hattı eklendi.
+- Parser, HMI çerçevesi ve bytecode doğrulayıcı fuzz hedefleri; GC/isolate soak,
+  paket rollback hata enjeksiyonu ve zamanlanmış dayanıklılık iş akışı eklendi.
+- Adanmış runner performans kapısı; parser, başlangıç, fonksiyon/closure,
+  liste/sözlük, Unicode, modül yükleme, GC, yorumlayıcı ve VM için medyan/p95/RSS izliyor.
+- HTTP sunucularına açık kapatma, eşzamanlı sunucu sınırı ve adaptör görevleri
+  düşerken iptal edilen yaşam döngüsü eklendi.
+- CI ve yayın iş akışlarındaki üçüncü taraf GitHub Actions bağımlılıkları
+  değişmez commit özetlerine sabitlendi.
+- Bakımı bırakılmış `ttf-parser` zincirini taşıyan deneysel aynı-süreç GUI
+  adaptörü varsayılan workspace ve CLI dağıtımından karantinaya alındı; kök
+  kilit dosyası/güvenlik kapısı artık bu zinciri içermez.
+- Paket kurulumu geçerli Ed25519 imzasını varsayılan zorunluluk yaptı. İmzasız
+  yerel geliştirme istisnası yalnız açık `--güvenilir` onayıyla çalışıyor ve
+  kilit dosyasına ayrı provenans olarak kaydediliyor; native kodu açmıyor.
+
 ## 0.6.0
 
 ### Dil çekirdeği
