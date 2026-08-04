@@ -1,0 +1,16 @@
+[package]
+name = "huma-syntax"
+version = "0.6.0"
+description = "Turkish source grammar, AST, lexer, parser, morphology, and diagnostics for Hüma."
+authors = ["VastSea0 <vastseaoffical0@outlook.com>"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.94.1"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive", "rc"] }
+thiserror = "2"
+unicode-normalization = "0.1"
+
+[dev-dependencies]
+serde_json = "1.0"

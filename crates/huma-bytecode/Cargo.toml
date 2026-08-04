@@ -1,0 +1,13 @@
+[package]
+name = "huma-bytecode"
+version = "0.6.0"
+description = "Versioned Hüma bytecode model and structural verifier."
+authors = ["VastSea0 <vastseaoffical0@outlook.com>"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.94.1"
+
+[dependencies]
+huma-syntax = { path = "../huma-syntax" }
+serde = { version = "1.0", features = ["derive", "rc"] }
+
