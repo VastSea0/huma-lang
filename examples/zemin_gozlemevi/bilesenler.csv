@@ -1,9 +1,0 @@
-bileşen,durum,test_sayısı,ölçüm_ms,bütçe_ms
-Sözdizimi,geçti,174,0.42,1.00
-Bytecode,geçti,91,0.31,1.00
-Çalışma Zamanı,geçti,238,1.84,2.50
-HMI,geçti,64,0.63,1.00
-Dosya Adaptörü,geçti,37,0.27,0.75
-Ağ Adaptörü,geçti,29,0.71,1.25
-SQLite Adaptörü,geçti,33,1.12,1.50
-Paket Güvenliği,geçti,41,0.56,1.00

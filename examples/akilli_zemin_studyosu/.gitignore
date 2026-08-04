@@ -1,0 +1,4 @@
+huma_modulleri/
+target/
+*.hbc
+.DS_Store

@@ -1,0 +1,15 @@
+{
+  "guncelleme_zamani": "2026-08-04T03:39:21.198349+03:00",
+  "paketler": {
+    "huma_sunucu": {
+      "hash": "c9f649cdcfd3678c34bb4edf8d9d21a03578334e4764722f0c00167d2c54c08e",
+      "kaynak": "yerel-imzasız-güvenilir",
+      "surum": "1.0.0"
+    },
+    "yapay_zeka": {
+      "hash": "89bdf5f6890aed0566c490e6021d2cbebd5ea31e2679fa89f843e666dd97405a",
+      "kaynak": "yerel-imzasız-güvenilir",
+      "surum": "1.0.0"
+    }
+  }
+}
