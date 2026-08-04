@@ -1,9 +1,0 @@
-{
-  "name": "brace-expansion",
-  "version": "5.0.8",
-  "private": true,
-  "main": "index.cjs",
-  "engines": {
-    "node": "20 || >=22"
-  }
-}
