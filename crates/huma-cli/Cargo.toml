@@ -21,6 +21,7 @@ huma-compiler = { path = "../huma-compiler" }
 huma-hmi = { path = "../huma-hmi" }
 huma-stdlib-ai = { path = "../huma-stdlib-ai" }
 huma-stdlib-file = { path = "../huma-stdlib-file" }
+huma-stdlib-gui = { path = "../huma-stdlib-gui" }
 huma-stdlib-native = { path = "../huma-stdlib-native" }
 huma-stdlib-net = { path = "../huma-stdlib-net" }
 huma-stdlib-process = { path = "../huma-stdlib-process" }

@@ -1614,11 +1614,14 @@ pub fn gui_calistir(interp: Yorumlayici) -> Result<(), String> {
     let runner = RunnerConfig {
         window_title: request.baslik,
         window_size: (request.genislik as f64, request.yukseklik as f64),
+        clear_color: [0.047, 0.071, 0.082, 1.0],
+        restore_previous_geometry: false,
         ..Default::default()
     };
 
     let draw_fn = request.cizim_fks;
     let mut interp = interp;
+    let mut last_draw_error = None::<String>;
 
     AppBuilder::new()
         .with_config(runner)
@@ -1642,16 +1645,21 @@ pub fn gui_calistir(interp: Yorumlayici) -> Result<(), String> {
                 | WindowFlags::NO_SAVED_SETTINGS
                 | WindowFlags::NO_BRING_TO_FRONT_ON_FOCUS
                 | WindowFlags::NO_NAV_FOCUS
-                | WindowFlags::MENU_BAR;
+                | WindowFlags::NO_BACKGROUND;
             ui.window("##huma_kok_penceresi")
                 .position([0.0, 0.0], Condition::Always)
                 .size(display_size, Condition::Always)
                 .flags(flags)
                 .build(|| {
-                    if let Deger::Hata(error) =
-                        interp.fonksiyon_cagrisi(draw_fn.clone(), Vec::new())
-                    {
+                    if let Err(error) = interp.geri_cagri_kontrollu(draw_fn.clone(), Vec::new()) {
+                        let error = error.to_string();
+                        if last_draw_error.as_deref() != Some(error.as_str()) {
+                            eprintln!("GUI çizim hatası: {error}");
+                            last_draw_error = Some(error.clone());
+                        }
                         ui.text_colored([1.0, 0.35, 0.35, 1.0], &error);
+                    } else {
+                        last_draw_error = None;
                     }
                 });
         })

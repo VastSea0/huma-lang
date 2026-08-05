@@ -12,6 +12,7 @@ members = [
     "crates/huma-stdlib-net",
     "crates/huma-stdlib-process",
     "crates/huma-stdlib-sqlite",
+    "crates/huma-stdlib-gui",
     "crates/huma-vm",
     "crates/huma-core",
     "crates/huma-compiler",
@@ -19,4 +20,3 @@ members = [
     "crates/huma-lsp",
     "crates/huma-perf",
 ]
-exclude = ["crates/huma-stdlib-gui"]

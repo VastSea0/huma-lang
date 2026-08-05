@@ -51,8 +51,6 @@ cargo audit
 cargo run --locked -p huma-cli -- test tests
 ```
 
-Eski web sitesi yaklaşan sıfırdan tasarım öncesinde kaldırılmıştır; kaynak depo
-şu anda web dağıtımı üretmez.
 
 ## İlk program
 
@@ -144,9 +142,9 @@ katmanlarında yaşayacaktır.
 Çalışma alanındaki fiziksel sınırlar: `huma-syntax`, `huma-bytecode`,
 `huma-runtime`, `huma-vm`, `huma-compiler` ve `huma-hmi` zemin katmanlarıdır;
 `huma-stdlib-file`, `huma-stdlib-net`, `huma-stdlib-process`,
-`huma-stdlib-sqlite`, `huma-stdlib-native` ve `huma-stdlib-ai` yalnız
-adaptördür. Eski aynı-süreç GUI adaptörü, bakımı bırakılmış bir font ayrıştırıcı
-zinciri nedeniyle varsayılan workspace/CLI dağıtımından karantinaya alınmıştır.
+`huma-stdlib-sqlite`, `huma-stdlib-native`, `huma-stdlib-ai` ve
+`huma-stdlib-gui` yalnız adaptördür. GUI adaptörü, `gui` yeteneği açıkken CLI
+tarafından yönetilen Dear ImGui tabanlı gerçek yerel pencere sağlar.
 `huma-core` geriye dönük uyumluluk şemsiyesidir; bu ayrımı ortadan kaldıran bir
 çekirdek bağımlılığı değildir.
 

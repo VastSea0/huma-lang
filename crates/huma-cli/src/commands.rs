@@ -24,6 +24,7 @@ pub fn run_file(path: &str, trusted_in_process_ffi: bool) -> Result<()> {
     let mut interp = Yorumlayici::new();
     huma_stdlib_ai::kayit_et(&mut interp.global_degiskenler);
     huma_stdlib_file::kayit_et(&mut interp.global_degiskenler);
+    huma_stdlib_gui::kayit_et(&mut interp.global_degiskenler);
     huma_stdlib_native::kayit_et(&mut interp.global_degiskenler);
     if trusted_in_process_ffi {
         huma_stdlib_native::guvenilir_ffi_kayit_et(&mut interp.global_degiskenler);
@@ -32,6 +33,10 @@ pub fn run_file(path: &str, trusted_in_process_ffi: bool) -> Result<()> {
     huma_stdlib_process::kayit_et(&mut interp.global_degiskenler);
     huma_stdlib_sqlite::kayit_et(&mut interp.global_degiskenler);
     execute_source(&source, &mut interp)?;
+
+    if huma_stdlib_gui::gui_istegi_var_mi().map_err(anyhow::Error::msg)? {
+        huma_stdlib_gui::gui_calistir(interp).map_err(anyhow::Error::msg)?;
+    }
 
     Ok(())
 }
@@ -134,6 +139,7 @@ pub fn start_repl(trusted_in_process_ffi: bool) -> Result<()> {
     let mut interp = Yorumlayici::new();
     huma_stdlib_ai::kayit_et(&mut interp.global_degiskenler);
     huma_stdlib_file::kayit_et(&mut interp.global_degiskenler);
+    huma_stdlib_gui::kayit_et(&mut interp.global_degiskenler);
     huma_stdlib_native::kayit_et(&mut interp.global_degiskenler);
     if trusted_in_process_ffi {
         huma_stdlib_native::guvenilir_ffi_kayit_et(&mut interp.global_degiskenler);

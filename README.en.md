@@ -100,9 +100,9 @@ narrow in-process FFI is available only with the additional
 Domain libraries, including AI, will become stable only after the core/runtime
 contracts are complete. GUI, networking, SQL, tensors, and other domains must
 live in separate capability-aware adapters and packages, not in the language
-core. The legacy in-process GUI prototype is quarantined from the default
-workspace and CLI because its dependency chain contains an unmaintained font
-parser. The previous website has been removed ahead of a ground-up redesign.
+core. The `huma-stdlib-gui` adapter provides a Dear ImGui native window managed
+by the CLI when the explicit `gui` capability is enabled. The previous website
+has been removed ahead of a ground-up redesign.
 
 ## Documentation
 
