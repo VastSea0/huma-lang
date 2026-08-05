@@ -1,11 +1,10 @@
 # Akıllı Zemin Stüdyosu
 
-Bu proje Hüma paket yöneticisiyle oluşturuldu. `yapay_zeka` ve `huma_sunucu`
+Bu proje Hüma paket yöneticisiyle oluşturuldu. `yapay_zeka` ve `gui`
 bağımlılıkları paket yöneticisiyle çözülür ve `huma.lock` içinde özetlenir.
 
-Uygulama 18 örnek üzerinde iki katmanlı bir sinir ağı eğitir. Tarayıcıdaki
-GUI; test kapsamı, P95 gecikme ve hata oranını Hüma HTTP API’sine gönderir.
-Görünen skor, eğitilmiş modelin gerçek ileri geçiş sonucudur.
+Uygulama 18 örnek üzerinde iki katmanlı bir sinir ağı eğitir. GUI gerçek bir
+native penceredir; slider'lar doğrudan eğitilmiş Hüma modeline girdi verir.
 
 Proje kökünden kullanım:
 
@@ -20,7 +19,7 @@ Proje kökünden kullanım:
 ../../target/release/huma paket run baslat
 ```
 
-Arayüz: <http://127.0.0.1:8787>
+Arayüz: yerel native pencere (Dear ImGui)
 
 Test:
 
@@ -28,5 +27,5 @@ Test:
 ../../target/release/huma paket run test
 ```
 
-İzinler paket betiğinde açıkça sınırlıdır: yalnız `dosya-okuma` ve
-`ağ-sunucu`. Uygulama dış ağa bağlanmaz; model ve GUI yereldir.
+İzinler paket betiğinde açıkça `gui` ile sınırlıdır. Uygulama ağ sunucusu
+kurmaz; model ve pencere yereldir.

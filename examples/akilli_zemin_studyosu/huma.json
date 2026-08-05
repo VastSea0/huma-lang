@@ -2,12 +2,12 @@
   "aciklama": "Hüma ile eğitilen sinir ağına bağlı etkileşimli zemin sağlık stüdyosu.",
   "ad": "akilli_zemin_studyosu",
   "bagimliliklar": {
-    "huma_sunucu": "^1.0.0",
+    "gui": "^1.0.0",
     "yapay_zeka": "^1.0.0"
   },
   "betikler": {
-    "baslat": "huma run akilli_zemin_studyosu.hb --izin dosya-okuma --izin ağ-sunucu",
-    "start": "huma run akilli_zemin_studyosu.hb --izin dosya-okuma --izin ağ-sunucu",
+    "baslat": "huma run akilli_zemin_studyosu.hb --izin gui",
+    "start": "huma run akilli_zemin_studyosu.hb --izin gui",
     "test": "huma run tests/test.hb"
   },
   "giris": "akilli_zemin_studyosu.hb",
