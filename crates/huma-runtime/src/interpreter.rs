@@ -5261,6 +5261,37 @@ impl Yorumlayici {
         self.fonksiyon_cagrisi_detayli(f, args, None, None)
     }
 
+    /// Uzun ömürlü ev sahibi döngülerinden (GUI, oyun döngüsü vb.) gelen tek
+    /// bir geri çağrıyı bağımsız yürütme bütçesiyle çalıştırır.
+    ///
+    /// Normal program yürütmesinden kalan hata ve sayaçların sonraki kareyi
+    /// zehirlemesini engeller; geri çağrı hatasını da sessiz bir `Boş` değer
+    /// yerine yapılandırılmış hata olarak ev sahibine iletir.
+    pub fn geri_cagri_kontrollu(&mut self, f: Deger, args: Vec<Deger>) -> HumaResult<Deger> {
+        self.runtime_errors.clear();
+        self.executed_steps = 0;
+        self.output_bytes = 0;
+
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            self.fonksiyon_cagrisi(f, args)
+        }));
+        let value = match result {
+            Ok(value) => value,
+            Err(payload) => {
+                self.runtime_error_ekle(format!(
+                    "Geri çağrı paniği güvenli biçimde yakalandı: {}",
+                    crate::error::panik_mesaji(payload)
+                ));
+                Deger::Bos
+            }
+        };
+
+        match self.runtime_errors.first() {
+            Some(diagnostic) => Err(HumaError::RuntimeError(diagnostic.clone())),
+            None => Ok(value),
+        }
+    }
+
     pub fn fonksiyon_cagrisi_detayli(
         &mut self,
         f: Deger,
