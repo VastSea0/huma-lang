@@ -19,3 +19,11 @@ huma-ide-linux-amd64
 huma-linux-amd64
 
 release-binaries/
+
+# Dependencies & Build Cache
+node_modules/
+.next/
+.vercel/
+.DS_Store
+.env.local
+**/target/
