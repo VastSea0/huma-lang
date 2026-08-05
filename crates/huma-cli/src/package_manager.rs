@@ -2319,7 +2319,7 @@ pub fn require_managed_run(target: &Path) -> Result<()> {
             "Hüma programları yalnız paket yöneticisiyle çalıştırılır. Önce huma.json içinde bir betik tanımlayın, ardından 'huma paket run <betik>' kullanın."
         )
     })?;
-    if PathBuf::from(managed_root) != project_root {
+    if Path::new(&managed_root) != project_root {
         return Err(anyhow!(
             "Paket yöneticisi çalışma kökü mevcut proje köküyle uyuşmuyor."
         ));
