@@ -6,8 +6,8 @@
     "nlp_temel": "3.2.0"
   },
   "betikler": {
-    "baslat": "huma --izin dosya-yazma run kelimeyivektore.hb",
-    "start": "huma --izin dosya-yazma run kelimeyivektore.hb",
+    "baslat": "huma --izin dosya-okuma --izin dosya-yazma run kelimeyivektore.hb",
+    "start": "huma --izin dosya-okuma --izin dosya-yazma run kelimeyivektore.hb",
     "test": "huma run tests/test.hb"
   },
   "giris": "kelimeyivektore.hb",
