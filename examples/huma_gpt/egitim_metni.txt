@@ -1,9 +1,12 @@
-Yapay zekâ bilgisayar sistemlerinin öğrenme ve karar verme yeteneklerini geliştiren modern bir teknolojidir. Derin öğrenme ve yapay sinir ağları büyük veri kümeleri üzerinde çalışarak karmaşık problemleri çözer.
-Türkiye tarihi binlerce yıllık zengin bir geçmişe sahiptir. Anadolu toprakları birçok medeniyete ev sahipliği yapmış ve modern cumhuriyet ile geleceğe adım atmıştır.
-Mustafa Kemal Atatürk 1923 yılında cumhuriyeti ilan ederek çağdaş eğitim ve bilim reformlarını başlatmıştır.
-Yazılım mühendisliği güvenilir ve performanslı sistemler tasarlama disiplinidir. Hüma dili Türkçe söz dizimi ile kod yazmayı kolaylaştırır.
-Bilim ve fizik doğadaki temel yasaları matematiksel yöntemlerle inceleyen doğa disiplinleridir. Uzay araştırmaları evrenin bilinmeyen sınırlarını keşfetmeyi amaçlar.
-Felsefe insanın varlık ve bilgi üzerindeki derin sorgulamalarını temsil eder.
-Şiir duyguların ve düşüncelerin kelimelerle ahenkli bir şekilde dile getirilmesidir. Geceye bir ışık yakar fikirler ve dizeler akıp gider.
-Merhaba hoş geldiniz ben Hüma yapay zekâ modeli size bilim teknoloji ve genel konularda yardımcı olmak için buradayım.
-Teşekkür ederim harika bir gün dilerim yeni sorularınızı sormaktan çekinmeyin.
+Yapay zekâ ve derin öğrenme modelleri insan zekasını taklit eden güçlü matematiksel sistemlerdir.
+Transformer mimarisi self attention mekanizması sayesinde metinlerdeki uzun süreli bağıntıları ve bağlamı öğrenebilir.
+Türkiye cumhuriyeti bilim ve teknoloji alanında yerli yapay zekâ çözümleri geliştirmektedir.
+Mustafa Kemal Atatürk geleceğin anahtarının bilim ve akıl olduğunu vurgulamıştır.
+Yazılım mühendisliği karmaşık problemleri algoritmalar ve veri yapıları ile çözer.
+Hüma programlama dili Türkçe söz dizimi ile yüksek performanslı yapay zeka modelleri geliştirilmesini sağlar.
+Fizik ve matematik evrenin temel kurallarını açıklayan kadim bilim dallarıdır.
+Uzay araştırmaları insanlığın bilinen sınırlarını öteye taşımaktadır.
+Felsefe düşüncenin ve varlığın özünü sorgulayan zihinsel bir yolculuktur.
+Şiir ve sanat insanın ruh halini en derin duygularla ifade eden estetik formlardır.
+Merhaba hoş geldiniz ben Hüma GPT gerçek bir transformer yapay zekâ modeliyim.
+Sizlere bilim teknoloji yazılım felsefe ve sanat konularında yardımcı olmaktan memnuniyet duyarım.

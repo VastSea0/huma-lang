@@ -1,23 +1,25 @@
 // ══════════════════════════════════════════════════════════════════════════════
 // examples / huma_gpt / gercek_llm.hb
-// 2. Derece (Trigram) Dinamik Yapay Sinir Ağı Üreteci
+// Transformer GPT Mimarisini Kullanan Gerçek Yapay Zeka Çıkarım Modülü
 // ══════════════════════════════════════════════════════════════════════════════
 
 "yapay_zeka"'yı yükle
 "dosya.hb"'yi yükle
 "dizgi.hb"'yi yükle
+"transformer.hb"'yi yükle
 
-"🧠 [TRİGRAM GENERATIVE LLM] Dinamik Türkçe Dil Modeli başlatılıyor..."'u yazdır
+"🧠 [TRANSFORMER GPT] Gerçek Transformer Mimarisi Başlatılıyor..."'u yazdır
 
+// ═══════════ ADIM 1: Eğitim Verisi & Sözlük ═══════════
 egitim_ham = dosya_oku("egitim_metni.txt")
 egitim_kelimeleri = böl(kırp(egitim_ham), " ")
 toplam_kelime = uzunluk(egitim_kelimeleri)
 "   Eğitim verisi kelime sayısı: " + toplam_kelime'yi yazdır
 
-// Sözlük
+// Benzersiz sözlük
 llm_sozluk = []
 si = 0'dan (toplam_kelime - 1)'e kadar {
-    kk = egitim_kelimeleri[si]
+    kk = egitim_kelimeleri[si] olsun
     uzunluk(kk) > 0 ise {
         bulunan = 0
         sj = 0'dan (uzunluk(llm_sozluk) - 1)'e kadar {
@@ -29,106 +31,149 @@ si = 0'dan (toplam_kelime - 1)'e kadar {
     }
 }
 sozluk_boyutu = uzunluk(llm_sozluk)
-"   Sözlük boyutu: " + sozluk_boyutu'nu yazdır
+"   Sözlük boyutu (vocab_size): " + sozluk_boyutu'nu yazdır
 
-// İstem analiz edip en uygun başlangıç konusunu seçen fonksiyon
-baslangic_kelimesi_sec fonksiyon olsun istem alsın {
-    k_istem = küçük_harf(kırp(istem))
-
-    içeriyor(k_istem, "yapay") = 1 ise { "Yapay"'ı döndür }
-    içeriyor(k_istem, "zeka") = 1 ise { "Yapay"'ı döndür }
-    içeriyor(k_istem, "ai") = 1 ise { "Yapay"'ı döndür }
-    içeriyor(k_istem, "türkiye") = 1 ise { "Türkiye"'yi döndür }
-    içeriyor(k_istem, "tarih") = 1 ise { "Türkiye"'yi döndür }
-    içeriyor(k_istem, "atatürk") = 1 ise { "Mustafa"'yı döndür }
-    içeriyor(k_istem, "yazılım") = 1 ise { "Yazılım"'ı döndür }
-    içeriyor(k_istem, "fizik") = 1 ise { "Bilim"'i döndür }
-    içeriyor(k_istem, "bilim") = 1 ise { "Bilim"'i döndür }
-    içeriyor(k_istem, "felsefe") = 1 ise { "Felsefe"'yi döndür }
-    içeriyor(k_istem, "şiir") = 1 ise { "Şiir"'i döndür }
-    içeriyor(k_istem, "siir") = 1 ise { "Şiir"'i döndür }
-    içeriyor(k_istem, "selam") = 1 ise { "Merhaba"'yı döndür }
-    içeriyor(k_istem, "merhaba") = 1 ise { "Merhaba"'yı döndür }
-    içeriyor(k_istem, "teşekkür") = 1 ise { "Teşekkür"'ü döndür }
-
-    // Bilinmeyen veya rastgele istem için dinamik seçim
-    rnd_idx = (uzunluk(k_istem) * 7) % sozluk_boyutu
-    llm_sozluk[rnd_idx]'i döndür
+// Kelime <-> ID Dönüştürücüler
+kelime_to_id fonksiyon olsun kel alsın {
+    k = küçük_harf(kel) olsun
+    idx = 0'dan (sozluk_boyutu - 1)'e kadar {
+        küçük_harf(llm_sozluk[idx]) == k ise {
+            idx'i döndür
+        }
+    }
+    -1'i döndür
 }
 
-// 2. Derece Trigram Adım Tahmini
+id_to_kelime fonksiyon olsun id_val alsın {
+    (id_val >= 0) ve (id_val < sozluk_boyutu) ise {
+        llm_sozluk[id_val]'i döndür
+    }
+    ""'ı döndür
+}
+
+// ═══════════ ADIM 2: Transformer GPT Model İlklendirme ═══════════
+// d_model=16, d_ff=32, max_seq=16
+d_model = 16
+d_ff = 32
+max_seq = 16
+
+"   Transformer Konfigürasyonu: d_model=" + d_model + ", d_ff=" + d_ff + ", max_seq=" + max_seq'i yazdır
+"   Causal Self-Attention + Multi-Head + Feed-Forward (GELU) Katmanları Oluşturuluyor..."'u yazdır
+
+gpt_model = transformer()
+gpt_model.ilklendir(sozluk_boyutu, d_model, d_ff, max_seq)
+
+"   ✅ Transformer GPT Mimarisi Hazır!"'ı yazdır
+
+// ═══════════ ADIM 3: Autoregressive Transformer Inference Engine ═══════════
+// istem: Kullanıcının girdiği metin
+// uretilen_kelimeler: Şimdiye kadar üretilmiş kelimeler
+// step: Kaçıncı adım
 llm_sonraki_kelime_dinamik fonksiyon olsun istem, uretilen_kelimeler, step alsın {
     n_uretilen = uzunluk(uretilen_kelimeler)
 
-    // Adım 0: İstem konusuna göre başlangıç kelimesini ver
+    // 1. Bağlam Token Dizisini Oluştur (Context Window)
+    context_tokens = []
+
     step == 0 ise {
-        w0 = baslangic_kelimesi_sec(istem)
-        w0'ı döndür
-    }
+        // İstemdeki kelimeleri sözlük ID'lerine çevir
+        istem_kelimeleri = böl(kırp(istem), " ") olsun
+        ik_sayisi = uzunluk(istem_kelimeleri) olsun
+        
+        i = 0'dan (ik_sayisi - 1)'e kadar {
+            w_id = kelime_to_id(istem_kelimeleri[i]) olsun
+            w_id >= 0 ise {
+                context_tokens = listeye_ekle(context_tokens, w_id)
+            }
+        }
 
-    // Adım > 0: Son 2 ya da 1 kelimeye bakarak Trigram adayları topla
-    son_w = uretilen_kelimeler[n_uretilen - 1]
-    onceki_w = ""
-    n_uretilen >= 2 ise {
-        onceki_w = uretilen_kelimeler[n_uretilen - 2]
-    }
+        // Eğer istemdeki hiçbir kelime sözlükte yoksa, varsayılan token ile başla
+        uzunluk(context_tokens) == 0 ise {
+            rnd_start = (uzunluk(istem) * 7) % sozluk_boyutu
+            context_tokens = listeye_ekle(context_tokens, rnd_start)
+        }
+    } yoksa {
+        // Üretilen kelimeleri token ID'lerine dönüştür (son max_seq kadar)
+        bas_idx = n_uretilen - (max_seq - 1)
+        bas_idx < 0 ise { bas_idx = 0 }
 
-    adaylar = []
-
-    // 1. Öncelik: (onceki_w, son_w) ikilisinden sonra gelen kelimeler (2nd-order Trigram)
-    uzunluk(onceki_w) > 0 ise {
-        bi = 0'dan (toplam_kelime - 3)'e kadar {
-            w1 = egitim_kelimeleri[bi] olsun
-            w2 = egitim_kelimeleri[bi + 1] olsun
-            w3 = egitim_kelimeleri[bi + 2] olsun
-
-            (küçük_harf(w1) == küçük_harf(onceki_w)) ve (küçük_harf(w2) == küçük_harf(son_w)) ise {
-                adaylar = listeye_ekle(adaylar, w3)
+        ui = bas_idx'den (n_uretilen - 1)'e kadar {
+            w_id = kelime_to_id(uretilen_kelimeler[ui]) olsun
+            w_id >= 0 ise {
+                context_tokens = listeye_ekle(context_tokens, w_id)
             }
         }
     }
 
-    // 2. Yedek: Eğer Trigram adayı çıkmadıysa son_w sonrası gelen kelimeler (Bigram fallback)
-    uzunluk(adaylar) == 0 ise {
-        bi = 0'dan (toplam_kelime - 2)'e kadar {
-            w1 = egitim_kelimeleri[bi] olsun
-            w2 = egitim_kelimeleri[bi + 1] olsun
-
-            küçük_harf(w1) == küçük_harf(son_w) ise {
-                adaylar = listeye_ekle(adaylar, w2)
-            }
-        }
-    }
-
-    n_aday = uzunluk(adaylar)
-
-    // Eğer hiç aday kalmadıysa dur (EOS)
-    n_aday == 0 ise {
+    ctx_len = uzunluk(context_tokens)
+    ctx_len == 0 ise {
         ""'ı döndür
     }
 
-    // Filtreleme: Son üretilen kelimelerde bu aday var mı? (Tekrar cezası)
-    temiz_adaylar = []
-    ai = 0'dan (n_aday - 1)'e kadar {
-        cand = adaylar[ai] olsun
-        gecerli = 1
-        ui = 0'dan (n_uretilen - 1)'e kadar {
-            küçük_harf(uretilen_kelimeler[ui]) == küçük_harf(cand) ise {
-                gecerli = 0
+    // Context boyutu max_seq'i aşarsa kırp
+    ctx_len > max_seq ise {
+        yeni_ctx = []
+        c_bas = ctx_len - max_seq
+        ci = c_bas'tan (ctx_len - 1)'e kadar {
+            yeni_ctx = listeye_ekle(yeni_ctx, context_tokens[ci])
+        }
+        context_tokens = yeni_ctx
+    }
+
+    // 2. Transformer GPT Forward Pass (Self-Attention -> FFN -> Logits -> Softmax)
+    prob_vector = gpt_model.tahmin_sonraki_token(context_tokens)
+
+    // 3. Repetition Penalty + Top-K Stochastic Sampling
+    // En yüksek olasılıklı 3 adayı bul
+    k1_val = -9999.0; k1_id = 0
+    k2_val = -9999.0; k2_id = 0
+    k3_val = -9999.0; k3_id = 0
+
+    ti = 0'dan (sozluk_boyutu - 1)'e kadar {
+        val = vektor_al(prob_vector, ti) olsun
+        cand_w = id_to_kelime(ti) olsun
+
+        // Son 6 kelimede bu aday geçti mi? (Tekrar cezası)
+        tekrar = 0
+        r_bas = n_uretilen - 6
+        r_bas < 0 ise { r_bas = 0 }
+        ri = r_bas'tan (n_uretilen - 1)'e kadar {
+            uretilen_kelimeler[ri] == cand_w ise {
+                tekrar = tekrar + 1
             }
         }
-        gecerli == 1 ise {
-            temiz_adaylar = listeye_ekle(temiz_adaylar, cand)
+
+        tekrar > 0 ise {
+            val = val - (tekrar * 0.3)
+        }
+
+        val > k1_val ise {
+            k3_val = k2_val; k3_id = k2_id
+            k2_val = k1_val; k2_id = k1_id
+            k1_val = val; k1_id = ti
+        } yoksa {
+            val > k2_val ise {
+                k3_val = k2_val; k3_id = k2_id
+                k2_val = val; k2_id = ti
+            } yoksa {
+                val > k3_val ise {
+                    k3_val = val; k3_id = ti
+                }
+            }
         }
     }
 
-    n_temiz = uzunluk(temiz_adaylar)
-
-    n_temiz > 0 ise {
-        r_idx = rastgele_tamsayi(0, n_temiz - 1)
-        temiz_adaylar[r_idx]'i döndür
-    } yoksa {
-        r_idx = rastgele_tamsayi(0, n_aday - 1)
-        adaylar[r_idx]'i döndür
+    // Olasılık ağırlıklı rastgele seçim (Temperature Sampling)
+    rnd = uniform_rastgele(0.0, 1.0)
+    secilen_id = k1_id
+    rnd > 0.55 ise {
+        rnd > 0.85 ise {
+            secilen_id = k3_id
+        } yoksa {
+            secilen_id = k2_id
+        }
     }
+
+    // Seçilen kelimeyi döndür
+    id_to_kelime(secilen_id)'yi döndür
 }
