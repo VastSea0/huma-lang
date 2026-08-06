@@ -1,0 +1,18 @@
+{
+  "aciklama": "Yeni bir Hüma projesi.",
+  "ad": "kelimeyivektore",
+  "bagimliliklar": {
+    "nlp_ileri": "1.0.0",
+    "nlp_temel": "3.2.0"
+  },
+  "betikler": {
+    "baslat": "huma --izin dosya-yazma run kelimeyivektore.hb",
+    "start": "huma --izin dosya-yazma run kelimeyivektore.hb",
+    "test": "huma run tests/test.hb"
+  },
+  "giris": "kelimeyivektore.hb",
+  "huma_surum": ">=0.6.0",
+  "lisans": "MIT",
+  "surum": "0.1.0",
+  "yazar": "Geliştirici"
+}
