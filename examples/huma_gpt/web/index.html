@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>huma gpt</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #0c0c0c;
+      color: #ededed;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 680px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 16px 0;
+      border-bottom: 1px solid #1e1e1e;
+      margin-bottom: 20px;
+    }
+
+    header h1 {
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      color: #888888;
+    }
+
+    .chat-log {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      padding-right: 8px;
+    }
+
+    .message {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .message .author {
+      font-size: 11px;
+      font-family: monospace;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .message.user .author { color: #777777; }
+    .message.bot .author { color: #aaaaaa; }
+    .message .text { color: #dddddd; white-space: pre-wrap; }
+
+    .input-wrapper {
+      padding-top: 16px;
+      border-top: 1px solid #1e1e1e;
+      margin-top: 10px;
+    }
+
+    .input-form {
+      display: flex;
+      gap: 10px;
+      background: #141414;
+      border: 1px solid #222222;
+      border-radius: 6px;
+      padding: 4px 6px;
+    }
+
+    .input-form input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #ffffff;
+      font-size: 14px;
+      padding: 10px 12px;
+      outline: none;
+      font-family: inherit;
+    }
+
+    .input-form input::placeholder { color: #444444; }
+
+    .input-form button {
+      background: #222222;
+      color: #cccccc;
+      border: none;
+      padding: 0 16px;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .input-form button:hover { background: #2a2a2a; color: #ffffff; }
+
+    .cursor-blink {
+      display: inline;
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>huma gpt</h1>
+    </header>
+
+    <div class="chat-log" id="chatLog">
+      <div class="message bot">
+        <div class="author">huma</div>
+        <div class="text">hazır.</div>
+      </div>
+    </div>
+
+    <div class="input-wrapper">
+      <form class="input-form" onsubmit="handleSubmit(event)">
+        <input type="text" id="userInput" placeholder="bir konu yazın..." autocomplete="off" />
+        <button type="submit" id="sendBtn">gönder</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const chatLog = document.getElementById('chatLog');
+    const userInput = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+    let isGenerating = false;
+
+    async function handleSubmit(e) {
+      e.preventDefault();
+      if (isGenerating) return;
+
+      const prompt = userInput.value.trim();
+      if (!prompt) return;
+
+      appendMsg('user', prompt);
+      userInput.value = '';
+      isGenerating = true;
+      sendBtn.disabled = true;
+
+      const botMsg = document.createElement('div');
+      botMsg.className = 'message bot';
+
+      const authorDiv = document.createElement('div');
+      authorDiv.className = 'author';
+      authorDiv.innerText = 'huma';
+
+      const textDiv = document.createElement('div');
+      textDiv.className = 'text';
+
+      const cursor = document.createElement('span');
+      cursor.className = 'cursor-blink';
+      cursor.innerText = '▌';
+
+      botMsg.appendChild(authorDiv);
+      botMsg.appendChild(textDiv);
+      botMsg.appendChild(cursor);
+      chatLog.appendChild(botMsg);
+      chatLog.scrollTop = chatLog.scrollHeight;
+
+      // her adımda sinir ağına son kelimeyi gönder, bir sonraki kelimeyi al
+      let accumulated = prompt;
+      let step = 0;
+      const maxSteps = 30;
+
+      while (step < maxSteps) {
+        try {
+          const res = await fetch(`/api/next_word?metin=${encodeURIComponent(prompt)}&step=${step}`);
+          const data = await res.json();
+
+          if (data.done || !data.word || data.word === '') break;
+
+          if (step === 0) {
+            textDiv.innerText = data.word;
+          } else {
+            textDiv.innerText += ' ' + data.word;
+          }
+          chatLog.scrollTop = chatLog.scrollHeight;
+          step++;
+          await new Promise(r => setTimeout(r, 40));
+        } catch (err) {
+          break;
+        }
+      }
+
+      cursor.remove();
+      isGenerating = false;
+      sendBtn.disabled = false;
+    }
+
+    function appendMsg(sender, text) {
+      const msg = document.createElement('div');
+      msg.className = `message ${sender}`;
+      const label = sender === 'user' ? 'siz' : 'huma';
+      msg.innerHTML = `<div class="author">${label}</div><div class="text">${esc(text)}</div>`;
+      chatLog.appendChild(msg);
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    function esc(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+  </script>
+</body>
+</html>
