@@ -1,0 +1,25 @@
+{
+  "guncelleme_zamani": "2026-08-06T03:48:51.944753+03:00",
+  "paketler": {
+    "huma_sunucu": {
+      "hash": "c9f649cdcfd3678c34bb4edf8d9d21a03578334e4764722f0c00167d2c54c08e",
+      "kaynak": "yerel-imzasız-güvenilir",
+      "surum": "1.0.0"
+    },
+    "nlp_ileri": {
+      "hash": "336082c58db56549fd793d258d705aa63a755b3c1270fc0d0d4e09d5fc4a33c1",
+      "kaynak": "yerel-imzasız-güvenilir",
+      "surum": "1.0.0"
+    },
+    "nlp_temel": {
+      "hash": "1cfcd902cd9f21af43405474e5a9b07ff169cfa0b93e7bf34da503aab3ebc668",
+      "kaynak": "yerel-imzasız-güvenilir",
+      "surum": "3.2.0"
+    },
+    "yapay_zeka": {
+      "hash": "89bdf5f6890aed0566c490e6021d2cbebd5ea31e2679fa89f843e666dd97405a",
+      "kaynak": "yerel-imzasız-güvenilir",
+      "surum": "1.0.0"
+    }
+  }
+}

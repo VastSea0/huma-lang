@@ -1,0 +1,11 @@
+{
+  "ad": "yapay_zeka",
+  "surum": "1.0.0",
+  "aciklama": "CPU üzerinde yoğun katman, geri yayılım, Adam güncellemesi ve model serileştirme araçları.",
+  "yazar": "Hüma Ekibi",
+  "giris": "yapay_zeka.hb",
+  "huma_surum": ">=0.6.0",
+  "bagimliliklar": {},
+  "betikler": {},
+  "lisans": "MIT"
+}

@@ -1,0 +1,20 @@
+{
+  "aciklama": "Hüma Dili ve Yerleşik AI Modülleri ile Otoregresif Türkçe GPT Modeli",
+  "ad": "huma_gpt",
+  "bagimliliklar": {
+    "huma_sunucu": "^1.0.0",
+    "nlp_ileri": "^1.0.0",
+    "nlp_temel": "^3.1.0",
+    "yapay_zeka": "^1.0.0"
+  },
+  "betikler": {
+    "baslat": "huma --izin dosya-okuma --izin dosya-yazma ana.hb",
+    "start": "huma --izin dosya-okuma --izin dosya-yazma ana.hb",
+    "web": "huma --izin ağ-sunucu --izin dosya-okuma web_arayuz.hb"
+  },
+  "giris": "ana.hb",
+  "huma_surum": ">=0.6.0",
+  "lisans": "MIT",
+  "surum": "1.0.0",
+  "yazar": "Hüma Ekibi & Antigravity"
+}
