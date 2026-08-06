@@ -1,0 +1,94 @@
+[
+  {
+    "soru_kaliplari": ["yapay zeka nedir", "yapay zeka", "ai nedir", "yapay zekâ"],
+    "cevap": "Yapay zekâ, bilgisayar sistemlerinin insan zekâsına özgü olan öğrenme, akıl yürütme, problem çözme ve karar verme gibi yetenekleri taklit etmesini sağlayan bir bilim dalıdır. Günümüzde derin öğrenme, doğal dil işleme ve bilgisayarlı görü gibi alt alanları ile sağlık, finans, ulaşım ve eğitim başta olmak üzere pek çok sektörde devrim niteliğinde uygulamalar geliştirmektedir."
+  },
+  {
+    "soru_kaliplari": ["makine öğrenmesi", "makine öğrenme", "machine learning"],
+    "cevap": "Makine öğrenmesi, bilgisayarların açıkça programlanmadan veriden örüntüler öğrenmesini sağlayan yapay zekâ alt dalıdır. Denetimli öğrenme, denetimsiz öğrenme ve pekiştirmeli öğrenme olmak üzere üç temel yaklaşımı vardır. Büyük veri kümeleri üzerinde eğitilen modeller, sınıflandırma, regresyon ve kümeleme gibi görevlerde insan düzeyinde ya da üstünde başarı gösterebilmektedir."
+  },
+  {
+    "soru_kaliplari": ["derin öğrenme", "deep learning", "sinir ağı", "sinir ağları"],
+    "cevap": "Derin öğrenme, çok katmanlı yapay sinir ağları kullanarak karmaşık verilerdeki soyut örüntüleri otomatik olarak öğrenen bir makine öğrenmesi yöntemidir. Görüntü tanıma, konuşma tanıma ve doğal dil işleme gibi alanlarda çığır açan sonuçlar elde etmiştir. Evrişimli sinir ağları ve transformer mimarileri bu alanın en önemli yapı taşlarıdır."
+  },
+  {
+    "soru_kaliplari": ["türkiye tarihi", "türkiye tarih", "anadolu tarihi"],
+    "cevap": "Türkiye tarihi, binlerce yıllık zengin bir geçmişe sahiptir. Anadolu toprakları Hitit, Frig, Lidya, Yunan ve Roma gibi kadim medeniyetlere ev sahipliği yapmıştır. 1071 Malazgirt Zaferi ile Türklerin Anadolu'ya yerleşmesi, Selçuklu ve Osmanlı dönemleri, ardından 1923'te Mustafa Kemal Atatürk önderliğinde kurulan Türkiye Cumhuriyeti ile modern bir ulus devlet oluşturulmuştur."
+  },
+  {
+    "soru_kaliplari": ["osmanlı", "osmanlı imparatorluğu", "osmanlı devleti"],
+    "cevap": "Osmanlı İmparatorluğu, 1299'dan 1922'ye kadar altı yüz yılı aşkın süre hüküm sürmüş dünyanın en uzun ömürlü devletlerinden biridir. Üç kıtaya yayılan topraklarıyla Avrupa, Asya ve Afrika'da derin izler bırakmıştır. Mimari, edebiyat, müzik ve hukuk alanlarında özgün bir medeniyet inşa etmiş, İstanbul'un fethiyle dünya tarihinin akışını değiştirmiştir."
+  },
+  {
+    "soru_kaliplari": ["atatürk", "mustafa kemal", "cumhuriyet"],
+    "cevap": "Mustafa Kemal Atatürk, Türk Kurtuluş Savaşı'nın önderi ve Türkiye Cumhuriyeti'nin kurucusudur. 29 Ekim 1923'te cumhuriyeti ilan etmiş, ardından harf devrimi, eğitim reformu, kadın hakları ve laiklik gibi köklü değişikliklerle Türkiye'yi çağdaş uygarlık düzeyine taşımayı hedeflemiştir. Çağdaş Türkiye'nin temellerini atan vizyon sahibi bir liderdir."
+  },
+  {
+    "soru_kaliplari": ["yazılım", "yazılım mühendisliği", "programlama", "kodlama"],
+    "cevap": "Yazılım mühendisliği, karmaşık yazılım sistemlerini sistematik ve ölçülebilir yöntemlerle tasarlama, geliştirme, test etme ve bakım yapma disiplinidir. Gereksinim analizi, mimari tasarım, kodlama, test ve dağıtım aşamalarını kapsayan mühendislik yaklaşımıyla güvenilir ve sürdürülebilir yazılımlar üretilmesini sağlar."
+  },
+  {
+    "soru_kaliplari": ["programlama dili", "programlama dilleri", "hangi dil"],
+    "cevap": "Programlama dilleri, insanların bilgisayarlara talimat vermesini sağlayan biçimsel dillerdir. Python basitliği ve geniş kütüphane desteğiyle yapay zekâ ve veri biliminde; JavaScript web geliştirmede; Rust bellek güvenliği ve performansıyla sistem programlamada; C ve C++ ise düşük seviyeli donanım kontrolü gerektiren alanlarda yaygın olarak kullanılmaktadır."
+  },
+  {
+    "soru_kaliplari": ["hüma", "huma dili", "hüma dili", "hüma nedir"],
+    "cevap": "Hüma, Türkçe söz dizimi ve anahtar kelimelerle programlama yapılmasını sağlayan özgün bir programlama dilidir. Rust ile geliştirilmiş yorumlayıcısı sayesinde dosya işlemleri, ağ istekleri, doğal dil işleme ve yapay sinir ağı eğitimi gibi geniş bir yetenek setine sahiptir. Türkçe konuşan geliştiricilerin ana dillerinde kod yazabilmesini amaçlamaktadır."
+  },
+  {
+    "soru_kaliplari": ["felsefe", "felsefe nedir", "filozoflar"],
+    "cevap": "Felsefe, varlık, bilgi, değer, akıl, us ve dil gibi temel konuları eleştirel ve sistematik bir yaklaşımla inceleyen düşünce disiplinidir. Sokrates, Platon ve Aristoteles'ten başlayarak Kant, Nietzsche ve Wittgenstein'a uzanan zengin bir geleneğe sahiptir. İnsanın evrendeki yerini, bilginin doğasını ve etik değerleri sorgulamak felsefenin temel uğraşıdır."
+  },
+  {
+    "soru_kaliplari": ["fizik", "fizik nedir", "fizik bilimi"],
+    "cevap": "Fizik, doğadaki madde ve enerjinin yapısını, hareketini ve etkileşimlerini temel yasalar çerçevesinde inceleyen doğa bilimidir. Newton mekaniğinden Einstein'ın görelilik kuramına, kuantum mekaniğinden parçacık fiziğine kadar geniş bir alana yayılır. Evrenin işleyişini anlamak ve teknolojik gelişmelere zemin hazırlamak fiziğin temel hedefidir."
+  },
+  {
+    "soru_kaliplari": ["matematik", "matematik nedir"],
+    "cevap": "Matematik, sayılar, yapılar, uzay ve değişim kavramlarını mantıksal akıl yürütme ve soyut düşünme yoluyla inceleyen temel bilimdir. Cebir, geometri, analiz ve olasılık gibi dalları ile hem kuramsal araştırmaların hem de mühendislik, ekonomi ve bilgisayar bilimi gibi uygulamalı alanların vazgeçilmez temelidir."
+  },
+  {
+    "soru_kaliplari": ["biyoloji", "biyoloji nedir", "canlı", "canlılar"],
+    "cevap": "Biyoloji, canlı organizmaların yapısını, işlevini, büyümesini, evrimini ve çevresiyle etkileşimini inceleyen doğa bilimidir. Hücre biyolojisi, genetik, ekoloji ve evrimsel biyoloji gibi alt dalları ile yaşamın temel mekanizmalarını anlamayı amaçlar. DNA'nın keşfinden genom haritalamaya uzanan süreç, biyolojinin en büyük başarılarından biridir."
+  },
+  {
+    "soru_kaliplari": ["uzay", "evren", "uzay araştırmaları", "galaksi", "gezegen"],
+    "cevap": "Uzay, Dünya atmosferinin ötesinde uzanan sınırsız boşluktur. Milyarlarca galaksi, yıldız ve gezegen sistemi barındıran evren, Büyük Patlama ile yaklaşık 13,8 milyar yıl önce oluşmuştur. NASA, ESA ve SpaceX gibi kuruluşlar, Mars'a insanlı görev planlaması ve derin uzay keşfi çalışmalarıyla insanlığın ufkunu genişletmeye devam etmektedir."
+  },
+  {
+    "soru_kaliplari": ["türkçe", "türk dili", "dil bilgisi", "dil bilimi"],
+    "cevap": "Türkçe, Altay dil ailesinin Türk koluna ait sondan eklemeli bir dildir. Yaklaşık 80 milyon ana dil konuşanıyla dünyanın en çok konuşulan dillerinden biridir. Orhun Yazıtları'ndan günümüze uzanan zengin bir yazılı geleneğe sahiptir. 1928 harf devrimi ile Latin alfabesine geçilmiş ve dilde sadeleşme hareketi başlatılmıştır."
+  },
+  {
+    "soru_kaliplari": ["selam", "merhaba", "nasılsın", "naber"],
+    "cevap": "Merhaba! Ben Hüma dilinde geliştirilmiş bir Türkçe dil modeliyim. Size yapay zekâ, bilim, tarih, felsefe, yazılım ve daha birçok konuda bilgi verebilirim. Ne hakkında konuşmak istersiniz?"
+  },
+  {
+    "soru_kaliplari": ["kimsin", "sen kimsin", "kendini tanıt", "ne yaparsın"],
+    "cevap": "Ben Hüma GPT, Hüma programlama dili kullanılarak geliştirilmiş bir Türkçe yapay zekâ asistanıyım. Tor-Qurtu veri seti oluşturucu ile toplanan Türkçe bilgi külliyatı üzerinde çalışıyorum. Amacım Türkçe sorulara anlamlı ve bilgilendirici yanıtlar vermektir."
+  },
+  {
+    "soru_kaliplari": ["teşekkür", "sağol", "sağ ol", "eyvallah"],
+    "cevap": "Rica ederim! Başka bir sorunuz olursa yardımcı olmaktan memnuniyet duyarım."
+  },
+  {
+    "soru_kaliplari": ["python", "python nedir"],
+    "cevap": "Python, okunabilirliği ve sadeliğiyle öne çıkan yüksek seviyeli bir programlama dilidir. Guido van Rossum tarafından 1991'de geliştirilmiştir. Geniş kütüphane ekosistemi sayesinde yapay zekâ, veri bilimi, web geliştirme ve otomasyon gibi pek çok alanda en çok tercih edilen dillerden biri haline gelmiştir."
+  },
+  {
+    "soru_kaliplari": ["rust", "rust nedir", "rust dili"],
+    "cevap": "Rust, bellek güvenliğini derleme zamanında garanti eden, yüksek performanslı bir sistem programlama dilidir. Mozilla tarafından geliştirilmiş olup, sahiplik sistemi sayesinde veri yarışlarını ve bellek sızıntılarını çalışma zamanı maliyeti olmadan önler. Firefox, Linux çekirdeği ve pek çok kritik altyapı projesinde kullanılmaktadır."
+  },
+  {
+    "soru_kaliplari": ["istanbul", "istanbul hakkında"],
+    "cevap": "İstanbul, Avrupa ve Asya kıtalarını birbirine bağlayan, Boğaziçi kıyısında kurulmuş dünyanın en eski ve en büyük şehirlerinden biridir. Bizans ve Osmanlı İmparatorluklarına başkentlik yapmış, Ayasofya, Topkapı Sarayı ve Sultanahmet Camii gibi tarihi yapılarıyla dünya mirasının önemli bir parçasıdır. Yaklaşık 16 milyon nüfusuyla Türkiye'nin kültür ve ekonomi merkezidir."
+  },
+  {
+    "soru_kaliplari": ["dünya", "dünya nedir", "yerküre"],
+    "cevap": "Dünya, Güneş Sistemi'nde yaşamın var olduğu bilinen tek gezegendir. Güneş'e olan uygun mesafesi, su varlığı ve atmosfer yapısı sayesinde zengin bir biyolojik çeşitliliğe ev sahipliği yapmaktadır. 4,5 milyar yaşındaki gezegenimiz, yaklaşık 8 milyar insana ve milyonlarca canlı türüne yurt olan benzersiz bir kozmik varlıktır."
+  },
+  {
+    "soru_kaliplari": ["iklim", "iklim değişikliği", "küresel ısınma"],
+    "cevap": "İklim değişikliği, fosil yakıt kullanımı ve ormansızlaşma gibi insan faaliyetlerinin atmosferdeki sera gazı konsantrasyonunu artırmasıyla küresel sıcaklıkların yükselmesi olgusudur. Deniz seviyesinin yükselmesi, aşırı hava olayları ve biyoçeşitlilik kaybı en önemli sonuçları arasındadır. Paris İklim Anlaşması, küresel ısınmayı sınırlandırmak için uluslararası iş birliği çerçevesi oluşturmaktadır."
+  }
+]
