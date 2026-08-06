@@ -1,0 +1,56 @@
+[
+  {
+    "id": "tr_wiki_yapay_zeka",
+    "ad": "Vikipedi Türkçe - Yapay Zekâ",
+    "url": "https://tr.wikipedia.org/wiki/Yapay_zek%C3%A2",
+    "kategori": "Bilim & Teknoloji"
+  },
+  {
+    "id": "tr_wiki_turkiye_tarihi",
+    "ad": "Vikipedi Türkçe - Türkiye Tarihi",
+    "url": "https://tr.wikipedia.org/wiki/T%C3%BCrkiye_tarihi",
+    "kategori": "Tarih & Kültür"
+  },
+  {
+    "id": "tr_wiki_turkce_dil",
+    "ad": "Vikipedi Türkçe - Türk Dili",
+    "url": "https://tr.wikipedia.org/wiki/T%C3%BCrk%C3%A7e",
+    "kategori": "Dilbilim & Kültür"
+  },
+  {
+    "id": "tr_wiki_uzay",
+    "ad": "Vikipedi Türkçe - Uzay Araştırmaları",
+    "url": "https://tr.wikipedia.org/wiki/Uzay",
+    "kategori": "Popüler Bilim"
+  },
+  {
+    "id": "tr_wiki_yazilim",
+    "ad": "Vikipedi Türkçe - Yazılım Mühendisliği",
+    "url": "https://tr.wikipedia.org/wiki/Yaz%C4%B1l%C4%B1m",
+    "kategori": "Yazılım & Bilişim"
+  },
+  {
+    "id": "tr_wiki_felsefe",
+    "ad": "Vikipedi Türkçe - Felsefe Tarihi",
+    "url": "https://tr.wikipedia.org/wiki/Felsefe",
+    "kategori": "Sosyal Bilimler"
+  },
+  {
+    "id": "tr_wiki_fizik",
+    "ad": "Vikipedi Türkçe - Fizik Bilimi",
+    "url": "https://tr.wikipedia.org/wiki/Fizik",
+    "kategori": "Temel Bilimler"
+  },
+  {
+    "id": "tr_wiki_biyoloji",
+    "ad": "Vikipedi Türkçe - Biyoloji Bilimi",
+    "url": "https://tr.wikipedia.org/wiki/Biyoloji",
+    "kategori": "Temel Bilimler"
+  },
+  {
+    "id": "tr_wiki_matematik",
+    "ad": "Vikipedi Türkçe - Matematik",
+    "url": "https://tr.wikipedia.org/wiki/Matematik",
+    "kategori": "Matematik & Mantık"
+  }
+]

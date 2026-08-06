@@ -1,0 +1,13 @@
+{
+  "ad": "nlp_ileri",
+  "surum": "1.0.0",
+  "aciklama": "Hüma ileri NLP modülü: TF-IDF ve CPU tabanlı sözcük gömme araçları.",
+  "yazar": "Egehan KAHRAMAN",
+  "giris": "nlp_ileri.hb",
+  "huma_surum": ">=0.6.0",
+  "bagimliliklar": {
+    "nlp_temel": "^3.2.0"
+  },
+  "betikler": {},
+  "lisans": "MIT"
+}

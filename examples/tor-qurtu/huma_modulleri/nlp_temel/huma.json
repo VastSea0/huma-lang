@@ -1,0 +1,13 @@
+{
+  "ad": "nlp_temel",
+  "surum": "3.2.0",
+  "aciklama": "Hüma Türkçe Doğal Dil İşleme (NLP) kütüphanesi. Tokenizasyon, kök bulma, duygu analizi, POS etiketleme ve NER desteği.",
+  "yazar": "Egehan KAHRAMAN",
+  "giris": "nlp_temel.hb",
+  "huma_surum": ">=0.5.0",
+  "bagimliliklar": {},
+  "betikler": {},
+  "github": "VastSea0/huma-lang",
+  "lisans": "MIT",
+  "kaynak": "github.com/VastSea0/huma-lang"
+}

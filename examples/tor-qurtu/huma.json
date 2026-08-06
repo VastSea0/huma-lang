@@ -1,0 +1,20 @@
+{
+  "aciklama": "Endüstriyel Standartlarda Türkçe Yapay Zekâ Veri Seti Oluşturucu (Examples)",
+  "ad": "tor-qurtu",
+  "bagimliliklar": {
+    "ag_istekleri": "^2.0.0",
+    "nlp_ileri": "^1.0.0",
+    "nlp_temel": "^3.1.0"
+  },
+  "betikler": {
+    "baslat": "huma --izin ağ-istemci --izin dosya-okuma --izin dosya-yazma ana.hb",
+    "birlestir": "huma --izin dosya-okuma --izin dosya-yazma birlestirici.hb",
+    "kazi": "huma --izin ağ-istemci --izin dosya-yazma kazici.hb",
+    "start": "huma --izin ağ-istemci --izin dosya-okuma --izin dosya-yazma ana.hb"
+  },
+  "giris": "ana.hb",
+  "huma_surum": ">=0.6.0",
+  "lisans": "MIT",
+  "surum": "2.0.0",
+  "yazar": "Hüma Ekibi & Antigravity"
+}

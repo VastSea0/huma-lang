@@ -1,0 +1,13 @@
+{
+  "ad": "ag_istekleri",
+  "surum": "2.0.0",
+  "aciklama": "GET, POST, PUT ve DELETE isteklerini dahili_istek üzerinden sarmalayan HTTP istemci API'si.",
+  "yazar": "Egehan KAHRAMAN",
+  "giris": "ag_istekleri.hb",
+  "huma_surum": ">=0.6.0",
+  "bagimliliklar": {},
+  "betikler": {},
+  "github": "VastSea0/ag_istekleri",
+  "lisans": "MIT",
+  "kaynak": "github.com/VastSea0/ag_istekleri"
+}
