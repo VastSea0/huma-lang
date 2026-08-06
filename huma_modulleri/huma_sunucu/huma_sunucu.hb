@@ -55,12 +55,17 @@ Sunucu sınıf olsun {
                 url = (istek'in url'u)
                 metot = (istek'in metot'u)
                 
+                temiz_yol = url
+                içeriyor(url, "?") = 1 ise {
+                    temiz_yol = böl(url, "?")[0]
+                }
+                
                 yanıt = Yanıt()
                 yanıt'ın istek_id'i = (istek'in id'i) olsun
                 
                 metot == "GET" ise {
-                    içeriyor(kendisi'nin _get_rotaları'sı, url) ise {
-                        islem = değer_al(kendisi'nin _get_rotaları'sı, url)
+                    içeriyor(kendisi'nin _get_rotaları'sı, temiz_yol) ise {
+                        islem = değer_al(kendisi'nin _get_rotaları'sı, temiz_yol)
                         islem(istek, yanıt)
                     } yoksa {
                         dahili_sunucu_yanitla((istek'in id'i), "404 Sayfa Bulunamadı", 404, "text/plain")
@@ -68,8 +73,8 @@ Sunucu sınıf olsun {
                 }
                 
                 metot == "POST" ise {
-                    içeriyor(kendisi'nin _post_rotaları'sı, url) ise {
-                        islem = değer_al(kendisi'nin _post_rotaları'sı, url)
+                    içeriyor(kendisi'nin _post_rotaları'sı, temiz_yol) ise {
+                        islem = değer_al(kendisi'nin _post_rotaları'sı, temiz_yol)
                         islem(istek, yanıt)
                     } yoksa {
                         dahili_sunucu_yanitla((istek'in id'i), "404 Sayfa Bulunamadı", 404, "text/plain")
