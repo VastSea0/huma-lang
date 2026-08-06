@@ -8,16 +8,16 @@
 "dizgi.hb"'yi yükle
 "transformer.hb"'yi yükle
 
-"🧠 [TRANSFORMER GPT] Gerçek Türkçe Veri Seti Üzerinde Model Başlatılıyor..."'u yazdır
+yazdır "🧠 [TRANSFORMER GPT] Gerçek Türkçe Veri Seti Üzerinde Model Başlatılıyor..."
 
 // ═══════════ ADIM 1: Eğitim Verisi & Sözlük ═══════════
-egitim_ham = dosya_oku("egitim_metni.txt")
-egitim_satirlari = böl(kırp(egitim_ham), "\n")
-toplam_satir = uzunluk(egitim_satirlari)
-"   Gerçek Türkçe Eğitim Cümlesi Sayısı: " + toplam_satir'i yazdır
+egitim_ham = dosya_oku("egitim_metni.txt") olsun
+egitim_satirlari = böl(kırp(egitim_ham), "\n") olsun
+toplam_satir = uzunluk(egitim_satirlari) olsun
+yazdır "   Gerçek Türkçe Eğitim Cümlesi Sayısı: " + toplam_satir
 
 // Tüm kelimeleri topla ve sözlük oluştur
-llm_sozluk = []
+llm_sozluk = [] olsun
 si = 0'dan (toplam_satir - 1)'e kadar {
     satir_kelimeleri = böl(kırp(egitim_satirlari[si]), " ") olsun
     sk_sayisi = uzunluk(satir_kelimeleri) olsun
@@ -34,8 +34,8 @@ si = 0'dan (toplam_satir - 1)'e kadar {
         }
     }
 }
-sozluk_boyutu = uzunluk(llm_sozluk)
-"   Sözlük Boyutu (vocab_size): " + sozluk_boyutu + " benzersiz kelime"'yi yazdır
+sozluk_boyutu = uzunluk(llm_sozluk) olsun
+yazdır "   Sözlük Boyutu (vocab_size): " + sozluk_boyutu + " benzersiz kelime"
 
 // Kelime <-> ID Dönüştürücüler
 kelime_to_id fonksiyon olsun kel alsın {
@@ -56,20 +56,20 @@ id_to_kelime fonksiyon olsun id_val alsın {
 }
 
 // ═══════════ ADIM 2: Transformer GPT Modelini İlklendir ═══════════
-d_model = 32
-d_ff = 64
-max_seq = 16
+d_model = 32 olsun
+d_ff = 64 olsun
+max_seq = 16 olsun
 
-"   Model Hiperparametreleri: d_model=" + d_model + ", d_ff=" + d_ff + ", max_seq=" + max_seq'i yazdır
-"   Causal Self-Attention + Multi-Head + Feed-Forward (GELU) Katmanları İlklendiriliyor..."'u yazdır
+yazdır "   Model Hiperparametreleri: d_model=" + d_model + ", d_ff=" + d_ff + ", max_seq=" + max_seq
+yazdır "   Causal Self-Attention + Multi-Head + Feed-Forward (GELU) Katmanları İlklendiriliyor..."
 
-gpt_model = transformer()
+gpt_model = transformer() olsun
 gpt_model.ilklendir(sozluk_boyutu, d_model, d_ff, max_seq)
 
 // ═══════════ ADIM 3: Sekans Eğitim Çiftleri Hazırla ═══════════
-"   Eğitim sekansları oluşturuluyor..."'u yazdır
-egitim_sekanslari = []
-egitim_hedefleri = []
+yazdır "   Eğitim sekansları oluşturuluyor..."
+egitim_sekanslari = [] olsun
+egitim_hedefleri = [] olsun
 
 li = 0'dan (toplam_satir - 1)'e kadar {
     skelimeler = böl(kırp(egitim_satirlari[li]), " ") olsun
@@ -86,7 +86,6 @@ li = 0'dan (toplam_satir - 1)'e kadar {
 
     t_len = uzunluk(t_ids) olsun
     t_len >= 2 ise {
-        // Autoregressive sekanslar: [t1] -> t2, [t1, t2] -> t3 vb.
         pos = 1'den (t_len - 1)'e kadar {
             sub_seq = []
             sub_len = pos
@@ -104,31 +103,26 @@ li = 0'dan (toplam_satir - 1)'e kadar {
     }
 }
 
-toplam_ornek = uzunluk(egitim_sekanslari)
-"   Toplam Eğitim Örneği (Sekans Çifti): " + toplam_ornek'i yazdır
+toplam_ornek = uzunluk(egitim_sekanslari) olsun
+yazdır "   Toplam Eğitim Örneği (Sekans Çifti): " + toplam_ornek
 
 // ═══════════ ADIM 4: Transformer Backpropagation Eğitimi ═══════════
-"   🚀 Transformer GPT Eğitimi Başlıyor (10 Epoch)..."'u yazdır
+yazdır "   🚀 Transformer GPT Eğitimi Başlıyor (10 Epoch)..."
 
-EPOCH_SAYISI = 10
-LR = 0.05
+EPOCH_SAYISI = 10 olsun
 
 e = 1'den EPOCH_SAYISI'ye kadar {
     toplam_kayip = 0.0 olsun
-    // Adım adımı örnekler üzerinde forward pass ve kayıp hesabı
-    // Sınırı korumak için ilk 60 temsilci örnek üzerinde eğit
-    ornek_limit = 60
+    ornek_limit = 50
     toplam_ornek < ornek_limit ise { ornek_limit = toplam_ornek }
 
     oi = 0'dan (ornek_limit - 1)'e kadar {
         seq = egitim_sekanslari[oi] olsun
         hedef = egitim_hedefleri[oi] olsun
 
-        // Forward pass -> Sonraki token olasılıkları
         probs = gpt_model.tahmin_sonraki_token(seq) olsun
         target_prob = vektor_al(probs, hedef) olsun
 
-        // Categorical Cross-Entropy Kaybı: -ln(p_target)
         eps = 1e-7 olsun
         target_prob < eps ise { target_prob = eps }
         sample_loss = -1.0 * ln(target_prob) olsun
@@ -141,58 +135,33 @@ e = 1'den EPOCH_SAYISI'ye kadar {
 
 yazdır "   ✅ Transformer GPT Eğitimi Başarıyla Tamamlandı!"
 
-// ═══════════ ADIM 5: Autoregressive Transformer Inference Engine ═══════════
-llm_sonraki_kelime_dinamik fonksiyon olsun istem, uretilen_kelimeler, step alsın {
-    n_uretilen = uzunluk(uretilen_kelimeler)
+// ═══════════ ADIM 5: Tek Paslı Hızlı Transformer Inference ═══════════
+llm_sonraki_kelime fonksiyon olsun metin alsın {
+    m_kelimeleri = böl(kırp(metin), " ") olsun
+    m_len = uzunluk(m_kelimeleri) olsun
 
-    // 1. Bağlam Token Dizisini Oluştur (Context Window)
+    // Son max_seq kelimeyi alıp token id dizisi yap
     context_tokens = []
+    bas_i = m_len - max_seq
+    bas_i < 0 ise { bas_i = 0 }
 
-    step == 0 ise {
-        istem_kelimeleri = böl(kırp(istem), " ") olsun
-        ik_sayisi = uzunluk(istem_kelimeleri) olsun
-
-        i = 0'dan (ik_sayisi - 1)'e kadar {
-            w_id = kelime_to_id(istem_kelimeleri[i]) olsun
-            w_id >= 0 ise {
-                context_tokens = listeye_ekle(context_tokens, w_id)
-            }
-        }
-
-        uzunluk(context_tokens) == 0 ise {
-            rnd_start = (uzunluk(istem) * 7) % sozluk_boyutu
-            context_tokens = listeye_ekle(context_tokens, rnd_start)
-        }
-    } yoksa {
-        bas_idx = n_uretilen - (max_seq - 1)
-        bas_idx < 0 ise { bas_idx = 0 }
-
-        ui = bas_idx'den (n_uretilen - 1)'e kadar {
-            w_id = kelime_to_id(uretilen_kelimeler[ui]) olsun
-            w_id >= 0 ise {
-                context_tokens = listeye_ekle(context_tokens, w_id)
-            }
+    m_idx = bas_i'den (m_len - 1)'e kadar {
+        w_id = kelime_to_id(m_kelimeleri[m_idx]) olsun
+        w_id >= 0 ise {
+            context_tokens = listeye_ekle(context_tokens, w_id)
         }
     }
 
     ctx_len = uzunluk(context_tokens)
     ctx_len == 0 ise {
-        ""'ı döndür
+        rnd_start = (uzunluk(metin) * 7) % sozluk_boyutu
+        context_tokens = listeye_ekle(context_tokens, rnd_start)
     }
 
-    ctx_len > max_seq ise {
-        yeni_ctx = []
-        c_bas = ctx_len - max_seq
-        ci = c_bas'tan (ctx_len - 1)'e kadar {
-            yeni_ctx = listeye_ekle(yeni_ctx, context_tokens[ci])
-        }
-        context_tokens = yeni_ctx
-    }
-
-    // 2. Transformer GPT Forward Pass (Self-Attention -> FFN -> Logits -> Softmax)
+    // Tek Paslı Transformer Forward Pass
     prob_vector = gpt_model.tahmin_sonraki_token(context_tokens)
 
-    // 3. Repetition Penalty + Top-K Stochastic Sampling
+    // Top-K (K=3) Olasılıksal Örnekleme
     k1_val = -9999.0; k1_id = 0
     k2_val = -9999.0; k2_id = 0
     k3_val = -9999.0; k3_id = 0
@@ -201,11 +170,12 @@ llm_sonraki_kelime_dinamik fonksiyon olsun istem, uretilen_kelimeler, step alsı
         val = vektor_al(prob_vector, ti) olsun
         cand_w = id_to_kelime(ti) olsun
 
+        // Tekrar Cezası
         tekrar = 0
-        r_bas = n_uretilen - 6
+        r_bas = m_len - 5
         r_bas < 0 ise { r_bas = 0 }
-        ri = r_bas'tan (n_uretilen - 1)'e kadar {
-            uretilen_kelimeler[ri] == cand_w ise {
+        ri = r_bas'tan (m_len - 1)'e kadar {
+            m_kelimeleri[ri] == cand_w ise {
                 tekrar = tekrar + 1
             }
         }
