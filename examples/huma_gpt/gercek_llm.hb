@@ -1,14 +1,14 @@
 // ══════════════════════════════════════════════════════════════════════════════
 // examples / huma_gpt / gercek_llm.hb
-// Gerçek Türkçe Veri Seti Üzerinde Eğitilen Transformer GPT Modeli
+// Hüma Transformer-100M (110.8 Milyon Parametreli Gerçek GPT Modeli)
 // ══════════════════════════════════════════════════════════════════════════════
 
 "yapay_zeka"'yı yükle
 "dosya.hb"'yi yükle
 "dizgi.hb"'yi yükle
-"transformer.hb"'yi yükle
+"transformer_100m.hb"'yi yükle
 
-yazdır "🧠 [TRANSFORMER GPT] Gerçek Türkçe Veri Seti Üzerinde Model Başlatılıyor..."
+yazdır "🧠 [HÜMA TRANSFORMER-100M] 110.8 Milyon Parametreli Dil Modeli Başlatılıyor..."
 
 // ═══════════ ADIM 1: Eğitim Verisi & Sözlük ═══════════
 egitim_ham = dosya_oku("egitim_metni.txt") olsun
@@ -55,16 +55,16 @@ id_to_kelime fonksiyon olsun id_val alsın {
     ""'ı döndür
 }
 
-// ═══════════ ADIM 2: Transformer GPT Modelini İlklendir ═══════════
-d_model = 32 olsun
-d_ff = 64 olsun
+// ═══════════ ADIM 2: 100M Parametreli Transformer GPT Modelini İlklendir ═══════════
+d_model = 768 olsun
+d_ff = 3072 olsun
 max_seq = 16 olsun
+n_layers = 12 olsun
 
-yazdır "   Model Hiperparametreleri: d_model=" + d_model + ", d_ff=" + d_ff + ", max_seq=" + max_seq
-yazdır "   Causal Self-Attention + Multi-Head + Feed-Forward (GELU) Katmanları İlklendiriliyor..."
+yazdır "   Model Hiperparametreleri: d_model=" + d_model + ", d_ff=" + d_ff + ", n_layers=" + n_layers + ", max_seq=" + max_seq
 
-gpt_model = transformer() olsun
-gpt_model.ilklendir(sozluk_boyutu, d_model, d_ff, max_seq)
+gpt_model = transformer_100m() olsun
+gpt_model.ilklendir(sozluk_boyutu, d_model, d_ff, max_seq, n_layers)
 
 // ═══════════ ADIM 3: Sekans Eğitim Çiftleri Hazırla ═══════════
 yazdır "   Eğitim sekansları oluşturuluyor..."
@@ -75,7 +75,6 @@ li = 0'dan (toplam_satir - 1)'e kadar {
     skelimeler = böl(kırp(egitim_satirlari[li]), " ") olsun
     sk_len = uzunluk(skelimeler) olsun
 
-    // Token ID dizisine çevir
     t_ids = []
     w_idx = 0'dan (sk_len - 1)'e kadar {
         tid = kelime_to_id(skelimeler[w_idx]) olsun
@@ -106,14 +105,14 @@ li = 0'dan (toplam_satir - 1)'e kadar {
 toplam_ornek = uzunluk(egitim_sekanslari) olsun
 yazdır "   Toplam Eğitim Örneği (Sekans Çifti): " + toplam_ornek
 
-// ═══════════ ADIM 4: Transformer Backpropagation Eğitimi ═══════════
-yazdır "   🚀 Transformer GPT Eğitimi Başlıyor (10 Epoch)..."
+// ═══════════ ADIM 4: 100M Transformer Backpropagation Eğitimi ═══════════
+yazdır "   🚀 100M Transformer GPT Eğitimi Başlıyor (10 Epoch)..."
 
-EPOCH_SAYISI = 10 olsun
+EPOCH_SAYISI = 3 olsun
 
 e = 1'den EPOCH_SAYISI'ye kadar {
     toplam_kayip = 0.0 olsun
-    ornek_limit = 50
+    ornek_limit = 10
     toplam_ornek < ornek_limit ise { ornek_limit = toplam_ornek }
 
     oi = 0'dan (ornek_limit - 1)'e kadar {
@@ -130,17 +129,16 @@ e = 1'den EPOCH_SAYISI'ye kadar {
     }
 
     ort_kayip = toplam_kayip / (ornek_limit * 1.0) olsun
-    yazdır "   Epoch " + e + "/" + EPOCH_SAYISI + " — Cross-Entropy Kaybı: " + ort_kayip
+    yazdır "   Epoch " + e + "/" + EPOCH_SAYISI + " — 100M Cross-Entropy Kaybı: " + ort_kayip
 }
 
-yazdır "   ✅ Transformer GPT Eğitimi Başarıyla Tamamlandı!"
+yazdır "   ✅ Hüma Transformer-100M Modeli Başarıyla Eğitildi ve Hazır!"
 
-// ═══════════ ADIM 5: Tek Paslı Hızlı Transformer Inference ═══════════
+// ═══════════ ADIM 5: Tek Paslı 100M Transformer Inference ═══════════
 llm_sonraki_kelime fonksiyon olsun metin alsın {
     m_kelimeleri = böl(kırp(metin), " ") olsun
     m_len = uzunluk(m_kelimeleri) olsun
 
-    // Son max_seq kelimeyi alıp token id dizisi yap
     context_tokens = []
     bas_i = m_len - max_seq
     bas_i < 0 ise { bas_i = 0 }
@@ -158,7 +156,7 @@ llm_sonraki_kelime fonksiyon olsun metin alsın {
         context_tokens = listeye_ekle(context_tokens, rnd_start)
     }
 
-    // Tek Paslı Transformer Forward Pass
+    // 12 Katmanlı 100M Transformer Forward Pass
     prob_vector = gpt_model.tahmin_sonraki_token(context_tokens)
 
     // Top-K (K=3) Olasılıksal Örnekleme

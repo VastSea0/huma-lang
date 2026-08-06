@@ -10,7 +10,8 @@
   "betikler": {
     "baslat": "huma --izin dosya-okuma --izin dosya-yazma ana.hb",
     "start": "huma --izin dosya-okuma --izin dosya-yazma ana.hb",
-    "web": "huma --izin ağ-sunucu --izin dosya-okuma web_arayuz.hb"
+    "web": "huma --izin ağ-sunucu --izin dosya-okuma web_arayuz.hb",
+    "param_test": "huma --izin dosya-okuma scratch_test_100m.hb"
   },
   "giris": "ana.hb",
   "huma_surum": ">=0.6.0",
