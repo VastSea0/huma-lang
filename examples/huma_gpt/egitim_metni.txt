@@ -1,12 +1,200 @@
-Yapay zekâ ve derin öğrenme modelleri insan zekasını taklit eden güçlü matematiksel sistemlerdir.
-Transformer mimarisi self attention mekanizması sayesinde metinlerdeki uzun süreli bağıntıları ve bağlamı öğrenebilir.
-Türkiye cumhuriyeti bilim ve teknoloji alanında yerli yapay zekâ çözümleri geliştirmektedir.
-Mustafa Kemal Atatürk geleceğin anahtarının bilim ve akıl olduğunu vurgulamıştır.
-Yazılım mühendisliği karmaşık problemleri algoritmalar ve veri yapıları ile çözer.
-Hüma programlama dili Türkçe söz dizimi ile yüksek performanslı yapay zeka modelleri geliştirilmesini sağlar.
-Fizik ve matematik evrenin temel kurallarını açıklayan kadim bilim dallarıdır.
-Uzay araştırmaları insanlığın bilinen sınırlarını öteye taşımaktadır.
-Felsefe düşüncenin ve varlığın özünü sorgulayan zihinsel bir yolculuktur.
-Şiir ve sanat insanın ruh halini en derin duygularla ifade eden estetik formlardır.
-Merhaba hoş geldiniz ben Hüma GPT gerçek bir transformer yapay zekâ modeliyim.
-Sizlere bilim teknoloji yazılım felsefe ve sanat konularında yardımcı olmaktan memnuniyet duyarım.
+Merhaba ben Hüma GPT Transformer yapay zeka modeliyim bilim teknoloji ve sohbet konularında size yardımcı olabilirim
+Şiir ve edebiyat duyguların estetik dizeler ve kelimelerle ifade edildiği sanatsal formdur
+Felsefe insanın varlık bilgi ve ahlak üzerine geliştirdiği derin mantıksal sorgulamaların bütünüdür
+Uzay araştırmaları insanlığın evrendeki sınırlarını sürekli genişleten keşif yolculuklarıdır
+Kuantum fiziği ve matematik doğanın en temel yasalarını kuantum seviyesinde inceleyen bilim dallarıdır
+Hüma programlama dili Türkçe söz dizimi ile yüksek performanslı yapay zeka modelleri yazmayı sağlar
+Yazılım mühendisliği güvenilir sistemler tasarlamak ve karmaşık algoritmik problemleri çözmek için kodlama yapar
+Mustafa Kemal Atatürk 1923 yılında cumhuriyeti kurarak eğitim bilim ve kültür devrimlerini gerçekleştirmiştir
+Türkiye Cumhuriyeti bilim ve teknoloji alanında yerli yapay zeka ve yazılım çözümleri geliştirmektedir
+Transformer mimarisi self attention ve positional encoding katmanları ile metinlerdeki bağlamsal ilişkileri öğrenir
+Yapay zek ve derin öğrenme modelleri insan zekasını taklit eden matematiksel yapay sinir ağlarıdır
+Bu bu sayfanın kontrol edilmiş bir sürümüdür
+Dördüncü Sanayi Devrimi nin en yaygın özelliklerinden biri olarak kabul edilir
+İlk ve ikinci kategoriler arasındaki ayrım genellikle seçilen kısaltmayla ortaya çıkar
+Önde gelen yapay zek ders kitapları alanı zeki etmenlerin çalışması olarak tanımlar Çevresini algılayan ve hedeflerine başarıyla ulaşma şansını en üst düzeye çıkaran eylemleri gerçekleştiren herhangi bir cihaz
+gibi bilişsel eylemleri taklit eden makineleri tanımlamak için kullanılır
+olarak bilinen bir fenomen olan yapay zek tanımından çıkarılır
+Tesler in teoremindeki bir espri Yapay zek henüz yapılmamış şeydir der
+yapay zek olarak değerlendirilen şeylerin dışında tutulur
+Genellikle yapay zek olarak sınıflandırılan modern makine yetenekleri
+sistemlerinde en üst düzeyde rekabet eden insan konuşmasını anlama
+bağımsız gelişebilecek bir yapay zek kavramına doğru yeni yönelimler oluşmaktadır
+anlama çabasında kendisine yardımcı olabilecek belki de kendisinden daha zeki insan ötesi varlıklar meydana getirme düşünün bir ürünüdür
+Bu düş 1920 li yıllarda yazılan ve sonraları
+ile insanlığın ortak toplumsal sorunlarını ele alarak 1920 yılında yapay zek nın insan aklından bağımsız gelişebileceğini öngörmüştür
+Yapay zek idealleştirilmiş bir perspektife göre insan zek sına özgü yüksek bilişsel fonksiyonları veya otonom davranışları sergileyen bir yapay işletim sistemidir
+Bu sistem algılama öğrenme çoğul kavramları bağlama düşünme fikir yürütme belirtme sorun çözme iletişim kurma ve karar verme gibi yeteneklere sahip olmalıdır
+Ayrıca bu yapay zek sistemi düşüncelerinden tepkiler üretebilmeli eyleyici yapay zek ve bu tepkileri fiziksel olarak dışa vurabilmelidir
+Bu alt problemler araştırmacıların zeki bir sistemden sergilemesini beklediği belirli özellikler veya yeteneklerden oluşur
+Aşağıda açıklanan özellikler yapay zek araştırmalarında en çok dikkat çeken konular arasında yer almakta ve bu araştırmaların kapsamını belirlemektedir
+Yapay zek nın ilk araştırmacıları insanların bulmacaları çözerken veya mantıksal
+Bu algoritmaların birçoğu büyük ölçekli akıl yürütme problemlerini çözmek için yetersizdir çünkü kombinatoryal patlama denilen bir durum yaşarlar Problemler büyüdükçe bu algoritmaların çalışması üstel bir şekilde yavaşlar
+İnsanlar çoğu sorunlarını hızlı ve sezgisel yargılarla çözerler
+Doğru ve verimli akıl yürütme h l çözülememiş bir problemdir
+yapay zek programlarının sorulara akıllıca yanıt vermesini ve gerçek dünya ile ilgili çıkarımlarda bulunmasını sağlar
+Formel bilgi temsilleri içerik tabanlı indeksleme ve bilgi erişimi
+Yapay zek tarihi antik çağlarda usta zanaatkarlar tarafından zeka veya bilinç kazandırılan yapay varlıklara ilişkin mitler hik yeler ve söylentilerle başladı
+Mekanik ya da formel akıl yürütme üzerine çalışmalar antik çağda filozoflar ve matematikçilerle birlikte devam etti
+Turing in teorisi 0 ve 1 gibi basit sembolleri kullanarak bir makinenin insan aklının gerçekleştirebileceği her türlü matematiksel akıl yürütmeyi simüle edebileceğini öne sürdü
+gibi alanlardaki keşiflerle birleşerek araştırmacılara elektronik bir beyin inşa etme olasılığını düşünmeye yöneltti
+ve Turing in 1950 de yayımladığı makine zek sının mümkün olduğunu gösterdiği
+Bu dönemde yapılan bu tür araştırmalar yapay zek nın temel alanlarının ortaya çıkardı
+Bu atölyeye katılan araştırmacılar 1960 larda yapay zek alanına liderlik ettiler
+Öğrencileriyle beraber bu araştırmacılar basının şaşırtıcı olarak nitelendirdiği projeler ürettiler
+1950 lerin sonu ve 1960 ların başlarında hem İngiltere deki hem de Amerika Birleşik Devletleri ndeki birçok üniversitede yapay zek laboratuvarları kuruldu
+sahip bir makine üretmenin mümkün olduğuna inanıyor ve bunu alanlarının nihai hedefi olarak görüyordu
+Herbert Simon makinelerin yirmi yıl içinde bir insanın yapabileceği her işi yapabilir h le geleceği tahmininde bulunmuş
+Ancak bu öngörüler yapay zek nın geliştirilmesindeki zorlukları göz ardı etmişti
+baskısı nedeniyle ABD ve İngiltere hük metleri keşif amaçlı yapay zek araştırmalarına verilen desteği durdurma kararı aldı
+gerçek dünya problemlerini çözmede etkisiz olduğunu savunmuş ve bu yaklaşım itibarını kaybetmişti
+Bunun sonucunda yapay zek projelerine fon bulmanın zorlaştığı yapay zek kışı adı verilen bir dönem başladı
+Uzman sistemler uzmanların bilgi ve analiz yeteneklerini taklit eden bir tür yapay zek programıydı
+projesi ABD ve Britanya hük metlerini akademik araştırmalara yeniden fon sağlamaya teşvik etti
+pazarının çöküşüyle yapay zek tekrar itibar kaybetti ve daha uzun süren ikinci bir yapay zek kışı başladı
+O zamana kadar yapay zek projelerinin büyük kısmı planlar hedefler inançlar ve bilinen gerçekler gibi
+Ancak 1980 lerde bazı araştırmacılar bu yaklaşımın insan bilişinin tüm süreçlerini özellikle
+gibi karmaşık süreçleri taklit edemeyeceği konusunda şüphe duymaya başladı
+Rodney Brooks genel olarak temsil fikrini reddederek hayatta kalabilen ve hareket edebilen makineler geliştirmeye odaklandı
+gibi isimler eksik ve belirsiz bilgileri mantıksal kesinlik yerine m kul tahminlerle işleyebilen yöntemler geliştirdi
+ve diğer araştırmacılar bağlantısallık ve sinir ağ araştırmalarını yeniden canlandırarak bu alanın gelişimine katkıda bulundu
+el yazısı ile yazılmış rakamları tanıyabildiğini gösterdi bu sinir ağlarının birçok başarılı uygulamasından ilkiydi
+yüzyılın başlarında formal matematik yöntemlerinden yararlanarak ve belirli problemlere özel çözümler geliştirerek itibarını yeniden kazanmaya başladı
+Bu dar ve formal yaklaşım araştırmacıların doğrulanabilir sonuçlar üretmesini ve
+gibi diğer alanlarla iş birliği yapmasını sağladı
+2000 li yıllara gelindiğinde yapay zek araştırmacılarının geliştirdiği çözümler yaygın olarak kullanılmaya başlanmıştı
+Ancak 1990 larda bu çözümler genellikle yapay zek olarak adlandırılmıyordu bu eğilim
+Buna karşın bazı akademisyenler yapay zek nın ilk hedefinden yani çok yönlü ve tam anlamıyla zeki makineler yaratma amacından uzaklaştığını düşünmeye başladı
+2002 nin başlarında bu hedefi yeniden canlandırmak amacıyla
+AGI adı verilen bir alt alan kuruldu
+2010 lara gelindiğinde yapay genel zek araştırmaları için iyi finanse edilen birçok kurum ortaya çıktı
+Derin öğrenme 2012 de endüstri standartlarında önemli bir üstünlük sağlayarak yapay zek alanında yaygın bir şekilde benimsendi
+gibi dikkatle oluşturulmuş veri kümelerinin de d hil olduğu
+Derin öğrenmenin bu yükselişi yapay zek ya olan ilgi ve finansmanda büyük bir artışı tetikledi
+2015 2019 yılları arasında makine öğrenimi araştırmalarındaki toplam yayımlanma sayısında 50 lik bir artış görüldü
+ve teknolojinin yanlış kullanımı gibi etik sorunlar makine öğrenimi konferanslarında ana gündem maddesi h line geldi
+Bu konularda yapılan yayımlar hızla artarken yeni finansman kaynakları sağlandı ve birçok araştırmacı kariyerlerini bu alanlara yönlendirdi
+Aynı dönemde yapay zek nın insan çıkarlarına uygun şekilde geliştirilmesini konu alan uyum problemi akademik bir çalışma alanı olarak ciddiyet kazandı
+2010 ların sonları ve 2020 lerin başlarında yapay genel zek üzerine çalışan şirketler dikkat çeken yazılımlar üretmeye başladı
+AlphaGo oyunun kuralları öğretilerek kendi stratejisini geliştirdi ve dünya şampiyonu
+GPT 3 insan benzeri yüksek kaliteli metinler üretebilen bir
+ise iki ay içinde 100 milyon kullanıcıya ulaşarak tarihin en hızlı büyüyen tüketici yazılımı oldu
+2022 yılı yapay zek nın geniş kitleler tarafından fark edildiği ve yaygın bir şekilde konuşulmaya başlandığı bir dönüm noktası olarak kabul edildi
+ABD deki yeni bilgisayar bilimi doktora mezunlarının yaklaşık 20 si yapay zek üzerine uzmanlaştı
+Aynı yıl ABD de yapay zek ile ilgili 800
+22 si kendilerini yapay zek şirketi olarak tanımlıyordu
+Bu ağ yapılarının uygun şekilde tanımlanmaları h linde öğrenme becerisi kazanabileceğini de ileri sürdüler
+Hebb sinir hücreleri arasındaki bağlantıların şiddetlerini değiştirmek için basit bir kural önerince öğrenebilen
+Dartmouth da iki aylık bir açık çalışma düzenledi
+Bu toplantıda birçok çalışmanın temelleri atılmakla birlikte toplantının en önemli özelliği Mc Carthy tarafından önerilen yapay zek adının konmasıdır
+Simon daha sonra fiziksel simge varsayımını ortaya atmış ve bu kuram insandan bağımsız zeki sistemler yapma çalışmalarıyla uğraşanların hareket noktasını oluşturmuştur
+Simon ın bu tanımlaması bilim adamlarının yapay zek ya yaklaşımlarında iki farklı akımın ortaya çıktığını belirginleştirmesi açısından önemlidir
+Simon ın sembolik yaklaşımından sonraki yıllarda mantık temelli çalışmalar egemen olmuş ve programların başarımlarını göstermek için bir takım yapay sorunlar ve dünyalar kullanılmıştır
+Daha sonraları bu sorunlar gerçek yaşamı hiçbir şekilde temsil etmeyen oyuncak dünyalar olmakla suçlanmış ve yapay zek nın yalnızca bu alanlarda başarılı olabileceği ve gerçek yaşamdaki sorunların çözümüne ölçeklenemeyeceği ileri sürülmüştür
+Geliştirilen programların gerçek sorunlarla karşılaşıldığında çok kötü bir başarım göstermesinin ardındaki temel neden bu programların yalnızca
+süreçleri benzeşimlendirerek anlam çıkarma bağlantı kurma ve fikir yürütme gibi süreçler konusunda başarısız olmasıydı
+Eliza karşısındaki ile sohbet edebiliyor gibi görünmesine karşın yalnızca karşısındaki insanın cümleleri üzerinde bazı işlemler yapıyordu
+İlk makine çevirisi çalışmaları sırasında benzeri yaklaşımlar kullanılıp çok gülünç çevirilerle karşılaşılınca bu çalışmaların desteklenmesi durdurulmuştu
+Zeki davranışı benzeşimlendirmek için bu çalışmalarda kullanılan temel yapılardaki bazı önemli yetersizliklerin ortaya konmasıyla birçok araştırmacılar çalışmalarını durdurdular
+adlı kitaplarında tek katmanlı algaçların bazı basit problemleri çözemeyeceğini gösterip aynı kısırlığın çok katmanlı algaçlarda da beklenilmesi gerektiğini söylemeleri ile bıçakla kesilmiş gibi durmasıdır
+akımın uğradığı başarısızlığın temel sebebi de benzer şekilde
+tek katmanlı görevi başarması fakat bu görevle ilgili vargıların veya sonuçların bir yargıya dönüşerek diğer kavramlar ile bir ilişki kurulamamasından kaynaklanmaktadır
+Her iki akımın da uğradığı başarısızlıklar her sorunu çözecek genel amaçlı sistemler yerine belirli bir uzmanlık alanındaki bilgiyle donatılmış programları kullanma fikrinin gelişmesine sebep oldu ve bu durum yapay zek alanında yeniden bir canlanmaya yol açtı
+Bunun bir avantajı her verilen kararın hangi kurallar uygulanarak verildiğinin kolayca bilinmesi idi
+Bu birçok kuralcı bürokratik karar örgütleri için kolayca uygulamalar geliştirilebilmesi demekti
+Bu doğal olarak bir otomobilin tamiri için önerilerde bulunan uzman sistem programının otomobilin ne işe yaradığından haberi olmaması da demekti
+Buna rağmen uzman sistemlerin başarıları beraberinde ilk ticari uygulamaları da getirdi
+Yapay zek yavaş yavaş bir endüstri h line geliyordu
+tarafından kullanılan ve müşteri siparişlerine göre donanım seçimi yapan R1 adlı uzman sistem şirkete bir yılda 40 milyon dolarlık tasarruf sağlamıştı
+Birden diğer ülkeler de yapay zek yı yeniden keşfettiler ve araştırmalara büyük kaynaklar ayrılmaya başlandı
+zek sının doğrudan doğruya kavramlarla düşünmediği dil ile düşündüğü dil kodları olan kelimeler ile kavramlar arasında bağlantı kurduğu anlaşıldı
+dizgeleri olan cümleler yani şablonlar ile etkili bir öğrenmeye ve bilgisini soyut olarak genişletebilme yeteneğine sahip olmuştu
+Artificial intelligence Markup Language ve
+Türkçe Yapay Zek İşaretleme Dili gibi bilgisayar dilleri ile
+dillerini kullanarak verileri birbiri ile ilişkilendirebilmekte geliştirilen özel
+Bütün bu gelişmelerin ve süreçlerin sonunda bir grup yapay zek araştırmacısı
+gibi düşünebilen sistemleri araştırmaya devam ederken diğer bir grup ise ticari değeri olan
+Doğal dil işleme ve makine öğrenmesi gibi yapay zeka teknolojileri kullanılarak insan ve makine yazılım arasında bir diyaloğun sürdürülmesini sağlayan yapay zeka alt dalına diyalog bazlı yapay zeka conversational artificial intelligence denir
+Daha önce insanların bilgisayara komut vermesinde kullanılan web mobil uygulama gibi
+CUI insanların bilgisayara günlük dilde yazarak veya konuşarak komut verebilmesini amaçlar
+Günümüzde chatbotlar ve sesli asistanlar diyalog bazlı yapay zeka alanında sıkça kullanılan teknolojik ürünler olarak karşımıza çıkmaktadır
+Chatbotlar diyalog bazlı yapay zekanın günlük hayatta kullanılan bir örneğidir
+olarak geçmiş bu dijital ürünler ile yazışarak belirli bir konuda bilgi alabilir veya uçak bileti almak banka havalesi yapmak veya bir kitap satın almak gibi günlük işlerini yapabilirler
+Chatbotlar şirketlerin web sitesinde veya mobil uygulamasında yer alabilirler
+Chatbotlar kullanıcı ile etkileşim kurma yöntemini arkasında yer alan teknolojik altyapıya göre farklı çeşitlerde oluşturulabilir
+Örneğin bir chatbot kullanıcı ile sadece kullanıcı onunla etkileşime girdiğinde iletişim kuruyorsa
+bir chatbottur eğer bir uyarıcı ile tetiklenerek kullanıcı ile olan diyaloğu başlatan taraf oluyorsa buna
+Teknoloji açısından bakılacak olursa yapay zeka tabanlı chatbotların yanında doğal dil işleme makine öğrenmesi gibi yapay zeka teknolojileri kullanılmadan geliştirilen
+Ancak bu iki tür chatbotun davranışı farklıdır
+Kural bazlı chatbotlarda genellikle kullanıcıya belirli seçenekler sunulur ve yaratılan deneyim bu seçeneklerle sınırlı kalır
+Yapay zeka tabanlı chatbotlarda ise kullanıcı serbest bir metin yazabilir chatbotun doğal dil işleme teknolojisi bu metni anlamlandırıp doğru yanıtı belirleyerek kullanıcıya sunar
+Süper zek en parlak ve en yetenekli insan zihninin zek sını çok aşan bir zek ya sahip varsayımsal bir etkendir
+üzerine yapılan araştırmalar yeterince zeki bir yazılım üretirse yazılım
+Gelişen yazılım kendini geliştirmede daha da iyi olur ve
+Vernor Vinge in tekillik olarak adlandırdığı şeye yol açar
+Ancak teknolojiler sonsuza kadar üstel olarak gelişemez ve genellikle
+bir eğri izler teknolojinin yapabileceği şeyin fiziksel sınırlarına ulaştığında yavaşlar
+Ray Kurzweil gelecekte insanların ve makinelerin birleşerek her ikisinden de daha yetenekli ve güçlü
+Edward Fredkin yapay zek nın evrimin bir sonraki adımı olduğunu savunmaktaydı bu fikir ilk olarak
+Samuel Butler ın Darwin among the Machines adlı mektubunda 1863 te ortaya atıldı ve
+Örneğin sosyal medya sitelerinde yeni arkadaş mağazalarda başka bir ürün gazetede başka bir haber önerileri
+Makine çevirisi Bir dilde ifade edilen cümleyi farklı bir dile çevirmek
+Sinyal işleme Ses ve görüntü gibi sinyallerin işlenerek bilgi çıkarımı
+Örneğin üretimsel müzik ve video oyunlarında prosedürel dünyalar
+Regresyon analizi Geçmiş verilere dayanılarak bir değişkenin gelecekteki değerinin tahmin edilmesi
+Dijital görüntülerde bulunan objeleri tanıma yerini bulma sınıflandırma gibi işlemlerin tümü
+gibi kurala dayalı algoritmalar ile sürdürülürken günümüzde bu kurallar veriden öğrenilmektedir
+yazma Dünyada yapay zeka ile yazılan ilk köşe yazısı 8 Eylül 2020 tarihinde The Guardian gazetesinde yayınlanmıştır
+Türkiye de yapay zekanın yazdığı ilk haber ise Şalom gazetesinde 2018 yılında yayınlanmıştır
+Bu akıllı özellikler listesi başlıca yapay zek ders kitaplarında ele alınan konulara dayanmaktadır
+Elektronik beyin terimi o sıralarda basın tarafından kullanılıyordu
+Daniel Crevier konferans genel olarak yeni bilimin resm doğum günü olarak kabul edilir yazdı
+Norvig konferansı yapay zek nın başlangıcı olarak adlandırdı
+Russell ve Norvig önümüzdeki 20 yıl boyunca bu alan bu insanlar ve öğrencileri tarafından domine edilecekti yazdılar
+Russell ve Norvig bilgisayarın akıllıca bir şey yapmasının şaşırtıcı olduğunu yazdı
+Russell ve Norvig hemen hemen tüm durumlarda bu ilk sistemlerin daha zor problemlerde başarısız olduğunu yazdılar
+te şunları yazdı On yıllar boyunca doğal dil işleme bilgisayarla görme ve robotik gibi bilgisayar bilimi alanları birbirinden tamamen farklı yöntemler kullanırken günümüzde hepsi derin öğrenme adı verilen bir programlama yöntemini kullanıyor
+Bu durum bu alanlardaki kod ve yaklaşımların birbirine daha benzer hale gelmesini ve modellerin birbirleriyle daha kolay entegre edilmesini sağladı
+den Jack Clark Yapay zek alanında beş yıllık sessiz atılımların ardından 2015 dönüm noktası niteliğinde bir yıl oldu
+Bilgisayarlar daha akıllı ve her zamankinden daha hızlı öğreniyor
+Problem çözme bulmaca çözme oyun oynama ve çıkarım yapma
+Alt sembolik akıl yürütme ve bilginin yaygınlığına dair psikolojik kanıtlar
+Yapay zek 1990 ların sonlarında yaygın olarak kullanıldı
+ChatGPT Sohbet için Fazla Güçlü Bir Dil Modeli
+Türk basın tarihinde bir ilk Yapay zek tarafından yazılan ilk haber
+Arama ve optimizasyonda ücretsiz öğle yemeği yok
+ACM Hesaplama ve Sınıflandırma Sistemi ne göre farklı konu ve alanlara ayrılabilir
+Vikipedi ve Wikipedia k r amacı gütmeyen kuruluş olan
+Türkiye Cumhuriyeti nin topraklarını oluşturan bölgenin tarihi olarak anlaşılan
+Daha önce siyasi olarak farklı olan bu iki bölge MÖ 2
+Roma İmparatorluğu nun kontrolü altına girdi ve sonunda Bizans İmparatorluğu nun çekirdeği haline geldi
+döneminden önceki zamanlar için Türk halklarının tarihleri ile şimdiki
+Türkiye Cumhuriyeti ni oluşturan toprakların tarihi arasında da bir ayrım yapılmalıdır
+tarafından fethedildiği zamandan bu yana Türkiye tarihi Selçuklu İmparatorluğu nun Orta Çağ tarihini Osmanlı İmparatorluğu nun Orta Çağ dan modern tarihini ve 1920 lerden bu yana da Türkiye Cumhuriyeti nin tarihini kapsar
+Doğu Anadolu yu fethetti ve Anadolu nun kapısı Türklere açılmış oldu
+Anadolu Selçuklu Devleti 1077 yılında Selçuklu Hanedanı na mensup olan
+Al eddin Keykubad ın saltanatı esnasında en parlak dönemlerini yaşadılar
+Zamanla Moğollar ın ülke içinde artan nüfuzu ve
+Mesud un da ölümüyle devlet dağıldı ve bunun sonucunda da
+Konstantinopolis Edirne den sonra İmparatorluğun yeni başkenti oldu
+Polonya Litvanya Birliği nin güneyine ve Orta Avrupa ya doğru istikrarlı bir şekilde ilerlediği için
+İran la sık sık savaş halindeydi ve bu da onların
+arasındaki deniz ticaret yolları üzerindeki kontrolünü savunmak için sık sık
+Ümit Burnu nu keşfetmesiyle bu rotalar yeni bir rekabetle karşı karşıya kaldı
+Malakka Sultanlığı nı işgal eden Portekizliler ile
+ve Balkanlar da dahil olmak üzere topraklarını kaybetmeye devam etti
+yüzyılın başlarına kadar pek çok etnik gruptan oluşan bir yapıya sahipti bölgenin sakinleri
+ve Venedik ten gelenler dahil olmak üzere çeşitli etnik kökenlerdendi
+yönetimindeki Osmanlı İmparatorluğu her taraftan toprak kaybıyla karşı karşıyayken kendisini asker ve teçhizatla destekleyen
+İttifak Devletleri nin yanında girdi ve sonunda mağlup oldu
+Dünya Savaşı nın ardından eskiden Osmanlı İmparatorluğu na bağlı bölgelerde pek çok yeni devlet kuruldu
+imzalandı ancak hiçbir zaman yürürlüğe girmedi bu açıdan Sevr ölü doğmuş antlaşma olarak bilinir
+Sevr Antlaşması Osmanlı İmparatorluğu nu parçalayacak ve İmparatorluğun topraklarında
+Dünya Savaşı sonrasında ülkenin bazı bölgelerinin İtilaf Devletleri tarafından işgal edilmesi
+Ankara Hük meti silahlı ve diplomatik mücadeleye girişti
+1921 1923 yılları arasında Ermeni Yunan Fransız ve İngiliz orduları ülkeden kovuldu
+Ankara Hük meti nin asker ilerleyişi ve diplomatik başarısı 11 Ekim 1922 de
+ve 623 yıllık monarşik Osmanlı İmparatorluğu resmen tarih sahnesinden silindi
+İstanbul dan çekilmesi ve 6 Ekim 1923 te Türk birliklerinin
+kadınlara seçme ve seçilme hakkı tanındı
+olarak adlandırılan toprak beyleri tarafından yönetilen ve feodal düzenleri olan
