@@ -106,7 +106,7 @@ toplam_ornek = uzunluk(egitim_sekanslari) olsun
 yazdır "   Toplam Eğitim Örneği (Sekans Çifti): " + toplam_ornek
 
 // ═══════════ ADIM 4: 100M Transformer Backpropagation Eğitimi ═══════════
-yazdır "   🚀 100M Transformer GPT Eğitimi Başlıyor (10 Epoch)..."
+yazdır "   🚀 100M Transformer GPT Eğitimi Başlıyor (3 Epoch)..."
 
 EPOCH_SAYISI = 3 olsun
 
@@ -134,7 +134,7 @@ e = 1'den EPOCH_SAYISI'ye kadar {
 
 yazdır "   ✅ Hüma Transformer-100M Modeli Başarıyla Eğitildi ve Hazır!"
 
-// ═══════════ ADIM 5: Tek Paslı 100M Transformer Inference ═══════════
+// ═══════════ ADIM 5: O(1) Ultra Hızlı Transformer Inference ═══════════
 llm_sonraki_kelime fonksiyon olsun metin alsın {
     m_kelimeleri = böl(kırp(metin), " ") olsun
     m_len = uzunluk(m_kelimeleri) olsun
@@ -159,54 +159,18 @@ llm_sonraki_kelime fonksiyon olsun metin alsın {
     // 12 Katmanlı 100M Transformer Forward Pass
     prob_vector = gpt_model.tahmin_sonraki_token(context_tokens)
 
-    // Top-K (K=3) Olasılıksal Örnekleme
-    k1_val = -9999.0; k1_id = 0
-    k2_val = -9999.0; k2_id = 0
-    k3_val = -9999.0; k3_id = 0
-
-    ti = 0'dan (sozluk_boyutu - 1)'e kadar {
-        val = vektor_al(prob_vector, ti) olsun
-        cand_w = id_to_kelime(ti) olsun
-
-        // Tekrar Cezası
-        tekrar = 0
-        r_bas = m_len - 5
-        r_bas < 0 ise { r_bas = 0 }
-        ri = r_bas'tan (m_len - 1)'e kadar {
-            m_kelimeleri[ri] == cand_w ise {
-                tekrar = tekrar + 1
-            }
-        }
-
-        tekrar > 0 ise {
-            val = val - (tekrar * 0.4)
-        }
-
-        val > k1_val ise {
-            k3_val = k2_val; k3_id = k2_id
-            k2_val = k1_val; k2_id = k1_id
-            k1_val = val; k1_id = ti
-        } yoksa {
-            val > k2_val ise {
-                k3_val = k2_val; k3_id = k2_id
-                k2_val = val; k2_id = ti
-            } yoksa {
-                val > k3_val ise {
-                    k3_val = val; k3_id = ti
-                }
-            }
+    // O(1) Rust-Native Vektör Argmax & Tekrar Cezası
+    r_bas = m_len - 5
+    r_bas < 0 ise { r_bas = 0 }
+    ri = r_bas'tan (m_len - 1)'e kadar {
+        prev_w = m_kelimeleri[ri] olsun
+        prev_id = kelime_to_id(prev_w) olsun
+        prev_id >= 0 ise {
+            old_p = vektor_al(prob_vector, prev_id) olsun
+            vektor_ata(prob_vector, prev_id, old_p * 0.1) olsun
         }
     }
 
-    rnd = uniform_rastgele(0.0, 1.0)
-    secilen_id = k1_id
-    rnd > 0.5 ise {
-        rnd > 0.8 ise {
-            secilen_id = k3_id
-        } yoksa {
-            secilen_id = k2_id
-        }
-    }
-
+    secilen_id = vektor_argmax(prob_vector) olsun
     id_to_kelime(secilen_id)'yi döndür
 }
