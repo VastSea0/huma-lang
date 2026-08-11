@@ -1,0 +1,63 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+
+const codeUsage = `"nlp_ileri"'yi yükle
+
+metin = "Hüma programlama dili genel amaçlı bir dildir." olsun
+
+// Çekirdek BPE (Byte-Pair Encoding) Tokenizer kullanımı
+eğitilmiş = bpe_eğit([metin], 100) olsun
+kodlanmış = bpe_kodla(metin, eğitilmiş) olsun
+"BPE Kodlanmış Baytlar: "'ı yazdır
+kodlanmış'ı yazdır
+
+çözülmüş = bpe_çöz(kodlanmış, eğitilmiş) olsun
+"Çözülen Metin: " + çözülmüş'ü yazdır`;
+---
+
+<DocLayout title="nlp_ileri Modülü" currentPage="kutuphaneler" activeTab="kutuphaneler">
+  <h1><code>nlp_ileri</code> — İleri NLP ve BPE Tokenizer Modülü</h1>
+  
+  <p>
+    <code>nlp_ileri</code>, TF-IDF ve CPU tabanlı sözcük gömme (word embeddings) araçları ile kayıpsız UTF-8 bayt düzeyli BPE tokenizer (Byte-Pair Encoding) araçlarını içerir.
+  </p>
+
+  <h2>Modülü Yükleme</h2>
+  <pre><code>"nlp_ileri"'yi yükle</code></pre>
+
+  <h2>Detaylı API Referansı</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Fonksiyon</th>
+        <th>Parametreler</th>
+        <th>Dönüş Değeri</th>
+        <th>Açıklama</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>bpe_eğit(metin_listesi, vokab_boyutu)</code></td>
+        <td><code>metin_listesi, vokab_boyutu</code></td>
+        <td>BPE Modeli</td>
+        <td>Verilen metin kümesinden bayt düzeyli BPE birleştirme kurallarını eğitir.</td>
+      </tr>
+      <tr>
+        <td><code>bpe_kodla(metin, bpe_modeli)</code></td>
+        <td><code>metin, bpe_modeli</code></td>
+        <td>Tamsayı Dizisi</td>
+        <td>Metni BPE token ID dizisine dönüştürür.</td>
+      </tr>
+      <tr>
+        <td><code>bpe_çöz(token_ids, bpe_modeli)</code></td>
+        <td><code>token_ids, bpe_modeli</code></td>
+        <td>Metin</td>
+        <td>Token ID dizisini kayıpsız UTF-8 metne dönüştürür.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Kod Örneği</h2>
+  <pre><code>{codeUsage}</code></pre>
+</DocLayout>

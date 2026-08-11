@@ -1,0 +1,62 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+
+const codeUsage = `# CLI İzin Bayrağı Zorunludur:
+# huma run uygulama.hb --izin ağ-istemci
+
+"ag_istekleri"'ni yükle
+
+// HTTP GET İsteği
+yanıt = http_get("https://api.github.com/zen") olsun
+"Yanıt: " + yanıt'ı yazdır`;
+---
+
+<DocLayout title="ag_istekleri Modülü" currentPage="kutuphaneler" activeTab="kutuphaneler">
+  <h1><code>ag_istekleri</code> — HTTP İstemci Modülü</h1>
+  
+  <p>
+    <code>ag_istekleri</code>, dış web servislerine ve REST API'lerine HTTP/HTTPS GET ve POST istekleri göndermeyi sağlayan ağ paket modülüdür.
+  </p>
+
+  <div class="alert">
+    <div class="alert-title">İzin ve Güvenlik Modeli</div>
+    Bu modülü kullanabilmek için programın CLI'da <code>--izin ağ-istemci</code> yetkisiyle çalıştırılması şarttır. Yetki verilmezse çalışma zamanı güvenlik hatası üretir.
+  </div>
+
+  <h2>Kurulum ve İzinli Çalıştırma</h2>
+
+  <pre><code># CLI çalıştırma komutu:
+huma run uygulama.hb --izin ağ-istemci</code></pre>
+
+  <pre><code>"ag_istekleri"'ni yükle</code></pre>
+
+  <h2>Detaylı API Referansı</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Fonksiyon</th>
+        <th>Parametreler</th>
+        <th>Dönüş Değeri</th>
+        <th>Açıklama</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>http_get(url)</code></td>
+        <td><code>url</code> (Metin)</td>
+        <td>Metin (Yanıt Gövdesi)</td>
+        <td>Belirtilen URL adresine HTTP GET isteği atar.</td>
+      </tr>
+      <tr>
+        <td><code>http_post(url, veri_metni)</code></td>
+        <td><code>url, veri_metni</code></td>
+        <td>Metin (Yanıt Gövdesi)</td>
+        <td>Belirtilen URL adresine JSON/Metin gövdeli HTTP POST isteği atar.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Kod Örneği</h2>
+  <pre><code>{codeUsage}</code></pre>
+</DocLayout>

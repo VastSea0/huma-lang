@@ -1,0 +1,189 @@
+---
+const { currentPage = '' } = Astro.props;
+---
+
+<aside class="sidebar">
+  <div class="sidebar-section">
+    <h3 class="sidebar-title">Başlarken</h3>
+    <ul class="sidebar-links">
+      <li>
+        <a href="/dokumantasyon/kurulum" class={currentPage === 'kurulum' ? 'active' : ''}>
+          Kurulum & Başlarken
+        </a>
+      </li>
+      <li>
+        <a href="/dokumantasyon/sozdizimi" class={currentPage === 'sozdizimi' ? 'active' : ''}>
+          Temel Sözdizimi
+        </a>
+      </li>
+      <li>
+        <a href="/dokumantasyon/ornekler" class={currentPage === 'ornekler' ? 'active' : ''}>
+          Örnek Programlar
+        </a>
+      </li>
+      <li>
+        <a href="/dokumantasyon/changelog" class={currentPage === 'changelog' ? 'active' : ''}>
+          Değişim Günlüğü (Changelog)
+        </a>
+      </li>
+    </ul>
+  </div>
+
+  <div class="sidebar-section">
+    <h3 class="sidebar-title">Dil Spesifikasyonu</h3>
+    <ul class="sidebar-links">
+      <li>
+        <a href="/dokumantasyon/dil-tanimi" class={currentPage === 'dil-tanimi' ? 'active' : ''}>
+          Dil Tanımı
+        </a>
+      </li>
+      <li>
+        <a href="/dokumantasyon/dil-grameri" class={currentPage === 'dil-grameri' ? 'active' : ''}>
+          Kanonik EBNF Grameri
+        </a>
+      </li>
+      <li>
+        <a href="/dokumantasyon/bytecode-bicimi" class={currentPage === 'bytecode-bicimi' ? 'active' : ''}>
+          Bytecode Biçimi (.hbc v4)
+        </a>
+      </li>
+    </ul>
+  </div>
+
+  <div class="sidebar-section">
+    <h3 class="sidebar-title">Mimari & Güvenlik</h3>
+    <ul class="sidebar-links">
+      <li>
+        <a href="/dokumantasyon/hmi" class={currentPage === 'hmi' ? 'active' : ''}>
+          HMI v1 Süreç Sınırı
+        </a>
+      </li>
+      <li>
+        <a href="/dokumantasyon/paket-guvenligi" class={currentPage === 'paket-guvenligi' ? 'active' : ''}>
+          Paket Güvenliği & İmzalar
+        </a>
+      </li>
+      <li>
+        <a href="/dokumantasyon/muhendislik-anayasasi" class={currentPage === 'muhendislik-anayasasi' ? 'active' : ''}>
+          Mühendislik Anayasası
+        </a>
+      </li>
+      <li>
+        <a href="/dokumantasyon/durum-ve-yol-haritasi" class={currentPage === 'durum-ve-yol-haritasi' ? 'active' : ''}>
+          Durum ve Yol Haritası
+        </a>
+      </li>
+      <li>
+        <a href="/dokumantasyon/api-stabilite" class={currentPage === 'api-stabilite' ? 'active' : ''}>
+          API & Uyumluluk
+        </a>
+      </li>
+    </ul>
+  </div>
+
+  <div class="sidebar-section">
+    <h3 class="sidebar-title">Kütüphaneler</h3>
+    <ul class="sidebar-links">
+      <li>
+        <a href="/dokumantasyon/kutuphaneler" class={currentPage === 'kutuphaneler' ? 'active' : ''}>
+          Tüm Kütüphaneler Portalı
+        </a>
+      </li>
+      <li><a href="/dokumantasyon/kutuphaneler/matematik" class={currentPage === 'matematik' ? 'active' : ''}><code>matematik.hb</code></a></li>
+      <li><a href="/dokumantasyon/kutuphaneler/istatistik" class={currentPage === 'istatistik' ? 'active' : ''}><code>istatistik.hb</code></a></li>
+      <li><a href="/dokumantasyon/kutuphaneler/liste" class={currentPage === 'liste' ? 'active' : ''}><code>liste.hb</code></a></li>
+      <li><a href="/dokumantasyon/kutuphaneler/dizgi" class={currentPage === 'dizgi' ? 'active' : ''}><code>dizgi.hb</code></a></li>
+      <li><a href="/dokumantasyon/kutuphaneler/dosya" class={currentPage === 'dosya' ? 'active' : ''}><code>dosya.hb</code></a></li>
+      <li><a href="/dokumantasyon/kutuphaneler/rastgele" class={currentPage === 'rastgele' ? 'active' : ''}><code>rastgele.hb</code></a></li>
+      <li><a href="/dokumantasyon/kutuphaneler/renkler" class={currentPage === 'renkler' ? 'active' : ''}><code>renkler.hb</code></a></li>
+      <li><a href="/dokumantasyon/kutuphaneler/zaman" class={currentPage === 'zaman' ? 'active' : ''}><code>zaman.hb</code></a></li>
+      <li><a href="/dokumantasyon/kutuphaneler/birim-test" class={currentPage === 'birim-test' ? 'active' : ''}><code>birim_test.hb</code></a></li>
+      <li><a href="/dokumantasyon/kutuphaneler/yapay-zeka-temel" class={currentPage === 'yapay-zeka-temel' ? 'active' : ''}><code>yapay_zeka_temel.hb</code></a></li>
+      <li><a href="/dokumantasyon/kutuphaneler/ag-istekleri" class={currentPage === 'ag-istekleri' ? 'active' : ''}><code>ag_istekleri</code></a></li>
+      <li><a href="/dokumantasyon/kutuphaneler/huma-sunucu" class={currentPage === 'huma-sunucu' ? 'active' : ''}><code>huma_sunucu</code></a></li>
+      <li><a href="/dokumantasyon/kutuphaneler/huma-sqlite" class={currentPage === 'huma-sqlite' ? 'active' : ''}><code>huma_sqlite</code></a></li>
+      <li><a href="/dokumantasyon/nlp-temel" class={currentPage === 'nlp-temel' ? 'active' : ''}><code>nlp_temel</code></a></li>
+      <li><a href="/dokumantasyon/kutuphaneler/nlp-ileri" class={currentPage === 'nlp-ileri' ? 'active' : ''}><code>nlp_ileri</code></a></li>
+      <li><a href="/dokumantasyon/kutuphaneler/yapay-zeka" class={currentPage === 'yapay-zeka' ? 'active' : ''}><code>yapay_zeka</code></a></li>
+    </ul>
+  </div>
+
+  <div class="sidebar-section">
+    <h3 class="sidebar-title">Performans & Testler</h3>
+    <ul class="sidebar-links">
+      <li>
+        <a href="/dokumantasyon/performans" class={currentPage === 'performans' ? 'active' : ''}>
+          Performans Ölçümü
+        </a>
+      </li>
+      <li>
+        <a href="/dokumantasyon/benchmark" class={currentPage === 'benchmark' ? 'active' : ''}>
+          Diller Arası Benchmark
+        </a>
+      </li>
+    </ul>
+  </div>
+</aside>
+
+<style>
+  .sidebar {
+    width: var(--sidebar-width);
+    flex-shrink: 0;
+    padding-right: 2rem;
+    border-right: 1px solid var(--border-color);
+  }
+
+  .sidebar-section {
+    margin-bottom: 2rem;
+  }
+
+  .sidebar-title {
+    font-family: var(--font-serif);
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-heading);
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .sidebar-links {
+    list-style: none;
+  }
+
+  .sidebar-links li {
+    margin-bottom: 0.3rem;
+  }
+
+  .sidebar-links a {
+    display: block;
+    padding: 0.25rem 0.5rem;
+    color: var(--text-primary);
+    font-size: 0.88rem;
+    border-radius: 6px;
+    transition: all 0.15s ease;
+  }
+
+  .sidebar-links a:hover {
+    color: var(--accent-color);
+    background-color: var(--bg-secondary);
+  }
+
+  .sidebar-links a.active {
+    color: var(--accent-color);
+    font-weight: 500;
+    background-color: var(--accent-light);
+  }
+
+  @media (max-width: 768px) {
+    .sidebar {
+      width: 100%;
+      border-right: none;
+      border-bottom: 1px solid var(--border-color);
+      padding-right: 0;
+      padding-bottom: 1.5rem;
+      margin-bottom: 2rem;
+    }
+  }
+</style>

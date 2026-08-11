@@ -1,0 +1,74 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+
+const codeUsage = `# CLI İzin Bayrağı Zorunludur:
+# huma run uygulama.hb --izin veritabanı
+
+"huma_sqlite"'yi yükle
+
+// Veritabanı bağlantısı aç
+db = veritabanı_aç("veri.db") olsun
+
+// SQL sorgusu çalıştır
+sorgu_çalıştır(db, "CREATE TABLE IF NOT EXISTS notlar (id INT, baslik TEXT)") olsun
+sorgu_çalıştır(db, "INSERT INTO notlar VALUES (1, 'Hüma Dökümantasyonu')") olsun
+
+// Açık bağlantıyı kapat
+dahili_sql_kapat(db) olsun`;
+---
+
+<DocLayout title="huma_sqlite Modülü" currentPage="kutuphaneler" activeTab="kutuphaneler">
+  <h1><code>huma_sqlite</code> — SQLite Veritabanı Modülü</h1>
+  
+  <p>
+    <code>huma_sqlite</code>, ilişkisel SQLite veritabanı dosyalarını açma, SQL sorguları çalıştırma ve tablo veri işlemlerini gerçekleştirir.
+  </p>
+
+  <div class="alert">
+    <div class="alert-title">Veritabanı İzni ve Bağlantı Kapatma</div>
+    Bu modül <code>--izin veritabanı</code> gerektirir. Açılan bağlantılar bellek sızıntısını önlemek için <code>dahili_sql_kapat(db)</code> ile kapatılmalıdır.
+  </div>
+
+  <h2>Kurulum ve İzinli Çalıştırma</h2>
+
+  <pre><code># CLI çalıştırma komutu:
+huma run uygulama.hb --izin veritabanı</code></pre>
+
+  <pre><code>"huma_sqlite"'yi yükle</code></pre>
+
+  <h2>Detaylı API Referansı</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Fonksiyon</th>
+        <th>Parametreler</th>
+        <th>Dönüş Değeri</th>
+        <th>Açıklama</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>veritabanı_aç(dosya_yolu)</code></td>
+        <td><code>dosya_yolu</code> (Metin)</td>
+        <td>DB Tutamacı (Handle)</td>
+        <td>SQLite veritabanı dosyasını açar veya yoksa oluşturur.</td>
+      </tr>
+      <tr>
+        <td><code>sorgu_çalıştır(db, sql_metni)</code></td>
+        <td><code>db, sql_metni</code></td>
+        <td>Sonuç / Liste</td>
+        <td>DDL veya DML SQL sorgusunu çalıştırır.</td>
+      </tr>
+      <tr>
+        <td><code>dahili_sql_kapat(db)</code></td>
+        <td><code>db</code> (Handle)</td>
+        <td>Boş</td>
+        <td>SQLite bağlantısını kapatır ve veritabanı kilitlerini serbest bırakır.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Kod Örneği</h2>
+  <pre><code>{codeUsage}</code></pre>
+</DocLayout>

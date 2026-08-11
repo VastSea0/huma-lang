@@ -1,0 +1,56 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+
+const codeUsage = `"yapay_zeka"'yi yükle
+
+// Katmanlı sinir ağı ilklendirme
+model = sinir_agi() olsun
+model.ilklendir() olsun
+model.katman_ekle(8, 16, "relu") olsun
+model.katman_ekle(16, 1, "sigmoid") olsun
+
+"Model başarıyla yapılandırıldı."'yı yazdır`;
+---
+
+<DocLayout title="yapay_zeka Modülü" currentPage="kutuphaneler" activeTab="kutuphaneler">
+  <h1><code>yapay_zeka</code> — Katmanlı Sinir Ağı ve Model Eğitimi</h1>
+  
+  <p>
+    <code>yapay_zeka</code>, yoğun katmanlar, MSE tabanlı geri yayılım (backpropagation), Adam güncellemeleri, gradyan kırpma ve JSON model kaydı sağlayan deneysel CPU makine öğrenimi paketidir.
+  </p>
+
+  <h2>Modülü Yükleme</h2>
+  <pre><code>"yapay_zeka"'yi yükle</code></pre>
+
+  <h2>Detaylı API Referansı</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Metot / Fonksiyon</th>
+        <th>Parametreler</th>
+        <th>Açıklama</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>sinir_agi()</code></td>
+        <td>Hiçbiri</td>
+        <td>Yeni bir sinir ağı nesnesi örneği oluşturur.</td>
+      </tr>
+      <tr>
+        <td><code>model.ilklendir()</code></td>
+        <td>Hiçbiri</td>
+        <td>Katman ve ağırlık yapılarını sıfırlar.</td>
+      </tr>
+      <tr>
+        <td><code>model.katman_ekle(girdi, çıktı, aktivasyon)</code></td>
+        <td><code>girdi, çıktı, aktivasyon</code> ("relu", "sigmoid", "linear")</td>
+        <td>Ağa yeni bir yoğun katman ekler.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Kod Örneği</h2>
+  <pre><code>{codeUsage}</code></pre>
+</DocLayout>

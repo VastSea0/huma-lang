@@ -1,0 +1,65 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+
+const codeUsage = `# CLI İzin Bayrağı Zorunludur:
+# huma run uygulama.hb --izin ağ-sunucu
+
+"huma_sunucu"'yi yükle
+
+// 8080 portunda sunucu başlat
+sunucu = sunucu_başlat(8080) olsun
+"HTTP Sunucu 8080 portunda aktif..."'yı yazdır
+
+// İşlem sonunda kaynağı güvenle kapat
+dahili_sunucu_kapat(sunucu) olsun`;
+---
+
+<DocLayout title="huma_sunucu Modülü" currentPage="kutuphaneler" activeTab="kutuphaneler">
+  <h1><code>huma_sunucu</code> — HTTP Sunucu Modülü</h1>
+  
+  <p>
+    <code>huma_sunucu</code>, yerel ağ veya sunucu ortamında HTTP isteklerini dinleyen ve yanıtlayan sunucu örnekleri oluşturur.
+  </p>
+
+  <div class="alert">
+    <div class="alert-title">Kaynak Kapatma Sözleşmesi</div>
+    Sunucular <code>--izin ağ-sunucu</code> gerektirir. Açılan sunucu kaynakları program sonlanmadan veya ihtiyaç bittiğinde <code>dahili_sunucu_kapat(sunucu)</code> ile açıkça kapatılmalıdır.
+  </div>
+
+  <h2>Kurulum ve İzinli Çalıştırma</h2>
+
+  <pre><code># CLI çalıştırma komutu:
+huma run uygulama.hb --izin ağ-sunucu</code></pre>
+
+  <pre><code>"huma_sunucu"'yi yükle</code></pre>
+
+  <h2>Detaylı API Referansı</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Fonksiyon</th>
+        <th>Parametreler</th>
+        <th>Dönüş Değeri</th>
+        <th>Açıklama</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>sunucu_başlat(port)</code></td>
+        <td><code>port</code> (Tamsayı)</td>
+        <td>Sunucu Tutamacı (Handle)</td>
+        <td>Belirtilen port üzerinde HTTP sunucu başlatır.</td>
+      </tr>
+      <tr>
+        <td><code>dahili_sunucu_kapat(sunucu)</code></td>
+        <td><code>sunucu</code> (Handle)</td>
+        <td>Boş</td>
+        <td>Sunucu dinleyicisini ve ağ soketlerini kapatır.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Kod Örneği</h2>
+  <pre><code>{codeUsage}</code></pre>
+</DocLayout>

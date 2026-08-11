@@ -1,0 +1,181 @@
+---
+import DocLayout from '../../layouts/DocLayout.astro';
+---
+
+<DocLayout title="nlp_temel Paketi" currentPage="nlp-temel" activeTab="nlp-temel">
+  <h1>nlp_temel Paketi Dökümantasyonu</h1>
+  
+  <p>
+    <code>nlp_temel</code>, Hüma için Türkçe metin temizleme, tokenizasyon, kural tabanlı kök bulma (stemmer), POS etiketleme, varlık ismi tanıma (NER) ve duygu analizi (sentiment) sözlük ve sınıflarını sağlayan standart temel pakettir.
+  </p>
+
+  <h2>Modülü Yükleme</h2>
+
+  <pre><code>"nlp_temel"'i yükle
+
+// Yüklendiğinde varsayılan olarak şu küresel örnekler hazır bulunur:
+// nlp_islemci = metin_islemci() olsun
+// nlp_stemmer = kok_bulucu() olsun
+// nlp_analizci = metin_analizci() olsun</code></pre>
+
+  <h2>1. Sınıflar ve Metotlar</h2>
+
+  <h3>A. <code>metin_islemci</code> Sınıfı</h3>
+  <p>Metin temizleme, küçük harfe dönüştürme ve kelime/karakter düzeyinde bölme işlemlerini gerçekleştirir.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Metot</th>
+        <th>Parametre</th>
+        <th>Açıklama</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>temizle(metin)</code></td>
+        <td><code>metin</code> (Metin)</td>
+        <td>Metni küçük harfe dönüştürür, <code>\t</code> ve <code>\n</code> karakterlerini temizler, kenar boşluklarını kırpar.</td>
+      </tr>
+      <tr>
+        <td><code>tokenize(metin)</code></td>
+        <td><code>metin</code> (Metin)</td>
+        <td>Noktalama işaretlerine (<code>. , ! ? : ; ( ) " '</code>) ve boşluklara göre token listesi döndürür.</td>
+      </tr>
+      <tr>
+        <td><code>karakter_tokenize(metin)</code></td>
+        <td><code>metin</code> (Metin)</td>
+        <td>Metni tek tek karakter dizisine çevirir.</td>
+      </tr>
+      <tr>
+        <td><code>durak_mı(kelime)</code></td>
+        <td><code>kelime</code> (Metin)</td>
+        <td>Kelimenin <code>DURAK_LİSTESİ</code> içinde yer alıp almadığını (doğru/yanlış) döndürür.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>B. <code>kok_bulucu</code> Sınıfı</h3>
+  <p>Türkçe çekim ve yapım eklerini gözeterek kelimelerin köklerini bulur.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Metot</th>
+        <th>Parametre</th>
+        <th>Açıklama</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>stem(kelime)</code></td>
+        <td><code>kelime</code> (Metin)</td>
+        <td>Kelimeden yapım ve çekim eklerini sökerek Türkçe kök sözlükleriyle eşleştirilmiş kökü döndürür.</td>
+      </tr>
+      <tr>
+        <td><code>stem_liste(tokens)</code></td>
+        <td><code>tokens</code> (Liste)</td>
+        <td>Token listesindeki tüm kelimelerin köklerini sırayla bulur ve liste olarak döndürür.</td>
+      </tr>
+      <tr>
+        <td><code>ek_var_mı(kelime, ek)</code></td>
+        <td><code>kelime, ek</code></td>
+        <td>Kelimenin verilen ek ile bitip bitmediğini denetler.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>C. <code>metin_analizci</code> Sınıfı</h3>
+  <p>POS etiketleme, varlık ismi tanıma (NER) ve duygu puanlaması yapar.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Metot</th>
+        <th>Parametre</th>
+        <th>Açıklama</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>pos_etiket(kelime)</code></td>
+        <td><code>kelime</code> (Metin)</td>
+        <td>Kelimenin tür etiketini (<code>POS_FİİL</code>, <code>POS_BAĞLAÇ</code>, <code>POS_EDAT</code>, <code>POS_ZAMİR</code> veya <code>POS_İSİM</code>) döndürür.</td>
+      </tr>
+      <tr>
+        <td><code>pos_etiketle(tokens)</code></td>
+        <td><code>tokens</code> (Liste)</td>
+        <td>Her kelime ve etiketinden oluşan ikililer (<code>[kelime, etiket]</code>) listesi döndürür.</td>
+      </tr>
+      <tr>
+        <td><code>ner_etiketle(tokens)</code></td>
+        <td><code>tokens</code> (Liste)</td>
+        <td>Şehir, ülke ve kurum sözlüklerini eşleştirerek varlık isimlerini etiketler.</td>
+      </tr>
+      <tr>
+        <td><code>duygu_skoru(tokens)</code></td>
+        <td><code>tokens</code> (Liste)</td>
+        <td>Pozitif/negatif kelimeler, olumsuzluk takıları ve yoğunlaştırıcı zarflarla hesaplanan duygu skorunu döndürür.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>2. Paket Sabitleri ve Sözlükler</h2>
+
+  <p><code>nlp_temel</code> paketi içerisinde yer alan <code>sabitler.hb</code> modülü aşağıdaki doğrulanmış sabit dizileri sunar:</p>
+
+  <h3>Kelime Türü Etiketleri (POS)</h3>
+  <ul>
+    <li><code>POS_İSİM</code> ("İSİM")</li>
+    <li><code>POS_FİİL</code> ("FİİL")</li>
+    <li><code>POS_SIFAT</code> ("SIFAT")</li>
+    <li><code>POS_ZARF</code> ("ZARF")</li>
+    <li><code>POS_ZAMİR</code> ("ZAMİR")</li>
+    <li><code>POS_BAĞLAÇ</code> ("BAĞLAÇ")</li>
+    <li><code>POS_EDAT</code> ("EDAT")</li>
+    <li><code>POS_SAYI</code> ("SAYI")</li>
+    <li><code>POS_ÜNLEM</code> ("ÜNLEM")</li>
+  </ul>
+
+  <h3>Fonetik ve Ünlü/Ünsüz Dizileri</h3>
+  <ul>
+    <li><code>TÜRKÇE_ÜNLÜLER</code>, <code>TÜRKÇE_ÜNSÜZLER</code></li>
+    <li><code>KALIN_ÜNLÜLER</code> (<code>["a", "ı", "o", "u"]</code>), <code>İNCE_ÜNLÜLER</code> (<code>["e", "i", "ö", "ü"]</code>)</li>
+    <li><code>DÜZ_ÜNLÜLER</code> (<code>["a", "e", "ı", "i"]</code>), <code>YUVARLAK_ÜNLÜLER</code> (<code>["o", "ö", "u", "ü"]</code>)</li>
+  </ul>
+
+  <h3>Durak Kelimeler (Stopwords)</h3>
+  <p>
+    <code>DURAK_LİSTESİ</code>: 90'dan fazla Türkçe durak kelime içerir (<code>"bir", "bu", "ve", "veya", "ile", "da", "de", "ama", "için", "gibi", "kadar", "olan", "değil", "her", "hiç"...</code>).
+  </p>
+
+  <h3>Ek Dizileri</h3>
+  <ul>
+    <li><code>ÇEKİM_EKLERİ</code>: 80'den fazla çekim eki (<code>-lar, -ler, -dan, -den, -mış, -miş, -ıyor, -iyor, -acak, -ecek...</code>)</li>
+    <li><code>YAPIM_EKLERİ</code>: Türetme ekleri (<code>-lık, -lik, -cı, -ci, -sız, -siz, -lı, -li, -sel, -sal...</code>)</li>
+  </ul>
+
+  <h3>Kök ve Alan Sözlükleri</h3>
+  <ul>
+    <li><code>TÜRKÇE_KÖK_SÖZLÜĞÜ</code>: Geniş Türkçe isim kökleri dizisi</li>
+    <li><code>FİİL_KÖKLERİ</code>: Türkçe fiil kökleri (<code>"gel", "git", "ver", "al", "yap", "bil", "gör"...</code>)</li>
+    <li><code>TEKNOLOJİ_KELİMELERİ</code>, <code>DOĞA_KELİMELERİ</code>, <code>AİLE_TOPLUM_KELİMELERİ</code>, <code>MESLEK_LİSTESİ</code>, <code>YİYECEK_İÇECEK_LİSTESİ</code></li>
+  </ul>
+
+  <h3>Özel İsimler ve NER Sözlükleri</h3>
+  <ul>
+    <li><code>TÜRKİYE_İLLERİ</code>: Türkiye'nin 81 il adı (<code>"adana", "ankara", "istanbul", "izmir"...</code>)</li>
+    <li><code>BİLİNEN_YERLER</code>: Kapadokya, Anadolu, Kadıköy, Taksim vb. bilinen bölgeler</li>
+    <li><code>ÜLKE_LİSTESİ</code>: Türkiye, Almanya, Fransa, İtalya vb. ülkeler</li>
+    <li><code>KURUM_LİSTESİ</code>: Bakanlığı, Belediyesi, Üniversitesi, Müdürlüğü, TÜBİTAK, AFAD vb. kurum ekleri ve isimleri</li>
+  </ul>
+
+  <h3>Duygu Analizi Sözlükleri</h3>
+  <ul>
+    <li><code>POZİTİF_KELİMELER</code>: 50+ olumlu anlam içeren kelime (<code>"iyi", "güzel", "harika", "mükemmel", "süper", "başarılı"...</code>)</li>
+    <li><code>NEGATİF_KELİMELER</code>: 50+ olumsuz anlam içeren kelime (<code>"kötü", "berbat", "rezalet", "başarısız", "yavaş", "bozuk"...</code>)</li>
+    <li><code>NÖTR_KELİMELER</code>: Normal, standart, ortalama</li>
+    <li><code>YOĞUNLAŞTIRICI_ZARFLAR</code>: <code>"çok", "pek", "gayet", "aşırı", "hayli", "epey", "oldukça"</code></li>
+    <li><code>OLUMSUZLUK_KELİMELERİ</code>: Kutup çevirici olumsuzluklar (<code>"değil", "yok", "hayır", "asla", "hiç"</code>)</li>
+  </ul>
+</DocLayout>

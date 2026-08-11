@@ -1,0 +1,32 @@
+---
+import DocLayout from '../../layouts/DocLayout.astro';
+
+const codeBench = `cargo bench -p huma-core --bench runtime`;
+const codePerf = `cargo run --release --locked -p huma-perf -- measure rapor.json
+cargo run --release --locked -p huma-perf -- check taban.json aday.json`;
+---
+
+<DocLayout title="Performans ve Bellek Ölçümü" currentPage="performans" activeTab="performans">
+  <h1>Hüma Performans ve Bellek Ölçümü</h1>
+  
+  <p>
+    Bu belgenin amacı aynı Hüma sürümündeki gerilemeleri yeniden üretilebilir iş yükleriyle görünür kılmaktır.
+  </p>
+
+  <h2>Mikro Benchmark</h2>
+  <pre><code>{codeBench}</code></pre>
+
+  <p>Criterion paketi üç ayrı sınırı ölçer:</p>
+  <ul>
+    <li><code>parser/10k-loop-source</code>: Kanonik döngü kaynağını lexer + parser'dan geçirme</li>
+    <li><code>interpreter/10k-loop</code>: Önceden ayrıştırılmış 10.000 yinelemeli AST'yi yürütme</li>
+    <li><code>vm/10k-loop</code>: Önceden derlenmiş programı yeni bir VM'de yürütme</li>
+  </ul>
+
+  <h2>Otomatik Gerileme Kapısı (huma-perf)</h2>
+  <pre><code>{codePerf}</code></pre>
+
+  <p>
+    Adanmış <code>huma-perf</code> runner'ındaki PR kapısı, aynı makinede taban ve aday revizyonları yeniden derler. Her suite için medyan sürede %5, p95 veya RSS'te %10'dan büyük gerileme PR kabulünü engeller.
+  </p>
+</DocLayout>

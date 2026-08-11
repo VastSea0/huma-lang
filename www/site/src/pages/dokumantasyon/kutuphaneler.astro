@@ -1,0 +1,138 @@
+---
+import DocLayout from '../../layouts/DocLayout.astro';
+---
+
+<DocLayout title="Kütüphane Envanteri" currentPage="kutuphaneler" activeTab="kutuphaneler">
+  <h1>Hüma Kütüphane Portalı</h1>
+  
+  <p>
+    Hüma programlama dilinde yer alan gömülü standart <code>lib/</code> kütüphaneleri, çekirdek yerleşikleri ve <code>huma_modulleri/</code> paketlerinin müstakil dökümantasyon sayfaları.
+  </p>
+
+  <h2>1. Gömülü Standart Kütüphaneler (<code>lib/</code>)</h2>
+  <p>Herhangi bir ek kurulum gerektirmeyen gömülü standart kütüphane sayfaları:</p>
+
+  <div class="lib-grid">
+    <a href="/dokumantasyon/kutuphaneler/matematik" class="lib-card">
+      <h3>matematik.hb ➔</h3>
+      <p>Aritmetik, üssel işlevler, EBOB/EKOK, asallık denetimi (<code>asal_mı</code>, <code>ebob</code>, <code>faktöriyel</code>).</p>
+    </a>
+
+    <a href="/dokumantasyon/kutuphaneler/istatistik" class="lib-card">
+      <h3>istatistik.hb ➔</h3>
+      <p>Ortalama, en büyük/küçük eleman, varyans ve standart sapma (<code>ortalama</code>, <code>standart_sapma</code>).</p>
+    </a>
+
+    <a href="/dokumantasyon/kutuphaneler/liste" class="lib-card">
+      <h3>liste.hb ➔</h3>
+      <p>Yüksek mertebeden fonksiyonel araçlar (<code>eşle</code>, <code>filtrele</code>, <code>indirge</code>, <code>dilimle</code>).</p>
+    </a>
+
+    <a href="/dokumantasyon/kutuphaneler/dizgi" class="lib-card">
+      <h3>dizgi.hb ➔</h3>
+      <p>Metin karakter denetimleri (<code>büyük_mü</code>, <code>küçük_mü</code>, <code>boşluk_mu</code>).</p>
+    </a>
+
+    <a href="/dokumantasyon/kutuphaneler/dosya" class="lib-card">
+      <h3>dosya.hb ➔</h3>
+      <p>Güvenli dosya okuma ve satırlara ayırma (<code>--izin dosya-okuma</code> gerektirir).</p>
+    </a>
+
+    <a href="/dokumantasyon/kutuphaneler/rastgele" class="lib-card">
+      <h3>rastgele.hb ➔</h3>
+      <p>Rastgele tamsayı üretimi, listeden eleman seçimi ve karıştırma (<code>r_tamsayı</code>, <code>r_seç</code>).</p>
+    </a>
+
+    <a href="/dokumantasyon/kutuphaneler/renkler" class="lib-card">
+      <h3>renkler.hb ➔</h3>
+      <p>Terminal renk çıktıları (<code>başarı_yaz</code>, <code>uyarı_yaz</code>, <code>hata_yaz</code>).</p>
+    </a>
+
+    <a href="/dokumantasyon/kutuphaneler/zaman" class="lib-card">
+      <h3>zaman.hb ➔</h3>
+      <p>Milisaniye hassasiyetli süreç bekletme ve kronometre ölçümü (<code>beklet</code>, <code>kronometre_başlat</code>).</p>
+    </a>
+
+    <a href="/dokumantasyon/kutuphaneler/birim-test" class="lib-card">
+      <h3>birim_test.hb ➔</h3>
+      <p>Test senaryoları tanımlama ve iddia doğrulama (<code>test_et</code>, <code>iddia_et</code>, <code>test_raporu</code>).</p>
+    </a>
+
+    <a href="/dokumantasyon/kutuphaneler/yapay-zeka-temel" class="lib-card">
+      <h3>yapay_zeka_temel.hb ➔</h3>
+      <p>Vektör nokta çarpımı, matris toplamı, ReLU/Sigmoid ve MSE kayıp hesaplamaları.</p>
+    </a>
+  </div>
+
+  <h2>2. Sistem ve Paket Modülleri (<code>huma_modulleri/</code>)</h2>
+  <p>CLI tarafında ilgili <code>--izin</code> bayraklarıyla çalışan paket modülleri:</p>
+
+  <div class="lib-grid">
+    <a href="/dokumantasyon/kutuphaneler/ag-istekleri" class="lib-card">
+      <h3>ag_istekleri ➔</h3>
+      <p>HTTP/HTTPS GET ve POST istemci istekleri (<code>--izin ağ-istemci</code> gerektirir).</p>
+    </a>
+
+    <a href="/dokumantasyon/kutuphaneler/huma-sunucu" class="lib-card">
+      <h3>huma_sunucu ➔</h3>
+      <p>HTTP dinleyici sunucusu başlatma ve yaşam döngüsü kapatma (<code>--izin ağ-sunucu</code> gerektirir).</p>
+    </a>
+
+    <a href="/dokumantasyon/kutuphaneler/huma-sqlite" class="lib-card">
+      <h3>huma_sqlite ➔</h3>
+      <p>SQLite veritabanı bağlantısı açma, SQL çalıştırma ve kapatma (<code>--izin veritabanı</code> gerektirir).</p>
+    </a>
+
+    <a href="/dokumantasyon/nlp-temel" class="lib-card">
+      <h3>nlp_temel ➔</h3>
+      <p>Metin temizleme, tokenizasyon, kök bulma, POS etiketleme, NER ve duygu analizi.</p>
+    </a>
+
+    <a href="/dokumantasyon/kutuphaneler/nlp-ileri" class="lib-card">
+      <h3>nlp_ileri ➔</h3>
+      <p>TF-IDF, sözcük gömme (embeddings) ve bayt düzeyli BPE (Byte-Pair Encoding) tokenizer.</p>
+    </a>
+
+    <a href="/dokumantasyon/kutuphaneler/yapay-zeka" class="lib-card">
+      <h3>yapay_zeka ➔</h3>
+      <p>Yoğun sinir ağı katmanları, MSE geri yayılım ve Adam optimizasyonu.</p>
+    </a>
+  </div>
+</DocLayout>
+
+<style>
+  .lib-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin: 1.5rem 0 3rem;
+  }
+
+  .lib-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    padding: 1.5rem;
+    border-radius: 10px;
+    display: block;
+    transition: all 0.2s ease;
+  }
+
+  .lib-card:hover {
+    border-color: var(--accent-color);
+    transform: translateY(-2px);
+  }
+
+  .lib-card h3 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    font-size: 1.15rem;
+    color: var(--text-heading);
+  }
+
+  .lib-card p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+</style>

@@ -1,0 +1,109 @@
+---
+import DocLayout from '../../layouts/DocLayout.astro';
+---
+
+<DocLayout title="Diller Arası Benchmark" currentPage="benchmark" activeTab="benchmark">
+  <h1>Hüma Diller Arası Benchmark Raporu</h1>
+  
+  <p>
+    Bu rapor Hüma 0.6 yürütme yollarını aynı makinede çalıştırılan Python, Node.js, Ruby, C, Rust, Swift ve Java programlarıyla karşılaştırır. Sonuçlar yalnız tanımlanan mikro iş yükleri için geçerlidir.
+  </p>
+
+  <h2>Ölçülen İş Yükleri</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>İş yükü</th>
+        <th>Kapsam</th>
+        <th style="text-align: right;">Beklenen Çıktı</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>branch_loop</code></td>
+        <td>200.000 koşullu sayısal durum geçişi</td>
+        <td style="text-align: right;"><code>99740874156250</code></td>
+      </tr>
+      <tr>
+        <td><code>numeric_loop</code></td>
+        <td>200.000 LCG ve modüler toplam adımı</td>
+        <td style="text-align: right;"><code>429301206370208</code></td>
+      </tr>
+      <tr>
+        <td><code>function_loop</code></td>
+        <td>100.000 kullanıcı fonksiyonu çağrısı</td>
+        <td style="text-align: right;"><code>2090659698</code></td>
+      </tr>
+      <tr>
+        <td><code>collection_loop</code></td>
+        <td>50.000 öğe ekleme, indeksleme ve toplama</td>
+        <td style="text-align: right;"><code>24836475</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Sonuç Özeti (Medyan Süreler)</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>İş yükü</th>
+        <th>Hüma Yorumlayıcı</th>
+        <th>Hüma VM</th>
+        <th>Hüma AOT</th>
+        <th>Python</th>
+        <th>Node.js</th>
+        <th>C <code>-O3</code></th>
+        <th>Rust <code>-O</code></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>branch_loop</code></td>
+        <td>213,14 ms</td>
+        <td>131,94 ms</td>
+        <td>3,73 ms</td>
+        <td>46,21 ms</td>
+        <td>22,59 ms</td>
+        <td>2,62 ms</td>
+        <td>2,72 ms</td>
+      </tr>
+      <tr>
+        <td><code>numeric_loop</code></td>
+        <td>124,41 ms</td>
+        <td>108,86 ms</td>
+        <td>desteklenmiyor</td>
+        <td>46,33 ms</td>
+        <td>27,84 ms</td>
+        <td>2,94 ms</td>
+        <td>3,09 ms</td>
+      </tr>
+      <tr>
+        <td><code>function_loop</code></td>
+        <td>96,74 ms</td>
+        <td>78,85 ms</td>
+        <td>desteklenmiyor</td>
+        <td>34,24 ms</td>
+        <td>24,26 ms</td>
+        <td>2,65 ms</td>
+        <td>2,82 ms</td>
+      </tr>
+      <tr>
+        <td><code>collection_loop</code></td>
+        <td>39,12 ms</td>
+        <td>desteklenmiyor</td>
+        <td>desteklenmiyor</td>
+        <td>25,74 ms</td>
+        <td>22,54 ms</td>
+        <td>2,38 ms</td>
+        <td>2,57 ms</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Bellek (Tepe RSS) Karşılaştırması</h2>
+  <p>
+    Sayısal işlerde Hüma yorumlayıcı/VM tepe RSS değeri 11,2–11,4 MiB aralığındadır. Aynı ölçümde Python 9,7 MiB, Ruby 27,9 MiB, Java 42 MiB ve Node.js 48–51 MiB kullanmıştır.
+  </p>
+</DocLayout>
