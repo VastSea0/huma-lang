@@ -1,0 +1,49 @@
+---
+import DocLayout from '../../layouts/DocLayout.astro';
+---
+
+<DocLayout title="HMI Spesifikasyonu" currentPage="hmi" activeTab="hmi">
+  <h1>Hüma Modül Arayüzü (HMI) v1</h1>
+  
+  <p>
+    HMI, native veya başka bir dilde yazılmış modüllerin Hüma sürecine yüklenmeden ayrı bir süreçte çalışmasını sağlayan kararlı sınırdır. HMI bir C ABI değildir; uzunluk önekli, boyut sınırlı ve sürümlü bir mesaj protokolüdür.
+  </p>
+
+  <h2>Paket Sözleşmesi</h2>
+  <p><code>huma.json</code> içindeki <code>hmi</code> alanı şunları taşır:</p>
+
+  <ul>
+    <li>Protokol ana/alt sürümü ve <code>stdio-json-v1</code> taşıması,</li>
+    <li>Paket köküne göre güvenli çalıştırılabilir yol,</li>
+    <li>Arayüz şema sürümü ve desteklenen Hüma sürüm aralığı,</li>
+    <li>Her dışa aktarım için parametre/dönüş türleri,</li>
+    <li>Dosya, ağ, süreç, veritabanı, GUI, saat, rastgelelik ve native etkileri,</li>
+    <li>Kararlı hata kodları ve yeniden denenebilirlik bilgisi.</li>
+  </ul>
+
+  <h2>Taşıma ve Yaşam Döngüsü</h2>
+  <p>
+    Her çerçeve 4 bayt big-endian uzunluk ve en fazla 16 MiB JSON payload taşır. Ana makine sırasıyla <code>initialize</code>, sıfır veya daha fazla <code>call</code>, sonra <code>shutdown</code> gönderir. İstek kimliği <code>1..2^53-1</code> aralığındadır. Yanıt aynı kimliği ve uyumlu protokol ana sürümünü taşımak zorundadır.
+  </p>
+
+  <p>
+    Yanlış kimlik, bozuk çerçeve, uyumsuz sürüm, beklenmedik EOF veya zaman aşımı fail-closed davranır; süreç sonlandırılır.
+  </p>
+
+  <h2>Değer Modeli</h2>
+  <p>
+    Sınırdan yalnız sonlu <code>f64</code>, boolean, UTF-8 metin, bayt, liste, metin anahtarlı harita ve boş değer geçer. Azami iç içelik 128, toplam öğe sayısı 1.000.000'dur. Döngüsel heap, fonksiyon, sınıf, görev ve süreç içi tutamaçlar taşınamaz.
+  </p>
+
+  <h2>API Uyumluluk Denetimi</h2>
+  <p>
+    <code>huma paket api-kontrol &lt;önceki.json&gt; &lt;yeni.json&gt;</code> denetimi aşağıdaki değişiklikleri kırıcı sayar:
+  </p>
+  <ul>
+    <li>Fonksiyon kaldırma,</li>
+    <li>Mevcut parametrenin adını, sırasını, türünü veya isteğe bağlılığını değiştirme,</li>
+    <li>Zorunlu parametre ekleme veya dönüş türünü değiştirme,</li>
+    <li>Yeni etki ya da yeni hata davranışı ekleme,</li>
+    <li>HMI sözleşmesini kaldırma veya protokol ana sürümünü değiştirme.</li>
+  </ul>
+</DocLayout>

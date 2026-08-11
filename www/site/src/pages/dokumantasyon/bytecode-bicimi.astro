@@ -1,0 +1,70 @@
+---
+import DocLayout from '../../layouts/DocLayout.astro';
+---
+
+<DocLayout title="Bytecode Biçimi" currentPage="bytecode-bicimi" activeTab="bytecode-bicimi">
+  <h1>Hüma Bytecode Kapsayıcısı (.hbc v4)</h1>
+  
+  <p>
+    Bu belge <code>.hbc</code> dosya kapsayıcısının 4 numaralı biçimini tanımlar. Kapsayıcı, ham serileştirilmiş verinin yanlış sürümle veya bozulmuş halde VM'ye ulaşmasını engelleyen bir güvenlik sınırıdır.
+  </p>
+
+  <h2>Başlık Yapısı</h2>
+  <p>Bütün çok baytlı tamsayılar little-endian kodlanır.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align: right;">Ofset</th>
+        <th style="text-align: right;">Uzunluk</th>
+        <th>Alan</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="text-align: right;">0</td>
+        <td style="text-align: right;">8</td>
+        <td>ASCII magic: <code>HUMA-HBC</code></td>
+      </tr>
+      <tr>
+        <td style="text-align: right;">8</td>
+        <td style="text-align: right;">2</td>
+        <td>Biçim sürümü (<code>u16</code>), mevcut değer <code>4</code></td>
+      </tr>
+      <tr>
+        <td style="text-align: right;">10</td>
+        <td style="text-align: right;">8</td>
+        <td>Payload uzunluğu (<code>u64</code>)</td>
+      </tr>
+      <tr>
+        <td style="text-align: right;">18</td>
+        <td style="text-align: right;">32</td>
+        <td>Payload SHA-256 özeti</td>
+      </tr>
+      <tr>
+        <td style="text-align: right;">50</td>
+        <td style="text-align: right;">değişken</td>
+        <td>Serileştirilmiş <code>Program</code> payload'u</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Güvenlik ve Doğrulama Kuralları</h2>
+  <p>
+    Payload, bakımı süren <code>serde_json</code> ile UTF-8 JSON olarak kodlanan <code>Program</code> değeridir. JSON, saldırganın küçük bir uzunluk alanıyla girdi boyutundan orantısız koleksiyon kapasitesi ayırmasına izin vermediği için güvenilmeyen bytecode sınırında tercih edilir. Kod çözücü:
+  </p>
+
+  <ul>
+    <li>64 MiB payload sınırı uygular.</li>
+    <li>Eksik veya sonda ek veri bulunan dosyaları reddeder.</li>
+    <li>Bilinmeyen biçim sürümlerini reddeder.</li>
+    <li>SHA-256 özetini karşılaştırır.</li>
+    <li>Sabit indekslerini, atlama hedeflerini ve koleksiyon/argüman sınırlarını VM başlamadan önce doğrular.</li>
+    <li>Bütün erişilebilir kontrol akışı yollarında yığın eksilmesini, azami yığın yüksekliğini ve birleşme noktalarındaki yığın yüksekliği eşitliğini doğrular.</li>
+  </ul>
+
+  <h2>Uyumluluk</h2>
+  <p>
+    Biçim sürümü eşleşmiyorsa okuyucu tahminde bulunmaz ve dosyayı çalıştırmaz. Bytecode opcode ve değer modeli 1.0'a kadar kararlı kamu ABI'si sayılmaz. Her uyumsuz kapsayıcı değişikliği biçim sürümünü artırmalıdır.
+  </p>
+</DocLayout>

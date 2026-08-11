@@ -1,0 +1,50 @@
+---
+import DocLayout from '../../layouts/DocLayout.astro';
+---
+
+<DocLayout title="Mühendislik Anayasası" currentPage="muhendislik-anayasasi" activeTab="muhendislik-anayasasi">
+  <h1>Hüma Mühendislik Anayasası</h1>
+  
+  <p>
+    Bu belge Hüma'nın proje boyunca geçerli ürün yönünü, değişmezlerini ve kabul ölçütlerini tanımlar. README, yol haritası veya sürüm notları bu belgeyle çelişemez.
+  </p>
+
+  <h2>1. Misyon</h2>
+  <p>
+    Hüma bir “AI dili” değildir. Hüma; web, veri, otomasyon, bilimsel hesaplama, masaüstü, sistem entegrasyonu ve gelecekte AI dâhil farklı alanlarda güvenilir kütüphaneler kurulabilen, Türkçe yüzeyli genel amaçlı modern bir programlama dili olmayı hedefler.
+  </p>
+
+  <h2>2. Değişmez Kimlik: Türkçe Dilbilgisi</h2>
+  <ul>
+    <li>UTF-8 kaynak ve Unicode NFC tanımlayıcılar,</li>
+    <li>Türkçe anahtar sözcükler ve kanonik Türkçe programlama yüzeyi,</li>
+    <li>Kesme işaretli ekler, ünlü uyumu, kaynaştırma ve denetlenebilir ünsüz benzeşmesi,</li>
+    <li>Türkçe kaynak konumlu tanı ve hata iletileri,</li>
+    <li><code>DIL_GRAMERI.ebnf</code> ile makinece tanımlanan yüzey grameri.</li>
+  </ul>
+
+  <h2>3. Tasarım Kararları Öncelik Sırası</h2>
+  <ol>
+    <li>Semantik doğruluk ve veri kaybetmeme</li>
+    <li>Bellek ve süreç güvenliği</li>
+    <li>Yeniden üretilebilirlik ve geriye dönük sözleşmeler</li>
+    <li>Öngörülebilir performans ve kaynak sınırları</li>
+    <li>Kütüphane yazarı deneyimi ve araç desteği</li>
+    <li>Yeni özellik veya alan kütüphanesi sayısı</li>
+  </ol>
+
+  <h2>4. Target Mimari Bileşenleri</h2>
+  <ul>
+    <li><code>huma-syntax</code>: Kaynak metin, Türkçe biçimbilim, token, AST, parser ve tanılar</li>
+    <li><code>huma-bytecode</code>: Sürümlü komut kümesi, kapsayıcı ve yapısal doğrulayıcı</li>
+    <li><code>huma-runtime</code>: Değer/heap modeli, yapılandırılmış hata ABI'si, modüller ve normatif yorumlayıcı</li>
+    <li><code>huma-vm</code>: Yalnız yorumlayıcıyla eşliği kanıtlanan bytecode yürütücüsü</li>
+    <li><code>huma-compiler</code>: Kaynak/bytecode hattı ve açıkça deneysel AOT adaptörü</li>
+    <li><code>huma-stdlib</code>: Yalnız saf, alan bağımsız temel işlevler</li>
+  </ul>
+
+  <h2>5. Bellek ve Isolate Modeli</h2>
+  <p>
+    Hüma'nın hedef bellek modeli, kararlı nesne tutamaçlarına sahip iz süren nesilsel bir çöp toplayıcıdır (generational tracing GC). Heap bir <code>isolate</code>'a aittir; bir isolate içindeki mutasyon tek iş parçacığında ve veri yarışı olmadan yürür.
+  </p>
+</DocLayout>

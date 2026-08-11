@@ -1,0 +1,136 @@
+---
+import DocLayout from '../../layouts/DocLayout.astro';
+
+const ebnfGrammar = `(* Hüma 0.6 kanonik yüzey grameri.
+   Köşeli ayraç isteğe bağlı, süslü ayraç sıfır veya daha çok yinelemedir.
+   "durum-eki" lexer tarafından doğrulanır ve çoğunlukla sözdizimsel ayıraçtır. *)
+
+program          = { komut } ;
+blok             = "{", { komut }, "}" ;
+ayraç            = [ ";" ] ;
+
+komut            = fonksiyon-tanımı
+                 | sınıf-tanımı
+                 | eski-liste-tanımı
+                 | atama
+                 | yazdırma
+                 | dönüş
+                 | koşul
+                 | süre-döngüsü
+                 | aralık-döngüsü
+                 | liste-ekleme
+                 | liste-çıkarma
+                 | deneme
+                 | yükleme
+                 | dışa-aktarım
+                 | "devam", ayraç
+                 | "kır", ayraç
+                 | ifade, "olsun", ayraç
+                 | ifade, ayraç ;
+
+fonksiyon-tanımı = tanımlayıcı, "fonksiyon", "olsun",
+                   [ parametreler, "alsın" ], blok ;
+anonim-fonksiyon = "fonksiyon", "olsun",
+                   [ parametreler, "alsın" ], blok ;
+parametreler     = tanımlayıcı, { ",", tanımlayıcı } ;
+
+sınıf-tanımı     = tanımlayıcı, "sınıf", "olsun", blok ;
+eski-liste-tanımı= tanımlayıcı, "liste", "olsun", ayraç ;
+
+atama            = atanabilir, "=", ifade, "olsun", ayraç ;
+atanabilir       = tanımlayıcı
+                 | art-ifade, ".", tanımlayıcı
+                 | art-ifade, "[", ifade, "]"
+                 | "kendisi", ilgi-eki, tanımlayıcı, [ iyelik-eki ] ;
+
+yazdırma         = "yazdır", ifade, ayraç
+                 | ifade, [ durum-eki ], "yazdır", ayraç ;
+dönüş            = "döndür", ifade, ayraç
+                 | ifade, [ durum-eki ], "döndür", ayraç ;
+
+koşul            = ifade, [ soru-eki ], "ise", blok,
+                   [ "yoksa", ( blok | koşul ) ] ;
+süre-döngüsü     = ifade, "olduğu", "sürece", blok ;
+aralık-döngüsü   = tanımlayıcı, "=", ifade, [ ayrılma-eki ],
+                   ifade, [ yönelme-eki ], [ "kadar" ], blok ;
+liste-ekleme     = ifade, yönelme-eki, ifade, [ durum-eki ], "ekle", ayraç
+                 | ifade, "[", ifade, "]", "ekle", ayraç ;
+liste-çıkarma    = ifade, ayrılma-eki, ifade, [ durum-eki ], "çıkar", ayraç
+                 | ifade, "[", ifade, "]", "çıkar", ayraç ;
+
+deneme           = "dene", blok, "yakala", [ hata-adı ], blok ;
+hata-adı         = tanımlayıcı | "hata" ;
+
+yükleme          = "yükle", metin, [ "olarak", tanımlayıcı ], ayraç
+                 | metin, [ durum-eki ], "yükle", ayraç ;
+dışa-aktarım     = tanımlayıcı, [ durum-eki ], "dışa", "aktar", ayraç ;
+
+ifade            = veya-ifadesi ;
+veya-ifadesi     = ve-ifadesi, { "veya", ve-ifadesi } ;
+ve-ifadesi       = eşitlik, { "ve", eşitlik } ;
+eşitlik          = karşılaştırma, { ( "=" | "==" | "!=" ), karşılaştırma } ;
+karşılaştırma    = toplama, { ( "<" | ">" | "<=" | ">=" ), toplama } ;
+toplama          = çarpma, { ( "+" | "-" ), çarpma } ;
+çarpma           = tekli, { ( "*" | "/" | "%" ), tekli } ;
+tekli            = ( "bekle" | "değil" | "-" ), tekli | art-ifade ;
+
+art-ifade        = temel, { art-işlem } ;
+art-işlem        = "(", [ argümanlar ], ")"
+                 | "[", ifade, "]"
+                 | ".", tanımlayıcı
+                 | ilgi-eki, "uzunluğu"
+                 | ilgi-eki, tanımlayıcı, [ iyelik-eki ]
+                 | ilgi-eki, "(", [ argümanlar ], ")",
+                   tanımlayıcı, [ iyelik-eki ], [ "çağır" ]
+                 | "ile", doğal-argüman,
+                   { ( "ve" | "ile" ), doğal-argüman },
+                   tanımlayıcı, [ durum-eki ], [ "çağır" ]
+                 | "uzunluğu" ;
+argümanlar       = ifade, { ",", ifade } ;
+doğal-argüman    = eşitlik ;
+
+temel            = sayı
+                 | metin
+                 | tanımlayıcı
+                 | "doğru"
+                 | "yanlış"
+                 | "kendisi"
+                 | "(", ifade, ")"
+                 | liste
+                 | sözlük
+                 | anonim-fonksiyon ;
+liste            = "[", [ ifade, { ",", ifade } ], "]" ;
+sözlük           = "{", [ çift, { ",", çift } ], "}" ;
+çift             = ifade, ":", ifade ;
+
+(* Sözcüksel sınıflar *)
+tanımlayıcı      = ( Unicode-harfi | "_" ),
+                   { Unicode-harfi | Unicode-sayısı | "_" } ;
+sayı             = rakam, { rakam }, [ ".", rakam, { rakam } ],
+                   [ ( "e" | "E" ), [ "+" | "-" ], rakam, { rakam } ] ;
+metin            = '"', { metin-karakteri | kaçış }, '"' ;
+kaçış            = "\\\\n" | "\\\\r" | "\\\\t" | "\\\\\\\\" | "\\\\\"" |
+                   "\\\\x", onaltılık, onaltılık ;
+
+durum-eki        = "'", ek | "’", ek ;
+ilgi-eki         = durum-eki ;  (* yalnız: nin/nın/nun/nün/in/ın/un/ün *)
+iyelik-eki       = durum-eki ;  (* bağlama göre: (s/n)?i/ı/u/ü *)
+ayrılma-eki      = durum-eki ;  (* dan/den/tan/ten *)
+yönelme-eki      = durum-eki ;  (* a/e/ya/ye *)
+soru-eki         = "mi" | "mı" | "mu" | "mü" ;`;
+---
+
+<DocLayout title="Dil Grameri (EBNF)" currentPage="dil-grameri" activeTab="dil-grameri">
+  <h1>Kanonik Dil Grameri (EBNF)</h1>
+  
+  <p>
+    Bu belge, Hüma 0.6 programlama dilinin makinece okunabilir kanonik yüzey gramerini Extended Backus–Naur Form (EBNF) biçiminde tanımlar.
+  </p>
+
+  <div class="alert">
+    <div class="alert-title">Gramatik Not</div>
+    Lexer katmanındaki durum ekleri ve ünlü uyumu doğrulamaları <code>DIL_TANIMI.md §4</code> kurallarına dayanmaktadır.
+  </div>
+
+  <pre><code>{ebnfGrammar}</code></pre>
+</DocLayout>

@@ -1,0 +1,141 @@
+---
+import DocLayout from '../../layouts/DocLayout.astro';
+
+const codeAssign = `sayı = 42 olsun
+ondalık = 1.25e-3 olsun
+metin = "Türkçe UTF-8" olsun
+evet = doğru olsun
+hayır = yanlış olsun
+yok = boş olsun
+dizi = [1, 2, 3] olsun
+sözlük = {"ad": "Hüma", "sürüm": 0.6} olsun`;
+
+const codeAssignStmt = `x = 10 olsun
+x = x + 1 olsun
+dizi[0] = 20 olsun
+sözlük["ad"] = "Yeni ad" olsun
+nesne.alan = 3 olsun`;
+
+const codeSuffixes = `değer'i yazdır
+metin'i döndür
+1'den 5'e kadar
+dizi'nin uzunluğu`;
+
+const codeFunc = `"Merhaba"'yı yazdır
+yazdır "Merhaba"
+
+iki_katı fonksiyon olsun n alsın {
+    (n * 2)'yi döndür
+}`;
+
+const codeCond = `x > 0 ve x < 10 ise {
+    "aralıkta"'yı yazdır
+} yoksa {
+    "aralık dışında"'yı yazdır
+}`;
+
+const codeLoops = `i = 0 olsun
+i < 10 olduğu sürece {
+    i = i + 1 olsun
+    i = 4 ise { devam }
+    i = 8 ise { kır }
+}
+
+j = 1'den 5'e kadar {
+    j'yi yazdır
+}`;
+
+const codeClass = `sayaç sınıf olsun {
+    değer = 0 olsun
+
+    artır fonksiyon olsun miktar alsın {
+        kendisi.değer = kendisi.değer + miktar olsun
+        kendisi.değer'i döndür
+    }
+}
+
+s = sayaç() olsun
+s.artır(2)'yi yazdır`;
+
+const codeTry = `dene {
+    10 / 0'ı yazdır
+} yakala hata {
+    hata'yı yazdır
+}`;
+
+const codeMod = `yükle "matematik.hb"
+"matematik.hb"'yi yükle
+
+yükle "hesap.hb" olarak hesap
+hesap.topla(2, 3)'ü yazdır`;
+---
+
+<DocLayout title="Dil Tanımı Spesifikasyonu" currentPage="dil-tanimi" activeTab="dil-tanimi">
+  <h1>Hüma 0.6 Dil Tanımı</h1>
+  
+  <p>
+    Bu belge Hüma 0.6 için kanonik ve normatif sözdizimi ile çalışma zamanı sözleşmesini tanımlar. Sitedeki diğer örnekler veya şablonlarla çelişirse bu normatif belge esas alınır.
+  </p>
+
+  <h2>1. Kaynak Metin ve Tanımlayıcılar</h2>
+  <ul>
+    <li>Kaynak dosyası UTF-8'dir ve <code>.hb</code> uzantısını kullanır.</li>
+    <li>Tek kaynak dosyası en fazla 64 MiB olabilir.</li>
+    <li>Tanımlayıcılar Unicode harf, sayı ve <code>_</code> içerebilir; ilk karakter harf veya <code>_</code> olmalıdır.</li>
+    <li>Tanımlayıcılar lexer tarafından Unicode NFC biçimine getirilir. Böylece görsel olarak aynı birleşik ve ayrık Unicode yazımları aynı adı belirtir.</li>
+    <li>Türkçe karakterler doğrudan kullanılabilir: <code>değer</code>, <code>öğrenci_sayısı</code>, <code>çözüm</code>.</li>
+    <li>Anahtar sözcükler tanımlayıcı olarak kullanılamaz. Özellikle <code>doğru</code>, <code>yanlış</code>, <code>liste</code>, <code>devam</code> ve <code>kır</code> ayrılmıştır. ASCII eşdeğerleri de ayrılmıştır: <code>dogru</code>, <code>yanlis</code>, <code>sinif</code> gibi.</li>
+    <li><code>//</code> ile satır sonuna kadar yorum yazılır.</li>
+    <li>Noktalı virgül isteğe bağlıdır.</li>
+  </ul>
+
+  <h2>2. Değerler ve Tür Modeli</h2>
+  <p>Kanonik literal ve temel çalışma zamanı değerleri:</p>
+
+  <pre><code>{codeAssign}</code></pre>
+
+  <p>
+    Hüma 0.6'nın tek sayısal türü sonlu IEEE-754 <code>f64</code> değeridir. Kaynak literal, aritmetik işlem veya dış veri dönüşümü <code>NaN</code> ya da sonsuz değer üretemez; böyle bir sonuç yakalanabilir çalışma zamanı hatasıdır. Metinler sayısal işlemlerde örtük olarak sayıya çevrilmez. Tamsayı hassasiyetinin gerektiği API'ler <code>2^53 - 1</code> sınırını aşan değerleri ayrıca reddeder.
+  </p>
+
+  <h2>3. Atama</h2>
+  <p>Atama cümlesi <code>olsun</code> ile biter:</p>
+
+  <pre><code>{codeAssignStmt}</code></pre>
+
+  <h2>4. Ek Ayıracı ve Türkçe Ses Kuralları</h2>
+  <p>Kesme işareti, bir Hüma tanımlayıcısını Türkçe görünümlü durum ekinden ayıran programlama dili işaretidir:</p>
+
+  <pre><code>{codeSuffixes}</code></pre>
+
+  <h3>Lexer Tarafından Doğrulanan Ek Biçimleri:</h3>
+  <ul>
+    <li><strong>Belirtme:</strong> <code>i ı u ü yi yı yu yü ni nı nu nü</code></li>
+    <li><strong>Yönelme:</strong> <code>a e ya ye</code></li>
+    <li><strong>Bulunma:</strong> <code>da de ta te</code></li>
+    <li><strong>Ayrılma:</strong> <code>dan den tan ten</code></li>
+    <li><strong>İlgi:</strong> <code>nin nın nun nün in ın un ün</code></li>
+    <li><strong>Diğer:</strong> <code>si sı su sü lar ler ca ce ça çe daki deki taki teki la le yla yle</code></li>
+  </ul>
+
+  <h2>5. Çıktı ve Dönüş</h2>
+  <pre><code>{codeFunc}</code></pre>
+
+  <h2>6. Koşullar ve Mantık</h2>
+  <pre><code>{codeCond}</code></pre>
+
+  <h2>7. Döngüler</h2>
+  <pre><code>{codeLoops}</code></pre>
+
+  <h2>8. Fonksiyonlar ve Kapsam</h2>
+  <p>Fonksiyon parametreleri ve fonksiyon içinde ilk kez atanan adlar yerel kapsamdadır.</p>
+
+  <h2>9. Sınıflar</h2>
+  <pre><code>{codeClass}</code></pre>
+
+  <h2>10. Hata Yönetimi</h2>
+  <pre><code>{codeTry}</code></pre>
+
+  <h2>11. Modül Sistemi</h2>
+  <pre><code>{codeMod}</code></pre>
+</DocLayout>

@@ -1,0 +1,39 @@
+---
+import DocLayout from '../../layouts/DocLayout.astro';
+---
+
+<DocLayout title="Paket Güvenliği" currentPage="paket-guvenligi" activeTab="paket-guvenligi">
+  <h1>Hüma 0.6 Paket Güvenliği</h1>
+  
+  <p>
+    Hüma 0.6 paket yöneticisi yalnız yerel kaynak ağacındaki paketleri çözer. Uzak URL, Git deposu veya kayıt kurulumu; güvenilir kayıt indeksi ve şeffaflık protokolü tamamlanmadığı için açıkça reddedilir.
+  </p>
+
+  <h2>Çözümleme ve Kilit</h2>
+  <ul>
+    <li>Paket ve proje metadata'sı bilinmeyen alanları reddeden katı JSON şemasıyla okunur.</li>
+    <li>Paket adı NFC, yol güvenliği ve uzunluk kurallarından geçer.</li>
+    <li>Bütün geçişli bağımlılık grafiği yazma başlamadan çözülür.</li>
+    <li>Döngüler, sürüm çakışmaları ve karşılanmayan SemVer aralıkları hata verir.</li>
+    <li><code>huma.lock</code>, her paket için kesin sürüm, kanonik SHA-256 içerik özeti ve kaynak/imza bilgisini saklar.</li>
+  </ul>
+
+  <h2>Kaynak Sınırları</h2>
+  <ul>
+    <li>Metadata: 1 MiB</li>
+    <li>Paket başına normal dosya: 10.000</li>
+    <li>Tek dosya: 64 MiB</li>
+    <li>Toplam paket verisi: 256 MiB</li>
+    <li>Bağımlılık veya betik sayısı: 1.024</li>
+    <li>Dizin derinliği: 64</li>
+  </ul>
+
+  <h2>Ed25519 İmzaları</h2>
+  <p>
+    <code>huma paket imzala --anahtar &lt;dosya&gt;</code> kanonik paket kimliği, SemVer'i ve SHA-256 özetini alan ayrımlı Ed25519 mesajına bağlar. Anahtar dosyası 32 baytlık hex tohumdur; sembolik bağ olamaz ve Unix'te <code>0600</code>'den geniş izin taşıyamaz.
+  </p>
+
+  <p>
+    <code>huma paket kur</code> varsayılan olarak her pakette geçerli Ed25519 imzası ister. İmzasız paket yalnız kullanıcının kaynak ağacını bizzat denetlediği yerel geliştirme için <code>--güvenilir</code> ile kurulabilir.
+  </p>
+</DocLayout>

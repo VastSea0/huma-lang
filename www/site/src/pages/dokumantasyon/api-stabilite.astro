@@ -1,0 +1,24 @@
+---
+import DocLayout from '../../layouts/DocLayout.astro';
+---
+
+<DocLayout title="API ve Uyumluluk Politikası" currentPage="api-stabilite" activeTab="api-stabilite">
+  <h1>Hüma API ve Uyumluluk Politikası</h1>
+  
+  <h2>Kararlılık Düzeyleri</h2>
+  <ul>
+    <li><strong>Normatif:</strong> Türkçe kaynak grameri, yorumlayıcı semantiği, yapılandırılmış tanı zarfı ve HMI v1 kuralları.</li>
+    <li><strong>Sürümlü Biçim:</strong> <code>.hbc</code> v4 ve paket/imza şemaları. Bilinmeyen sürüm açıkça reddedilir.</li>
+    <li><strong>Deneysel:</strong> Bytecode VM destek alt kümesi, Cranelift AOT, Rust crate API'leri ve depodaki alan kütüphaneleri.</li>
+  </ul>
+
+  <h2>SemVer ve HMI</h2>
+  <p>
+    HMI fonksiyon imzası, etki veya hata kataloğundaki kırıcı değişiklik paket ana sürümünü artırmalıdır. Otomatik denetim <code>huma paket api-kontrol</code> ile sağlanır.
+  </p>
+
+  <h2>Hata ABI'si (DiagnosticEnvelope)</h2>
+  <p>
+    Makine tüketimine açık tanılar <code>DiagnosticEnvelope</code> şema sürümü, kararlı kod, kategori, Türkçe ileti, kaynak konumu, çağrı izi ve neden zinciri taşır.
+  </p>
+</DocLayout>

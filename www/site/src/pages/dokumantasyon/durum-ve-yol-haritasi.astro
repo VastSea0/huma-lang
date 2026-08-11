@@ -1,0 +1,58 @@
+---
+import DocLayout from '../../layouts/DocLayout.astro';
+---
+
+<DocLayout title="Durum ve Yol Haritası" currentPage="durum-ve-yol-haritasi" activeTab="durum-ve-yol-haritasi">
+  <h1>Hüma Durum ve Yol Haritası</h1>
+  
+  <p>
+    Hüma'nın önceliği hazır kütüphane üretimi değil, farklı türde kütüphanelerin güvenle kurulabileceği genel amaçlı dil zeminidir.
+  </p>
+
+  <h2>0.6.0 Doğrulanmış Çekirdek Sınırı</h2>
+  <div class="timeline">
+    <div class="timeline-item">
+      <div class="timeline-dot"></div>
+      <div class="timeline-header">
+        <span class="timeline-title">AST Yorumlayıcı</span>
+        <span class="timeline-badge badge-success">Kanonik Yol</span>
+      </div>
+      <p class="timeline-desc">Fonksiyon, özyineleme, sınıf, liste/sözlük, modül, döngü, <code>dene/yakala</code> ve yerleşik kütüphanelerin tam yürütme doğruluğu.</p>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot"></div>
+      <div class="timeline-header">
+        <span class="timeline-title">Bytecode VM & Kapsayıcı</span>
+        <span class="timeline-badge badge-info">.hbc v4</span>
+      </div>
+      <p class="timeline-desc">Bağımsız frame yığınları, SHA-256 doğrulama, JSON payload ve yapılandırılmış <code>dene/yakala</code> sarımı.</p>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot"></div>
+      <div class="timeline-header">
+        <span class="timeline-title">Isolate Heap & GC</span>
+        <span class="timeline-badge badge-success">İki Nesilli GC</span>
+      </div>
+      <p class="timeline-desc">Kararlı <code>Gc</code> tutamaçları, genç nesil + yazma bariyeri, major çevrim toplayıcı ve paylaşılmayan isolate bellekleri.</p>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot"></div>
+      <div class="timeline-header">
+        <span class="timeline-title">HMI v1 Süreç Sınırı</span>
+        <span class="timeline-badge badge-success">Süreç Dışı</span>
+      </div>
+      <p class="timeline-desc">Native modüller için 16 MiB çerçeve, protokol pazarlığı, zaman aşımı koruması ve fail-closed süreç sonlandırma.</p>
+    </div>
+  </div>
+
+  <h2>1.0 Kabul Ölçütleri</h2>
+  <ol>
+    <li>Normatif dil tanımındaki tüm yapılar yorumlayıcı ve VM'de eş sonuç veya eş hata üretmeli.</li>
+    <li>Her arka uç ve platformun destek kapsamı sürümlü, otomatik testli sözleşme olmalı.</li>
+    <li>Fuzz, diferansiyel, güvenlik ve soak testleri CI'da düzenli çalışmalı.</li>
+    <li>Kamu API'si, bytecode ve paket biçimi geriye uyumluluk politikasıyla sabitlenmeli.</li>
+  </ol>
+</DocLayout>
