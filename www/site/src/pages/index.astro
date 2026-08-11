@@ -1,0 +1,467 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const codeSyntax = `// Değişken atamaları ve Türkçe ek ayıracı
+ad = "Hüma" olsun
+sayılar = [1, 2, 3] olsun
+
+sonuç = 10 olsun
+sonuç > 5 ise {
+    "büyük"'ü yazdır
+} yoksa {
+    "küçük veya eşit"'i yazdır
+}`;
+
+const codeFunc = `// Özyinelemeli fonksiyon tanımı
+fibonacci fonksiyon olsun n alsın {
+    n <= 1 ise { n'i döndür }
+    (fibonacci(n - 1) + fibonacci(n - 2))'yi döndür
+}
+
+i = 0'dan 5'e kadar {
+    "fib(" + i + ") = " + fibonacci(i)'yi yazdır
+}`;
+---
+
+<Layout title="Resmi Web Sitesi ve Dökümantasyon" activeTab="home">
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="hero-tag">SÜRÜM 0.6.0</div>
+    <h1 class="hero-title">
+      Hüma <span class="serif-italic">Programlama Dili</span>
+    </h1>
+    <p class="hero-description">
+      Türkçe dilbilgisini koruyan, sürümlenebilir ve güvenli genel amaçlı modern bir programlama dili zemini. Çekirdek yorumlayıcı, bytecode VM, izole GC ve süreç dışı HMI mimarisiyle geleceğin kütüphane ekosistemini inşa eder.
+    </p>
+
+    <div class="hero-actions">
+      <a href="/dokumantasyon" class="btn-pill btn-primary">Dökümantasyon Portalı ➔</a>
+      <a href="/dokumantasyon/kurulum" class="btn-pill btn-secondary">Kurulum Rehberi</a>
+      <a href="https://github.com/vastsea0/huma-lang" target="_blank" rel="noopener noreferrer" class="btn-pill btn-outline">GitHub Deposu ↗</a>
+    </div>
+  </section>
+
+  <!-- Split Showcase Section (Asymmetric Split) -->
+  <section class="showcase-section">
+    <div class="showcase-grid">
+      <div class="showcase-code">
+        <div class="code-header">
+          <span class="code-dot"></span>
+          <span class="code-dot"></span>
+          <span class="code-dot"></span>
+          <span class="code-title">fibonacci.hb</span>
+        </div>
+        <pre><code>{codeFunc}</code></pre>
+      </div>
+
+      <div class="showcase-highlights">
+        <div class="highlight-item">
+          <span class="highlight-num">01</span>
+          <div>
+            <h3>Dilbilgisi & Lexer</h3>
+            <p>Ünlü uyumu, kaynaştırma ve benzeşme denetimli Türkçe ek ayırıcıları ve NFC Unicode tanımlayıcılar.</p>
+          </div>
+        </div>
+
+        <div class="highlight-item">
+          <span class="highlight-num">02</span>
+          <div>
+            <h3>Güvenlik & İzin Modeli</h3>
+            <p>Varsayılan olarak kapalı dosya, ağ, veritabanı ve FFI erişimi. CLI düzeyinde <code>--izin</code> yetkilendirmesi.</p>
+          </div>
+        </div>
+
+        <div class="highlight-item">
+          <span class="highlight-num">03</span>
+          <div>
+            <h3>Süreç Dışı HMI v1</h3>
+            <p>Native uzantılar için tip güvenli, 16 MiB çerçeve ve zaman aşımı korumalı sürümlü mesaj protokolü.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Dual Code Comparison Section -->
+  <section class="code-section">
+    <div class="section-intro">
+      <h2>Kanonik Sözdizimi</h2>
+      <p>Hüma, Türkçe gramer yapısını ve atama mekanizmasını doğrudan çalışma zamanında doğrular.</p>
+    </div>
+
+    <div class="dual-code-grid">
+      <div class="code-card">
+        <h3>Atama ve Koşul Yapısı</h3>
+        <p><code>olsun</code> anahtar kelimesi ile atama ve <code>ise / yoksa</code> blokları.</p>
+        <pre><code>{codeSyntax}</code></pre>
+      </div>
+
+      <div class="code-card">
+        <h3>Fonksiyonlar ve Döngüler</h3>
+        <p><code>fonksiyon olsun ... alsın</code> yapısı ve <code>...'den ...'e kadar</code> aralık döngüsü.</p>
+        <pre><code>{codeFunc}</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- Asymmetric Timeline Section -->
+  <section class="timeline-section">
+    <div class="timeline-layout">
+      <div class="timeline-sidebar">
+        <h2>Doğrulanmış Sürüm Durumu</h2>
+        <p>Hüma 0.6 araç zincirinin otomatik test kapılarıyla korunan kanonik bileşenleri.</p>
+        <a href="/dokumantasyon/durum-ve-yol-haritasi" class="link-more">Detaylı Yol Haritası ➔</a>
+      </div>
+
+      <div class="timeline-main">
+        <div class="timeline">
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-header">
+              <span class="timeline-title">AST Yorumlayıcı</span>
+              <span class="timeline-badge">Kanonik Yol</span>
+            </div>
+            <p class="timeline-desc">Fonksiyon, özyineleme, sınıf, liste/sözlük, modül, döngü, <code>dene/yakala</code> ve yerleşik kütüphanelerin tam yürütme doğruluğu.</p>
+          </div>
+
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-header">
+              <span class="timeline-title">Bytecode VM (.hbc v4)</span>
+              <span class="timeline-badge">Doğrulanmış Alt Küme</span>
+            </div>
+            <p class="timeline-desc">Bağımsız frame/closure yığınları, SHA-256 doğrulama, JSON payload ve yapılandırılmış <code>dene/yakala</code> sarımı.</p>
+          </div>
+
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-header">
+              <span class="timeline-title">HMI v1 Süreç Sınırı</span>
+              <span class="timeline-badge">Süreç Dışı</span>
+            </div>
+            <p class="timeline-desc">İmza/etki/hata kataloğu, API uyumluluk denetimi, çerçeve sınırları ve zaman aşımında fail-closed süreç sonlandırma.</p>
+          </div>
+
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-header">
+              <span class="timeline-title">Heap / Isolate</span>
+              <span class="timeline-badge">Çevrim Toplayıcı</span>
+            </div>
+            <p class="timeline-desc">Kararlı <code>Gc</code> tutamaçları, genç nesil + yazma bariyeri, major çevrim toplama ve paylaşılmayan isolate heap yapısı.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Categorized Documentation Portal Section -->
+  <section class="portal-section">
+    <div class="section-intro">
+      <h2>Dökümantasyon Portalı</h2>
+      <p>Sitedeki tüm teknik belgeler yerel HTML sayfaları olarak sunulmaktadır.</p>
+    </div>
+
+    <div class="portal-grid">
+      <div class="portal-category">
+        <h3>Başlarken</h3>
+        <ul>
+          <li><a href="/dokumantasyon/kurulum">Kurulum & Başlarken ➔</a></li>
+          <li><a href="/dokumantasyon/sozdizimi">Temel Sözdizimi ➔</a></li>
+          <li><a href="/dokumantasyon/ornekler">Örnek Programlar ➔</a></li>
+        </ul>
+      </div>
+
+      <div class="portal-category">
+        <h3>Dil Spesifikasyonu</h3>
+        <ul>
+          <li><a href="/dokumantasyon/dil-tanimi">Dil Tanımı Spesifikasyonu ➔</a></li>
+          <li><a href="/dokumantasyon/dil-grameri">Kanonik EBNF Grameri ➔</a></li>
+          <li><a href="/dokumantasyon/bytecode-bicimi">Bytecode Biçimi (.hbc v4) ➔</a></li>
+        </ul>
+      </div>
+
+      <div class="portal-category">
+        <h3>Mimari & Güvenlik</h3>
+        <ul>
+          <li><a href="/dokumantasyon/hmi">HMI v1 Süreç Sınırı ➔</a></li>
+          <li><a href="/dokumantasyon/paket-guvenligi">Paket Güvenliği & İmzalar ➔</a></li>
+          <li><a href="/dokumantasyon/muhendislik-anayasasi">Mühendislik Anayasası ➔</a></li>
+          <li><a href="/dokumantasyon/durum-ve-yol-haritasi">Durum ve Yol Haritası ➔</a></li>
+        </ul>
+      </div>
+
+      <div class="portal-category">
+        <h3>Kütüphaneler & Ölçüm</h3>
+        <ul>
+          <li><a href="/dokumantasyon/kutuphaneler">Kütüphane Envanteri ➔</a></li>
+          <li><a href="/dokumantasyon/nlp-temel"><code>nlp_temel</code> Modülü ➔</a></li>
+          <li><a href="/dokumantasyon/performans">Performans Ölçümü ➔</a></li>
+          <li><a href="/dokumantasyon/benchmark">Diller Arası Benchmark ➔</a></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  /* Hero */
+  .hero {
+    padding: 3.5rem 0 4rem;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 4rem;
+  }
+
+  .hero-tag {
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    color: var(--accent-color);
+    letter-spacing: 0.08em;
+    font-weight: 600;
+    margin-bottom: 1.25rem;
+  }
+
+  .hero-title {
+    font-size: 4rem;
+    line-height: 1.1;
+    margin-bottom: 1.5rem;
+    color: var(--text-heading);
+    letter-spacing: -0.02em;
+  }
+
+  .hero-description {
+    font-size: 1.2rem;
+    color: var(--text-primary);
+    max-width: 780px;
+    line-height: 1.8;
+    margin-bottom: 2.25rem;
+  }
+
+  .hero-actions {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  /* Showcase Split */
+  .showcase-section {
+    margin-bottom: 5rem;
+  }
+
+  .showcase-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 3rem;
+    align-items: center;
+  }
+
+  .showcase-code {
+    background-color: var(--bg-code);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+  }
+
+  .code-header {
+    background-color: #27272a;
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .code-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #52525b;
+  }
+
+  .code-dot:nth-child(1) { background-color: #ef4444; }
+  .code-dot:nth-child(2) { background-color: #eab308; }
+  .code-dot:nth-child(3) { background-color: #22c55e; }
+
+  .code-title {
+    color: #a1a1aa;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    margin-left: 0.5rem;
+  }
+
+  .showcase-code pre {
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    padding: 1.5rem;
+  }
+
+  .showcase-highlights {
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+  }
+
+  .highlight-item {
+    display: flex;
+    gap: 1.25rem;
+    align-items: flex-start;
+  }
+
+  .highlight-num {
+    font-family: var(--font-serif);
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--accent-color);
+    line-height: 1;
+    padding-top: 0.2rem;
+  }
+
+  .highlight-item h3 {
+    margin-top: 0;
+    margin-bottom: 0.35rem;
+    font-size: 1.15rem;
+  }
+
+  .highlight-item p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  /* Code Section */
+  .code-section {
+    margin-bottom: 5rem;
+  }
+
+  .section-intro {
+    margin-bottom: 2rem;
+  }
+
+  .section-intro h2 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+  }
+
+  .section-intro p {
+    color: var(--text-muted);
+    font-size: 1.05rem;
+    margin: 0;
+  }
+
+  .dual-code-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+
+  .code-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    padding: 1.75rem;
+    border-radius: 12px;
+  }
+
+  .code-card h3 {
+    margin-top: 0;
+    margin-bottom: 0.4rem;
+    font-size: 1.2rem;
+  }
+
+  .code-card p {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+  }
+
+  /* Timeline Section */
+  .timeline-section {
+    margin-bottom: 5rem;
+    background-color: var(--bg-secondary);
+    padding: 3rem 2.5rem;
+    border-radius: 16px;
+    border: 1px solid var(--border-subtle);
+  }
+
+  .timeline-layout {
+    display: grid;
+    grid-template-columns: 0.8fr 1.2fr;
+    gap: 3rem;
+  }
+
+  .timeline-sidebar h2 {
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+  }
+
+  .timeline-sidebar p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+  }
+
+  .link-more {
+    display: inline-block;
+    font-weight: 500;
+    color: var(--accent-color);
+    font-size: 0.95rem;
+  }
+
+  /* Portal Grid */
+  .portal-section {
+    margin-bottom: 2rem;
+  }
+
+  .portal-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+  }
+
+  .portal-category {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    padding: 1.5rem;
+    border-radius: 12px;
+  }
+
+  .portal-category h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1.15rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .portal-category ul {
+    list-style: none;
+    padding: 0;
+  }
+
+  .portal-category li {
+    margin-bottom: 0.6rem;
+  }
+
+  .portal-category a {
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    transition: color 0.15s ease;
+  }
+
+  .portal-category a:hover {
+    color: var(--accent-color);
+  }
+
+  @media (max-width: 900px) {
+    .showcase-grid, .dual-code-grid, .timeline-layout {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+    
+    .hero-title { font-size: 2.75rem; }
+    .timeline-section { padding: 2rem 1.5rem; }
+  }
+</style>
