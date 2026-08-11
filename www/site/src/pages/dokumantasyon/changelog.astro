@@ -1,0 +1,60 @@
+---
+import DocLayout from '../../layouts/DocLayout.astro';
+---
+
+<DocLayout title="Değişim Günlüğü (Changelog)" currentPage="changelog" activeTab="changelog">
+  <h1>Hüma Değişim Günlüğü (Changelog)</h1>
+  
+  <p>
+    Bu belge, Hüma programlama dili araç zinciri ve sürümleri boyunca gerçekleştirilen tüm mimari güncellemeleri, dil çekirdeği düzeltmelerini ve sürüm notlarını içerir.
+  </p>
+
+  <h2>Yayımlanmamış — Zemin Mühendisliği</h2>
+  <ul>
+    <li>Hüma'nın AI-öncelikli değil, Türkçe dilbilgisini koruyan genel amaçlı kütüphane zemini olduğu kanonik mühendislik anayasasıyla tanımlandı.</li>
+    <li>Rust araç zinciri 1.94.1'e sabitlendi; CI bağımlılık değiştiren bütün Cargo işlemlerini <code>--locked</code> çalıştıracak biçimde sertleştirildi.</li>
+    <li>Yapısal ayrılma/yönelme ekli aralık ayrıştırması düzeltildi ve bütün izlenen Hüma kaynaklarının ayrıştırılabilirliği yeniden yeşile getirildi.</li>
+    <li>Monolit; <code>syntax</code>, <code>bytecode</code>, <code>runtime</code>, <code>vm</code>, <code>compiler</code>, HMI, saf stdlib ve yetkili alan adaptörlerine ayrıldı. AI/tensor/BPE ile dosya/CSV/JSONL kodu çekirdekten fiziksel olarak çıkarıldı.</li>
+    <li>Kararlı <code>Gc</code> tutamaçları, genç/eskimiş nesiller, yazma bariyeri, minor/major çevrim toplama ve paylaşılmayan heap'li isolate yürütmesi eklendi.</li>
+    <li><code>DiagnosticEnvelope</code> kararlı hata kodu, konum, çağrı izi, güvenli ayrıntılar ve sınırlı neden zinciri taşıyacak biçimde sürümlendi.</li>
+    <li>Yorumlayıcı normatif; VM ve AOT deneysel olarak sürümlü destek tablosuna bağlandı. Üretilmiş ve örnek havuzlu diferansiyel testler eklendi.</li>
+    <li>HMI v1; imza/etki/hata sözleşmesi, sürüm pazarlığı, boyut sınırlı stdio çerçevesi, zaman aşımı ve fail-closed çocuk süreç yaşam döngüsüyle eklendi.</li>
+    <li>Paket API farkı SemVer'e bağlandı; paket ve dağıtım artefaktı Ed25519 imzaları, checksum ve build-provenance üreten çoklu platform yayın hattı eklendi.</li>
+    <li>Parser, HMI çerçevesi ve bytecode doğrulayıcı fuzz hedefleri; GC/isolate soak, paket rollback hata enjeksiyonu ve zamanlanmış dayanıklılık iş akışı eklendi.</li>
+    <li>Adanmış runner performans kapısı; parser, başlangıç, fonksiyon/closure, liste/sözlük, Unicode, modül yükleme, GC, yorumlayıcı ve VM için medyan/p95/RSS izliyor.</li>
+  </ul>
+
+  <h2>Sürüm 0.6.0</h2>
+
+  <h3>Dil Çekirdeği</h3>
+  <ul>
+    <li>Kanonik EBNF eklendi; tanımlayıcılar NFC'ye normalize ediliyor ve kesme işaretli eklerde ünlü uyumu, kaynaştırma, sert ünsüz benzeşmesi ile zincirli ekler doğrulanıyor.</li>
+    <li>Kaynak konumları AST'den bytecode fonksiyonlarına kadar korunuyor; çalışma zamanı hataları kaynak konumlu çağrı izi taşıyor.</li>
+    <li>Yorumlayıcı ve VM için ortak adım, çağrı, çıktı ve koleksiyon sınırları eklendi; panikler yapılandırılmış hataya çevriliyor.</li>
+    <li>Ayrıştırıcı tanıları standart hata nesnelerine taşındı; beklenmeyen ifadeler ve geçersiz atama hedefleri artık sessizce <code>Boş</code> üretmiyor.</li>
+    <li>Bilimsel sayı gösterimi eklendi; sonlu olmayan literal değerler reddediliyor.</li>
+    <li><code>devam</code> ve <code>kır</code> döngü komutları eklendi.</li>
+    <li><code>ve</code> ve <code>veya</code> kısa devreli çalışacak şekilde düzeltildi.</li>
+    <li>Liste/sözlük öğesi ataması, sınır ve tip hatalarıyla güvenli hale getirildi.</li>
+    <li><code>dene/yakala</code>, yorumlayıcı hatalarını yakalayıp programa devam edebiliyor.</li>
+  </ul>
+
+  <h3>VM ve AOT</h3>
+  <ul>
+    <li>Bytecode VM gerçek çağrı frame'leri ve sözcüksel closure ortamları kullanıyor.</li>
+    <li>Bytecode kapsayıcısı fonksiyon tablosu ve kaynak konumları taşıyan v4'e yükseltildi.</li>
+    <li>AOT derleyici desteklenmeyen AST için sahte <code>0</code> çıktısı üretmek yerine derleme hatası veriyor.</li>
+    <li>JSON dönüşümü sonlu olmayan, döngüsel veya temsil edilemeyen değerleri sessiz varsayılanlarla değiştirmek yerine reddediyor.</li>
+    <li>Bytecode doğrulaması kontrol akışı boyunca yığın etkilerini denetliyor.</li>
+  </ul>
+
+  <h3>Kalite ve Temizlik</h3>
+  <ul>
+    <li>Dosya, ağ, süreç, FFI, veritabanı ve GUI erişimi varsayılan kapalı, ayrı CLI yeteneklerine taşındı.</li>
+    <li>Yerel paket çözümleyici tam geçişli grafiği yazmadan önce çözüyor; SemVer, döngü, çakışma ve özet doğruluyor.</li>
+    <li>Paket betikleri kabuk yerine doğrudan program/argv olarak çalıştırılıyor.</li>
+    <li>FFI ad/yol/imza ve kitaplık sayısı sınırlandırıldı; <code>ffi_boşalt</code> eklendi.</li>
+    <li><code>cargo clippy --workspace --all-targets -- -D warnings</code> sıfır uyarıya indirildi.</li>
+    <li>Astro tabanlı teknik dökümantasyon sitesi 100% doğrulanmış içerik ve yerel belgelerle sıfırdan inşa edildi.</li>
+  </ul>
+</DocLayout>

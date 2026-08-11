@@ -1,0 +1,87 @@
+---
+import DocLayout from '../../layouts/DocLayout.astro';
+
+const codeFib = `fibonacci fonksiyon olsun n alsın {
+    n <= 1 ise { n'i döndür }
+    (fibonacci(n - 1) + fibonacci(n - 2))'yi döndür
+}
+
+i = 0'dan 9'a kadar {
+    "fib(" + i + ") = " + fibonacci(i)'yi yazdır
+}`;
+
+const codeNlp = `"nlp_temel"'i yükle
+
+metin = "Hüma programlama dili Türkçe dilbilgisini korur." olsun
+
+// Metni token'lara ayırma
+tokens = nlp_islemci.tokenize(metin) olsun
+"Token'lar: "'ı yazdır
+tokens'ı yazdır
+
+// Kelime köklerini bulma
+kökler = nlp_stemmer.stem_liste(tokens) olsun
+"Kökler: "'ı yazdır
+kökler'i yazdır
+
+// POS (Kelime türü) etiketleme
+pos_sonucu = nlp_analizci.pos_etiketle(tokens) olsun
+"POS Etiketleri: "'ni yazdır
+pos_sonucu'nu yazdır`;
+
+const codeClassEx = `sayaç sınıf olsun {
+    değer = 0 olsun
+
+    artır fonksiyon olsun miktar alsın {
+        kendisi.değer = kendisi.değer + miktar olsun
+        kendisi.değer'i döndür
+    }
+
+    sıfırla fonksiyon olsun {
+        kendisi.değer = 0 olsun
+        kendisi.değer'i döndür
+    }
+}
+
+s = sayaç() olsun
+s.artır(5)'i yazdır
+s.artır(10)'u yazdır
+s.sıfırla()'yı yazdır`;
+
+const codeTryCatchEx = `dene {
+    x = 10 / 0 olsun
+    x'i yazdır
+} yakala hata {
+    "İşlem sırasında hata oluştu: " + hata'yı yazdır
+}
+
+"Program güvenle devam ediyor..."'yu yazdır`;
+---
+
+<DocLayout title="Örnek Programlar" currentPage="ornekler" activeTab="ornekler">
+  <h1>Örnek Programlar</h1>
+  
+  <p>
+    Aşağıdaki kod örnekleri, Hüma'nın kanonik sözdizimi ve çalışma zamanında gerçekten çalışan kodlardan derlenmiştir.
+  </p>
+
+  <h2>1. Fibonacci Dizisi Hesaplama</h2>
+  <p>Özyinelemeli fonksiyon tanımı ve <code>...'den ...'e kadar</code> döngü kullanımı:</p>
+
+  <pre><code>{codeFib}</code></pre>
+
+  <h2>2. Metin Analizi ve POS Etiketleme (<code>nlp_temel</code>)</h2>
+  <p>Türkçe metin temizleme, tokenizasyon ve kelime türü etiketleme:</p>
+
+  <pre><code>{codeNlp}</code></pre>
+
+  <h2>3. Sınıf ve Nesne Tabanlı Sayaç</h2>
+  <p>Sınıf tanımı, alan başlatma ve <code>kendisi</code> referansı ile metot çağrısı:</p>
+
+  <pre><code>{codeClassEx}</code></pre>
+
+  <h2>4. Güvenli Hata Yakalama (<code>dene/yakala</code>)</h2>
+  <p>Çalışma zamanı hatalarını güvenli şekilde ele alma:</p>
+
+  <pre><code>{codeTryCatchEx}</code></pre>
+</DocLayout>

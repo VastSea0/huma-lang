@@ -1,0 +1,98 @@
+---
+import DocLayout from '../../layouts/DocLayout.astro';
+
+const codeClone = `# Depoyu klonlayın
+git clone https://github.com/VastSea0/huma-lang.git
+cd huma-lang
+
+# Release modunda kilitli bağımlılıklarla derleyin
+cargo build --release --locked
+
+# Kurulumu doğrulayın
+./target/release/huma --version`;
+
+const codeCheck = `cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --all-targets --locked
+cargo audit
+cargo run --locked -p huma-cli -- test tests`;
+
+const codeNew = `# Yeni bir paket oluşturun
+huma paket yeni fibonacci_uygulamasi
+cd fibonacci_uygulamasi`;
+
+const codeFibApp = `fibonacci fonksiyon olsun n alsın {
+    n <= 1 ise { n'i döndür }
+    (fibonacci(n - 1) + fibonacci(n - 2))'yi döndür
+}
+
+i = 0'dan 9'a kadar {
+    "fib(" + i + ") = " + fibonacci(i)'yi yazdır
+}`;
+
+const codeRun = `huma paket run baslat`;
+
+const codePerm = `# Örnek izinli çalıştırma:
+huma run uygulama.hb --izin dosya-okuma --izin ağ-istemci`;
+---
+
+<DocLayout title="Kurulum ve Başlarken" currentPage="kurulum" activeTab="kurulum">
+  <h1>Kurulum ve Başlarken</h1>
+  
+  <p>
+    Hüma araç zinciri Rust 1.94.1 ile derlenmektedir. Proje bağımlılıkları ve derleme adımları <code>rust-toolchain.toml</code> ve <code>Cargo.lock</code> ile kilitlenmiştir.
+  </p>
+
+  <h2>1. Kaynak Koddan Derleme</h2>
+
+  <p>Hüma CLI aracını kaynak koddan derlemek için bilgisayarınızda Git ve Rust kurulu olmalıdır:</p>
+
+  <pre><code>{codeClone}</code></pre>
+
+  <h2>2. Geliştirici Kabul Denetimi</h2>
+
+  <p>Katkıda bulunmak veya yerel ortamdaki testleri tam doğrulamak için aşağıdaki kabul komut setini çalıştırabilirsiniz:</p>
+
+  <pre><code>{codeCheck}</code></pre>
+
+  <h2>3. İlk Paketi Oluşturma ve Çalıştırma</h2>
+
+  <p>
+    Hüma'da her program paket yöneticisiyle oluşturulur ve <code>huma.json</code> içinde tanımlı paket betiği üzerinden çalıştırılır. Gevşek <code>.hb</code> dosyalarının doğrudan yürütülmesi kapalıdır.
+  </p>
+
+  <pre><code>{codeNew}</code></pre>
+
+  <p>Oluşturulan projenin ana dosyasını düzenleyin:</p>
+
+  <pre><code>{codeFibApp}</code></pre>
+
+  <p>Paket betiğini çalıştırın:</p>
+
+  <pre><code>{codeRun}</code></pre>
+
+  <h2>4. Güvenlik ve İzin Modeli</h2>
+
+  <p>
+    Hüma'da dış dünya yetenekleri (dosya erişimi, ağ, veritabanı vb.) varsayılan olarak tamamen kapalıdır. Paket veya betik çalıştırılırken açık izinler tanımlanmalıdır:
+  </p>
+
+  <pre><code>{codePerm}</code></pre>
+
+  <h3>Mevcut İzin Bayrakları:</h3>
+  <ul>
+    <li><code>dosya-okuma</code>: Dosyaları okuma izni (<code>dosya.hb</code> vb.)</li>
+    <li><code>dosya-yazma</code>: Dosya oluşturma ve yazma izni</li>
+    <li><code>ağ-istemci</code>: Dış sunuculara HTTP/TCP istekleri atma izni</li>
+    <li><code>ağ-sunucu</code>: Yerel ağ sunucusu (HTTP server) başlatma izni</li>
+    <li><code>süreç</code>: Alt süreç çalıştırma izni</li>
+    <li><code>veritabanı</code>: SQLite veritabanı erişim izni</li>
+    <li><code>ffi</code>: Güvenilir süreç içi FFI yükleme izni</li>
+    <li><code>gui</code>: Pencere arayüzü başlatma izni</li>
+  </ul>
+
+  <div class="alert">
+    <div class="alert-title">Güvenlik Sınırı Uyarısı</div>
+    <code>--tüm-izinler</code> bayrağı yalnız güvenilen kod içindir ve bir işletim sistemi sandbox'ı sağlamaz. İzin verilen komutlar Hüma sürecinin işletim sistemi yetkileriyle çalışır.
+  </div>
+</DocLayout>

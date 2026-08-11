@@ -1,0 +1,145 @@
+---
+import DocLayout from '../../layouts/DocLayout.astro';
+
+const codeAssign = `sayı = 42 olsun
+ondalık = 1.25e-3 olsun
+metin = "Türkçe UTF-8" olsun
+evet = doğru olsun
+hayır = yanlış olsun
+yok = boş olsun
+dizi = [1, 2, 3] olsun
+sözlük = {"ad": "Hüma", "sürüm": 0.6} olsun`;
+
+const codeSuffix = `değer'i yazdır
+metin'i döndür
+1'den 5'e kadar
+dizi'nin uzunluğu`;
+
+const codeCondition = `x > 0 ve x < 10 ise {
+    "Aralıkta"'yı yazdır
+} yoksa {
+    "Aralık dışında"'yı yazdır
+}`;
+
+const codeLoops = `// 1. Süreç döngüsü
+i = 0 olsun
+i < 10 olduğu sürece {
+    i = i + 1 olsun
+    i = 4 ise { devam }
+    i = 8 ise { kır }
+}
+
+// 2. Aralık döngüsü (iki sınır da dahildir)
+j = 1'den 5'e kadar {
+    j'yi yazdır
+}`;
+
+const codeFunc = `topla fonksiyon olsun a, b alsın {
+    (a + b)'yi döndür
+}
+
+sonuç = topla(4, 5) olsun
+sonuç'u yazdır`;
+
+const codeFuncNatural = `1 ile 2 ve 3'ü topla3`;
+
+const codeClass = `sayaç sınıf olsun {
+    değer = 0 olsun
+
+    artır fonksiyon olsun miktar alsın {
+        kendisi.değer = kendisi.değer + miktar olsun
+        kendisi.değer'i döndür
+    }
+}
+
+s = sayaç() olsun
+s.artır(2)'yi yazdır`;
+
+const codeTryCatch = `dene {
+    olmayan_değişken'i yazdır
+} yakala hata {
+    "Yakalandı: " + hata'yı yazdır
+}`;
+
+const codeModule = `// Modül yükleme biçimleri:
+"matematik.hb"'yi yükle
+yükle "hesap.hb" olarak hesap
+
+hesap.topla(2, 3)'ü yazdır
+
+// Modül içinde dışa aktarma:
+topla'yı dışa aktar`;
+---
+
+<DocLayout title="Temel Sözdizimi" currentPage="sozdizimi" activeTab="sozdizimi">
+  <h1>Hüma Temel Sözdizimi</h1>
+  
+  <p>
+    Hüma'nın kanonik sözdizimi UTF-8 kaynak dosyalarında tanımlıdır (<code>.hb</code> uzantılı). Türkçe tanımlayıcılar ve kesme işaretinden sonraki ek ayırıcıları lexer katmanında dilbilgisi kurallarına göre doğrulanır.
+  </p>
+
+  <h2>1. Değişken Atama ve Türler</h2>
+
+  <p>Atama cümleleri <code>olsun</code> anahtar kelimesi ile biter. Hüma 0.6 dinamik tiplidir ve sayısal değerler IEEE-754 <code>f64</code> hassasiyetindedir.</p>
+
+  <pre><code>{codeAssign}</code></pre>
+
+  <h2>2. Ek Ayıracı ve Türkçe Ses Kuralları</h2>
+
+  <p>
+    Kesme işareti (<code>'</code>), Hüma tanımlayıcılarını Türkçe ek ayırıcılarından ayıran programlama dili işaretidir:
+  </p>
+
+  <pre><code>{codeSuffix}</code></pre>
+
+  <h3>Kabul Edilen Ek Biçimleri:</h3>
+  <ul>
+    <li><strong>Belirtme Eki:</strong> <code>i ı u ü yi yı yu yü ni nı nu nü</code></li>
+    <li><strong>Yönelme Eki:</strong> <code>a e ya ye</code></li>
+    <li><strong>Bulunma Eki:</strong> <code>da de ta te</code></li>
+    <li><strong>Ayrılma Eki:</strong> <code>dan den tan ten</code></li>
+    <li><strong>İlgi Eki:</strong> <code>nin nın nun nün in ın un ün</code> (Özellik/uzunluk erişimi)</li>
+    <li><strong>Diğer Ekler:</strong> <code>si sı su sü lar ler ca ce ça çe daki deki taki teki la le yla yle</code></li>
+  </ul>
+
+  <p>Lexer, tanım adlarında ünlü uyumunu (büyük/küçük ünlü uyumu), <code>y/n</code> kaynaştırmasını ve sert ünsüz benzeşmesini (<code>d → t</code>, <code>c → ç</code>) otomatik doğrular. Bilinmeyen ekler sözdizimi hatası üretir.</p>
+
+  <h2>3. Akış Kontrolü ve Koşullar</h2>
+
+  <p>Koşullar <code>ise</code> ve <code>yoksa</code> blokları ile kurulur:</p>
+
+  <pre><code>{codeCondition}</code></pre>
+
+  <p>Mantıksal operatörler <code>ve</code> ile <code>veya</code> kısa devrelidir (short-circuit).</p>
+
+  <h2>4. Döngüler</h2>
+
+  <p>Hüma iki ana döngü biçimi sunar: <code>olduğu sürece</code> (while) ve <code>...'den ...'e kadar</code> (range-for).</p>
+
+  <pre><code>{codeLoops}</code></pre>
+
+  <h2>5. Fonksiyonlar</h2>
+
+  <p>Fonksiyonlar <code>fonksiyon olsun ... alsın</code> ile tanımlanır. Örtük dönüş yoktur; değer döndürmek için <code>döndür</code> kullanılır.</p>
+
+  <pre><code>{codeFunc}</code></pre>
+
+  <h3>Doğal Çağrı Biçimi:</h3>
+  <pre><code>{codeFuncNatural}</code></pre>
+
+  <h2>6. Sınıflar ve Nesneler</h2>
+
+  <p>Sınıflar <code>sınıf olsun</code> ile tanımlanır. Alan erişimi ve örnek referansı <code>kendisi</code> üzerinden yapılır.</p>
+
+  <pre><code>{codeClass}</code></pre>
+
+  <h2>7. Hata Yönetimi</h2>
+
+  <p>Hatalar <code>dene &#123; ... &#125; yakala hata &#123; ... &#125;</code> bloğu ile yakalanır:</p>
+
+  <pre><code>{codeTryCatch}</code></pre>
+
+  <h2>8. Modül Yükleme ve Dışa Aktarma</h2>
+
+  <pre><code>{codeModule}</code></pre>
+</DocLayout>

@@ -1,0 +1,116 @@
+---
+import DocLayout from '../../layouts/DocLayout.astro';
+---
+
+<DocLayout title="Dökümantasyon Genel Bakış" currentPage="kurulum" activeTab="kurulum">
+  <h1>Hüma Dökümantasyon Portalı</h1>
+  <p>
+    Hüma programlama dilinin resmi teknik dökümantasyonuna hoş geldiniz. Hüma, Türkçe dilbilgisine dayanan ancak genel amaçlı programlama dili ilkelerini ve katı çalışma zamanı güvenlik sınırlarını koruyan bir programlama dilidir.
+  </p>
+
+  <div class="alert">
+    <div class="alert-title">Sürüm Notu (v0.6.0)</div>
+    Hüma henüz ilk aşamalarındadır. Yorumlayıcı kanonik yürütme yoludur. Bytecode VM ve Cranelift AOT arka uçları doğrulanmış alt kümelerde çalışmaktadır.
+  </div>
+
+  <h2>Dökümantasyon Kütüphanesi</h2>
+
+  <div class="sections-grid">
+    <a href="/dokumantasyon/kurulum" class="doc-card">
+      <h3>1. Kurulum & Başlarken ➔</h3>
+      <p>Rust 1.94.1 araç zinciri ile derleme, <code>huma paket yeni</code> ile proje oluşturma ve <code>--izin</code> güvenlik modeli.</p>
+    </a>
+
+    <a href="/dokumantasyon/sozdizimi" class="doc-card">
+      <h3>2. Temel Sözdizimi ➔</h3>
+      <p><code>olsun</code> atamaları, ek ayıracı (<code>'i</code>, <code>'e</code>, <code>'den</code>, <code>'nin</code>), <code>ise/yoksa</code> koşulları, döngüler ve fonksiyonlar.</p>
+    </a>
+
+    <a href="/dokumantasyon/dil-tanimi" class="doc-card">
+      <h3>3. Dil Tanımı Spesifikasyonu ➔</h3>
+      <p>UTF-8 kaynaklar, IEEE-754 <code>f64</code> değer modeli, Unicode NFC tanımlayıcılar ve normatif kurallar.</p>
+    </a>
+
+    <a href="/dokumantasyon/dil-grameri" class="doc-card">
+      <h3>4. Kanonik Dil Grameri (EBNF) ➔</h3>
+      <p>Lexer ve parser dilbilgisi kurallarının makinece okunabilir EBNF tanımı.</p>
+    </a>
+
+    <a href="/dokumantasyon/bytecode-bicimi" class="doc-card">
+      <h3>5. Bytecode Biçimi (.hbc v4) ➔</h3>
+      <p>4 numaralı <code>.hbc</code> dosya kapsayıcısı, SHA-256 doğrulama, JSON payload ve VM yığın kontrolleri.</p>
+    </a>
+
+    <a href="/dokumantasyon/hmi" class="doc-card">
+      <h3>6. HMI v1 Süreç Dışı Sınır ➔</h3>
+      <p>Native uzantılar için tip güvenli, 16 MiB çerçeve ve zaman aşımı korumalı sürümlü mesaj protokolü.</p>
+    </a>
+
+    <a href="/dokumantasyon/paket-guvenligi" class="doc-card">
+      <h3>7. Paket Güvenliği & İmzalar ➔</h3>
+      <p>Katı JSON şeması, SemVer bağımlılık kilit mekanizması, Ed25519 paket imzaları ve <code>huma.lock</code>.</p>
+    </a>
+
+    <a href="/dokumantasyon/muhendislik-anayasasi" class="doc-card">
+      <h3>8. Mühendislik Anayasası ➔</h3>
+      <p>Ürün yönü, değişmezler, bellek ve isolate modeli, backend sözleşmesi ve kabul kapıları.</p>
+    </a>
+
+    <a href="/dokumantasyon/durum-ve-yol-haritasi" class="doc-card">
+      <h3>9. Durum ve Yol Haritası ➔</h3>
+      <p>Doğrulanmış 0.6 çekirdek sınırları ve 1.0 kabul ölçütleri.</p>
+    </a>
+
+    <a href="/dokumantasyon/kutuphaneler" class="doc-card">
+      <h3>10. Kütüphane Envanteri ➔</h3>
+      <p>Matematik, istatistik, liste, dizgi, dosya, rastgelelik, zaman ve alan adaptörleri.</p>
+    </a>
+
+    <a href="/dokumantasyon/performans" class="doc-card">
+      <h3>11. Performans Ölçümü ➔</h3>
+      <p>Criterion mikro benchmark'lar, <code>huma-perf</code> PR gerileme kapısı ve tepe bellek takibi.</p>
+    </a>
+
+    <a href="/dokumantasyon/benchmark" class="doc-card">
+      <h3>12. Diller Arası Benchmark ➔</h3>
+      <p>Python, Node.js, Ruby, C, Rust, Swift ve Java ile uçtan uca karşılaştırma sonuçları.</p>
+    </a>
+  </div>
+</DocLayout>
+
+<style>
+  .sections-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+  }
+
+  .doc-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    padding: 1.5rem;
+    border-radius: 10px;
+    display: block;
+    transition: all 0.2s ease;
+  }
+
+  .doc-card:hover {
+    border-color: var(--accent-color);
+    transform: translateY(-2px);
+  }
+
+  .doc-card h3 {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    font-size: 1.15rem;
+    color: var(--text-heading);
+  }
+
+  .doc-card p {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+</style>
