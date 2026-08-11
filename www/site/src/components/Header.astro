@@ -1,0 +1,133 @@
+---
+const { activeTab = '' } = Astro.props;
+---
+
+<header class="header">
+  <div class="header-container">
+    <div class="brand">
+      <a href="/" class="logo">
+        <span class="logo-title">Hüma</span>
+        <span class="version-badge">v0.6.0</span>
+      </a>
+    </div>
+
+    <nav class="nav">
+      <a href="/" class={activeTab === 'home' ? 'active' : ''}>Ana Sayfa</a>
+      <a href="/dokumantasyon/kurulum" class={activeTab === 'kurulum' ? 'active' : ''}>Kurulum</a>
+      <a href="/dokumantasyon/sozdizimi" class={activeTab === 'sozdizimi' ? 'active' : ''}>Sözdizimi</a>
+      <a href="/dokumantasyon/kutuphaneler" class={activeTab === 'kutuphaneler' ? 'active' : ''}>Kütüphaneler</a>
+      <a href="/dokumantasyon/ornekler" class={activeTab === 'ornekler' ? 'active' : ''}>Örnekler</a>
+      <a href="https://github.com/vastsea0/huma-lang" target="_blank" rel="noopener noreferrer" class="github-icon-link" aria-label="GitHub Deposu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+        </svg>
+      </a>
+    </nav>
+  </div>
+</header>
+
+<style>
+  .header {
+    background-color: var(--bg-primary);
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+  }
+
+  .header-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+  }
+
+  .logo {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    color: var(--text-heading);
+    font-family: var(--font-serif);
+    font-weight: 700;
+    font-size: 1.6rem;
+    letter-spacing: -0.02em;
+  }
+
+  .version-badge {
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    color: var(--accent-color);
+    background-color: var(--accent-light);
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+  }
+
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .nav a:not(.github-icon-link) {
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    font-weight: 400;
+    position: relative;
+    padding: 0.25rem 0;
+  }
+
+  .nav a:not(.github-icon-link):hover,
+  .nav a.active:not(.github-icon-link) {
+    color: var(--text-heading);
+    font-weight: 500;
+  }
+
+  .nav a.active:not(.github-icon-link)::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: var(--accent-color);
+  }
+
+  .github-icon-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-heading);
+    padding: 0.4rem;
+    border-radius: 50%;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .github-icon-link:hover {
+    background-color: var(--bg-secondary);
+    color: var(--accent-color);
+  }
+
+  @media (max-width: 768px) {
+    .header-container {
+      padding: 1rem;
+    }
+
+    .nav {
+      gap: 0.85rem;
+      overflow-x: auto;
+    }
+
+    .nav a:not(.github-icon-link) {
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
+  }
+</style>

@@ -1,0 +1,42 @@
+---
+import Layout from './Layout.astro';
+import Sidebar from '../components/Sidebar.astro';
+
+interface Props {
+  title: string;
+  description?: string;
+  currentPage: string;
+  activeTab?: string;
+}
+
+const { title, description, currentPage, activeTab } = Astro.props;
+---
+
+<Layout title={title} description={description} activeTab={activeTab || currentPage}>
+  <div class="doc-container">
+    <Sidebar currentPage={currentPage} />
+    <article class="doc-content">
+      <slot />
+    </article>
+  </div>
+</Layout>
+
+<style>
+  .doc-container {
+    display: flex;
+    gap: 3.5rem;
+    align-items: flex-start;
+  }
+
+  .doc-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  @media (max-width: 768px) {
+    .doc-container {
+      flex-direction: column;
+      gap: 2rem;
+    }
+  }
+</style>
