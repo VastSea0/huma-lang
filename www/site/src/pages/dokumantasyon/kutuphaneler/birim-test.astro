@@ -1,0 +1,56 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+
+const codeUsage = `"birim_test.hb"'yi yükle
+"matematik.hb"'yi yükle
+
+test_et("Toplama Testi", fonksiyon olsun {
+    iddia_et((2 + 3) = 5, "2 + 3 5 olmalı")
+    iddia_et(karesi(4) = 16, "4'ün karesi 16 olmalı")
+})
+
+test_raporu()`;
+---
+
+<DocLayout title="birim_test.hb Kütüphanesi" currentPage="kutuphaneler" activeTab="kutuphaneler">
+  <h1><code>birim_test.hb</code> — Birim Test Kütüphanesi</h1>
+  
+  <p>
+    <code>birim_test.hb</code>, Hüma kodları için birim test senaryoları tanımlama, iddiaları (assertion) doğrulama ve özet test raporları üretme araçlarını sunar.
+  </p>
+
+  <h2>Modülü Yükleme</h2>
+  <pre><code>"birim_test.hb"'yi yükle</code></pre>
+
+  <h2>Detaylı API Referansı</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Fonksiyon</th>
+        <th>Parametreler</th>
+        <th>Açıklama</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>test_et(ad, test_fn)</code></td>
+        <td><code>ad</code> (Metin), <code>test_fn</code> (Fonksiyon)</td>
+        <td>İsimlendirilmiş bir birim test bloğunu çalıştırır.</td>
+      </tr>
+      <tr>
+        <td><code>iddia_et(koşul, mesaj)</code></td>
+        <td><code>koşul</code> (Mantıksal), <code>mesaj</code> (Metin)</td>
+        <td>Koşulun doğru (1) olduğunu iddia eder. Yanlışsa test hatası kaydeder.</td>
+      </tr>
+      <tr>
+        <td><code>test_raporu()</code></td>
+        <td>Hiçbiri</td>
+        <td>Çalıştırılan toplam, başarılı ve başarısız test raporunu terminale basar.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Kod Örneği</h2>
+  <pre><code>{codeUsage}</code></pre>
+</DocLayout>

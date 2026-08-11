@@ -1,0 +1,61 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+
+const codeUsage = `# Çalıştırma izni: huma run uygulama.hb --izin dosya-okuma
+
+"dosya.hb"'yi yükle
+
+içerik = güvenli_oku("veri.txt") olsun
+satırlar = satırlara_ayır(içerik) olsun
+
+"Toplam Satır Sayısı: " + satırlar'ın uzunluğu'nu yazdır`;
+---
+
+<DocLayout title="dosya.hb Kütüphanesi" currentPage="kutuphaneler" activeTab="kutuphaneler">
+  <h1><code>dosya.hb</code> — Güvenli Dosya İşlemleri Kütüphanesi</h1>
+  
+  <p>
+    <code>dosya.hb</code>, yerel dosya sisteminden metin dosyalarını güvenli okuma ve satır tabanlı bölme işlevlerini sağlar.
+  </p>
+
+  <div class="alert">
+    <div class="alert-title">İzin Gereksinimi</div>
+    Bu modülü kullanmak için CLI çalıştırmasında <code>--izin dosya-okuma</code> bayrağı verilmelidir.
+  </div>
+
+  <h2>Modülü Yükleme ve İzin</h2>
+  <pre><code># CLI çalıştırma komutu:
+huma run uygulama.hb --izin dosya-okuma</code></pre>
+
+  <pre><code>"dosya.hb"'yi yükle</code></pre>
+
+  <h2>Detaylı API Referansı</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Fonksiyon</th>
+        <th>Parametreler</th>
+        <th>Dönüş Değeri</th>
+        <th>Açıklama</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>güvenli_oku(dosya_yolu)</code></td>
+        <td><code>dosya_yolu</code> (Metin)</td>
+        <td>Metin</td>
+        <td>Belirtilen yoldaki dosyayı okur. Hata durumunda boş metin döndürür.</td>
+      </tr>
+      <tr>
+        <td><code>satırlara_ayır(metin)</code></td>
+        <td><code>metin</code> (Metin)</td>
+        <td>Liste (Metin Dizisi)</td>
+        <td>Metni <code>\n</code> ve <code>\r</code> karaktere göre satır dizisine çevirir.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Kod Örneği</h2>
+  <pre><code>{codeUsage}</code></pre>
+</DocLayout>

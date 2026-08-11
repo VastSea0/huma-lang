@@ -1,0 +1,74 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+
+const codeUsage = `"istatistik.hb"'yi yükle
+
+veri = [10, 20, 30, 40, 50] olsun
+
+ort = ortalama(veri) olsun         // 30
+en_b = en_büyük(veri) olsun        // 50
+en_k = en_küçük(veri) olsun        // 10
+std = standart_sapma(veri) olsun
+
+"Ortalama: " + ort'u yazdır
+"Standart Sapma: " + std'yi yazdır`;
+---
+
+<DocLayout title="istatistik.hb Kütüphanesi" currentPage="kutuphaneler" activeTab="kutuphaneler">
+  <h1><code>istatistik.hb</code> — İstatistiksel Analiz Kütüphanesi</h1>
+  
+  <p>
+    <code>istatistik.hb</code>, veri dizileri üzerinde ortalama, en büyük/küçük değer bulma, varyans ve standart sapma hesaplamalarını yapan standart gömülü kütüphanedir.
+  </p>
+
+  <h2>Modülü Yükleme</h2>
+  <pre><code>"istatistik.hb"'yi yükle</code></pre>
+
+  <h2>Detaylı API Referansı</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Fonksiyon</th>
+        <th>Parametreler</th>
+        <th>Dönüş Değeri</th>
+        <th>Açıklama</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>ortalama(liste)</code></td>
+        <td><code>liste</code> (Sayı Dizisi)</td>
+        <td>Sayı</td>
+        <td>Dizideki sayıların aritmetik ortalamasını hesaplar.</td>
+      </tr>
+      <tr>
+        <td><code>en_büyük(liste)</code></td>
+        <td><code>liste</code> (Sayı Dizisi)</td>
+        <td>Sayı</td>
+        <td>Dizideki en büyük elemanı döndürür.</td>
+      </tr>
+      <tr>
+        <td><code>en_küçük(liste)</code></td>
+        <td><code>liste</code> (Sayı Dizisi)</td>
+        <td>Sayı</td>
+        <td>Dizideki en küçük elemanı döndürür.</td>
+      </tr>
+      <tr>
+        <td><code>varyans(liste)</code></td>
+        <td><code>liste</code> (Sayı Dizisi)</td>
+        <td>Sayı</td>
+        <td>Popülasyon varyansını hesaplar.</td>
+      </tr>
+      <tr>
+        <td><code>standart_sapma(liste)</code></td>
+        <td><code>liste</code> (Sayı Dizisi)</td>
+        <td>Sayı</td>
+        <td>Karekök varyans üzerinden standart sapmayı hesaplar.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Kod Örneği</h2>
+  <pre><code>{codeUsage}</code></pre>
+</DocLayout>

@@ -1,0 +1,75 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+
+const codeUsage = `"yapay_zeka_temel.hb"'yi yükle
+
+v1 = [1.0, 2.0, 3.0] olsun
+v2 = [4.0, 5.0, 6.0] olsun
+
+// Nokta çarpım (Dot product)
+dot = vektör_nokta_çarpım(v1, v2) olsun
+"Nokta Çarpım: " + dot'u yazdır
+
+// ReLU Aktivasyonu
+act = relu(-2.5) olsun // 0.0
+"ReLU(-2.5): " + act'ı yazdır`;
+---
+
+<DocLayout title="yapay_zeka_temel.hb Kütüphanesi" currentPage="kutuphaneler" activeTab="kutuphaneler">
+  <h1><code>yapay_zeka_temel.hb</code> — Vektör ve Matris Kütüphanesi</h1>
+  
+  <p>
+    <code>yapay_zeka_temel.hb</code>, dizi tabanlı temel vektör işlemleri, matris nokta çarpanları, relu/sigmoid aktivasyon fonksiyonları ve kayıp (loss) metriklerini sağlar.
+  </p>
+
+  <h2>Modülü Yükleme</h2>
+  <pre><code>"yapay_zeka_temel.hb"'yi yükle</code></pre>
+
+  <h2>Detaylı API Referansı</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Fonksiyon</th>
+        <th>Parametreler</th>
+        <th>Dönüş Değeri</th>
+        <th>Açıklama</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>vektör_nokta_çarpım(v1, v2)</code></td>
+        <td><code>v1, v2</code> (Sayı Dizileri)</td>
+        <td>Sayı</td>
+        <td>İki vektörün nokta çarpımını (dot product) hesaplar.</td>
+      </tr>
+      <tr>
+        <td><code>vektör_topla(v1, v2)</code></td>
+        <td><code>v1, v2</code> (Sayı Dizileri)</td>
+        <td>Sayı Dizisi</td>
+        <td>İki vektörü eleman eleman toplar.</td>
+      </tr>
+      <tr>
+        <td><code>relu(x)</code></td>
+        <td><code>x</code> (Sayı)</td>
+        <td>Sayı</td>
+        <td>Rectified Linear Unit aktivasyon işlevi (<code>max(0, x)</code>).</td>
+      </tr>
+      <tr>
+        <td><code>sigmoid(x)</code></td>
+        <td><code>x</code> (Sayı)</td>
+        <td>Sayı</td>
+        <td>Sigmoid aktivasyon işlevi (<code>1 / (1 + e^-x)</code>).</td>
+      </tr>
+      <tr>
+        <td><code>mse_kayıp(tahminler, hedefler)</code></td>
+        <td><code>tahminler, hedefler</code></td>
+        <td>Sayı</td>
+        <td>Ortalama Kare Hata (Mean Squared Error) kayıp değerini hesaplar.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Kod Örneği</h2>
+  <pre><code>{codeUsage}</code></pre>
+</DocLayout>

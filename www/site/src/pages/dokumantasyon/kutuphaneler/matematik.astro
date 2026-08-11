@@ -1,0 +1,136 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+
+const codeLoad = `"matematik.hb"'yi yükle
+
+// veya kanonik yükleme biçimi:
+yükle "matematik.hb"`;
+
+const codeUsage = `"matematik.hb"'yi yükle
+
+x = karesi(5) olsun          // 25
+y = asal_mı(17) olsun        // 1 (doğru)
+z = ebob(12, 18) olsun       // 6
+k = ekok(4, 6) olsun         // 12
+r = derece_radyan(180) olsun // 3.141592653589793
+
+"17 Asal mı?: " + y'yi yazdır
+"12 ve 18 EBOB: " + z'yi yazdır`;
+---
+
+<DocLayout title="matematik.hb Kütüphanesi" currentPage="kutuphaneler" activeTab="kutuphaneler">
+  <h1><code>matematik.hb</code> — Temel Matematik Kütüphanesi</h1>
+  
+  <p>
+    <code>matematik.hb</code>, Hüma programlama dili için temel aritmetik, üssel işlevler, EBOB/EKOK, asallık denetimi ve trigonometri dönüştürücülerini sağlayan standart gömülü kütüphanedir.
+  </p>
+
+  <h2>Modülü Yükleme ve Kullanım</h2>
+  <p>Bu modül binary içine gömülüdür; herhangi bir ek izin gerektirmez ve doğrudan yüklenebilir:</p>
+
+  <pre><code>{codeLoad}</code></pre>
+
+  <h2>Sabitler</h2>
+  <ul>
+    <li><code>PI</code>: <code>3.141592653589793</code></li>
+    <li><code>E</code>: <code>2.718281828459045</code></li>
+    <li><code>TAU</code>: <code>6.283185307179586</code></li>
+    <li><code>SONSUZ</code>: <code>1.0e308</code></li>
+  </ul>
+
+  <h2>Detaylı API Referansı</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Fonksiyon</th>
+        <th>Parametreler</th>
+        <th>Dönüş Değeri</th>
+        <th>Açıklama</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>karesi(n)</code></td>
+        <td><code>n</code> (Sayı)</td>
+        <td>Sayı (<code>n * n</code>)</td>
+        <td>Sayı kendisiyle çarpar.</td>
+      </tr>
+      <tr>
+        <td><code>küpü(n)</code></td>
+        <td><code>n</code> (Sayı)</td>
+        <td>Sayı (<code>n * n * n</code>)</td>
+        <td>Sayının küpünü hesaplar.</td>
+      </tr>
+      <tr>
+        <td><code>mutlak(n)</code></td>
+        <td><code>n</code> (Sayı)</td>
+        <td>Sayı (<code>|n|</code>)</td>
+        <td>Güvenli mutlak değer döndürür.</td>
+      </tr>
+      <tr>
+        <td><code>kuvvet(a, b)</code></td>
+        <td><code>a</code> (Taban), <code>b</code> (Üs)</td>
+        <td>Sayı (<code>a^b</code>)</td>
+        <td><code>a</code> sayısının <code>b</code>-inci kuvvetini hesaplar.</td>
+      </tr>
+      <tr>
+        <td><code>yuvarla(n)</code></td>
+        <td><code>n</code> (Sayı)</td>
+        <td>Sayı (Tamsayı)</td>
+        <td>En yakın tamsayıya yuvarlar (<code>&gt;= 0.5</code> yukarı).</td>
+      </tr>
+      <tr>
+        <td><code>faktöriyel(n)</code></td>
+        <td><code>n</code> (Tamsayı)</td>
+        <td>Sayı (<code>n!</code>)</td>
+        <td>Özyinelemeli faktöriyel hesaplar.</td>
+      </tr>
+      <tr>
+        <td><code>log_taban(x, taban)</code></td>
+        <td><code>x, taban</code></td>
+        <td>Sayı</td>
+        <td>Herhangi bir tabanda logaritma alır (<code>ln(x) / ln(taban)</code>).</td>
+      </tr>
+      <tr>
+        <td><code>güvenli_ln(x)</code></td>
+        <td><code>x</code> (Sayı)</td>
+        <td>Sayı</td>
+        <td><code>x &lt;= 0</code> durumunda hata vermek yerine <code>-1000.0</code> döndürür.</td>
+      </tr>
+      <tr>
+        <td><code>derece_radyan(d)</code></td>
+        <td><code>d</code> (Derece)</td>
+        <td>Sayı (Radyan)</td>
+        <td>Dereceyi radyana çevirir.</td>
+      </tr>
+      <tr>
+        <td><code>radyan_derece(r)</code></td>
+        <td><code>r</code> (Radyan)</td>
+        <td>Sayı (Derece)</td>
+        <td>Radyanı dereceye çevirir.</td>
+      </tr>
+      <tr>
+        <td><code>ebob(a, b)</code></td>
+        <td><code>a, b</code> (Tamsayı)</td>
+        <td>Sayı (EBOB)</td>
+        <td>Öklid algoritması ile En Büyük Ortak Bölen hesaplar.</td>
+      </tr>
+      <tr>
+        <td><code>ekok(a, b)</code></td>
+        <td><code>a, b</code> (Tamsayı)</td>
+        <td>Sayı (EKOK)</td>
+        <td>En Küçük Ortak Kat hesaplar.</td>
+      </tr>
+      <tr>
+        <td><code>asal_mı(n)</code></td>
+        <td><code>n</code> (Tamsayı)</td>
+        <td>Mantıksal (1 / 0)</td>
+        <td>Sayının asal sayı olup olmadığını denetler.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Kod Örneği</h2>
+  <pre><code>{codeUsage}</code></pre>
+</DocLayout>

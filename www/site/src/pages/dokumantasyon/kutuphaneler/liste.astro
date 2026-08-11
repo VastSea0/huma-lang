@@ -1,0 +1,92 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+
+const codeUsage = `"liste.hb"'yi yükle
+
+sayılar = [1, 2, 3, 4, 5, 6] olsun
+
+// 1. Eşle (Map): Her elemanın karesini al
+kareler = eşle(sayılar, fonksiyon olsun x alsın { (x * x)'i döndür }) olsun
+"Kareler: "'ı yazdır
+kareler'i yazdır
+
+// 2. Filtrele (Filter): Çift sayıları seç
+çiftler = filtrele(sayılar, fonksiyon olsun x alsın { ((x % 2) = 0)'ı döndür }) olsun
+"Çiftler: "'i yazdır
+çiftler'i yazdır
+
+// 3. İndirge (Reduce): Toplamını bul
+toplam = indirge(sayılar, fonksiyon olsun acc, x alsın { (acc + x)'i döndür }, 0) olsun
+"Toplam: " + toplam'ı yazdır`;
+---
+
+<DocLayout title="liste.hb Kütüphanesi" currentPage="kutuphaneler" activeTab="kutuphaneler">
+  <h1><code>liste.hb</code> — Gelişmiş Liste ve Fonksiyonel İşlemler</h1>
+  
+  <p>
+    <code>liste.hb</code>, Hüma listeleri üzerinde yüksek mertebeden fonksiyonel araçlar (<code>eşle</code>, <code>filtrele</code>, <code>indirge</code>), eleman arama, ters çevirme ve dilimleme olanakları sunar.
+  </p>
+
+  <h2>Modülü Yükleme</h2>
+  <pre><code>"liste.hb"'yi yükle</code></pre>
+
+  <h2>Detaylı API Referansı</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Fonksiyon</th>
+        <th>Parametreler</th>
+        <th>Dönüş Değeri</th>
+        <th>Açıklama</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>yazdır_liste(liste)</code></td>
+        <td><code>liste</code> (Liste)</td>
+        <td>Boş</td>
+        <td>Listeyi ekrana yazar.</td>
+      </tr>
+      <tr>
+        <td><code>içeriyor_mu(liste, e)</code></td>
+        <td><code>liste, e</code></td>
+        <td>Mantıksal (1 / 0)</td>
+        <td>Elemanın listede olup olmadığını kontrol eder.</td>
+      </tr>
+      <tr>
+        <td><code>ters_cevir(liste)</code></td>
+        <td><code>liste</code> (Liste)</td>
+        <td>Yeni Liste</td>
+        <td>Listeyi ters çevrilmiş sırayla yeni bir liste olarak döndürür.</td>
+      </tr>
+      <tr>
+        <td><code>eşle(liste, f)</code></td>
+        <td><code>liste, f</code> (Fonksiyon)</td>
+        <td>Yeni Liste</td>
+        <td>Her elemana <code>f(x)</code> fonksiyonunu uygular (Map).</td>
+      </tr>
+      <tr>
+        <td><code>filtrele(liste, f)</code></td>
+        <td><code>liste, f</code> (Fonksiyon)</td>
+        <td>Yeni Liste</td>
+        <td><code>f(x)</code> koşulunu (doğru) sağlayan elemanları süzer (Filter).</td>
+      </tr>
+      <tr>
+        <td><code>indirge(liste, f, başlangıç)</code></td>
+        <td><code>liste, f, başlangıç</code></td>
+        <td>Değer</td>
+        <td>Listeyi akümülatör ve eleman ile teke indirger (Reduce).</td>
+      </tr>
+      <tr>
+        <td><code>dilimle(liste, baş, son)</code></td>
+        <td><code>liste, baş, son</code></td>
+        <td>Yeni Liste</td>
+        <td><code>baş</code> indeksinden <code>son</code> indeksine kadar olan dilimi döndürür.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Kod Örneği</h2>
+  <pre><code>{codeUsage}</code></pre>
+</DocLayout>

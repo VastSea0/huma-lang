@@ -1,0 +1,64 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+
+const codeUsage = `"zaman.hb"'yi yükle
+
+// 1. Süreç bekletme (milisaniye)
+beklet(500) // 500ms bekle
+
+// 2. Kronometre ölçümü
+k = kronometre_başlat() olsun
+
+// Ölçülecek işlem...
+i = 0'dan 1000'e kadar { x = i * 2 olsun }
+
+süre = kronometre_bitir(k) olsun
+"Geçen süre: " + süre + " ms"'yi yazdır`;
+---
+
+<DocLayout title="zaman.hb Kütüphanesi" currentPage="kutuphaneler" activeTab="kutuphaneler">
+  <h1><code>zaman.hb</code> — Zaman ve Kronometre Kütüphanesi</h1>
+  
+  <p>
+    <code>zaman.hb</code>, milisaniye hassasiyetinde süreç bekletme ve kod bloklarının çalışma süresini kronometre ile ölçme olanakları sağlar.
+  </p>
+
+  <h2>Modülü Yükleme</h2>
+  <pre><code>"zaman.hb"'yi yükle</code></pre>
+
+  <h2>Detaylı API Referansı</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Fonksiyon</th>
+        <th>Parametreler</th>
+        <th>Dönüş Değeri</th>
+        <th>Açıklama</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>beklet(ms)</code></td>
+        <td><code>ms</code> (Milisaniye)</td>
+        <td>Boş</td>
+        <td>Sürecin yürütülmesini belirtilen milisaniye kadar durdurur.</td>
+      </tr>
+      <tr>
+        <td><code>kronometre_başlat()</code></td>
+        <td>Hiçbiri</td>
+        <td>Zaman Damgası (Sayı)</td>
+        <td>Hassas kronometreyi başlatır ve başlangıç zamanını döndürür.</td>
+      </tr>
+      <tr>
+        <td><code>kronometre_bitir(zaman_damgası)</code></td>
+        <td><code>zaman_damgası</code> (Sayı)</td>
+        <td>Sayı (Milisaniye)</td>
+        <td>Başlangıçtan bu yana geçen süreyi milisaniye olarak döndürür.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Kod Örneği</h2>
+  <pre><code>{codeUsage}</code></pre>
+</DocLayout>

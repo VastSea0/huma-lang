@@ -1,0 +1,59 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+
+const codeUsage = `"renkler.hb"'yi yükle
+
+başarı_yaz("İşlem başarıyla tamamlandı!")
+uyarı_yaz("Bellek kullanımı yüksek düzeyde.")
+hata_yaz("Bağlantı zaman aşımına uğradı!")
+
+renkli_yaz("Özel Mavi Metin", "mavi")`;
+---
+
+<DocLayout title="renkler.hb Kütüphanesi" currentPage="kutuphaneler" activeTab="kutuphaneler">
+  <h1><code>renkler.hb</code> — Terminal Renklendirme Kütüphanesi</h1>
+  
+  <p>
+    <code>renkler.hb</code>, ANSI kaçış dizilerini kullanarak terminal çıktılarını renklendirir ve biçimlendirir.
+  </p>
+
+  <h2>Modülü Yükleme</h2>
+  <pre><code>"renkler.hb"'yi yükle</code></pre>
+
+  <h2>Detaylı API Referansı</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Fonksiyon</th>
+        <th>Parametreler</th>
+        <th>Açıklama</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>renkli_yaz(metin, renk)</code></td>
+        <td><code>metin, renk</code> ("kırmızı", "yeşil", "sarı", "mavi", "mor", "siyan")</td>
+        <td>Metni belirtilen renkte terminale yazar.</td>
+      </tr>
+      <tr>
+        <td><code>başarı_yaz(metin)</code></td>
+        <td><code>metin</code> (Metin)</td>
+        <td>Metni yeşil renkte ve onay ikonuyla yazar.</td>
+      </tr>
+      <tr>
+        <td><code>uyarı_yaz(metin)</code></td>
+        <td><code>metin</code> (Metin)</td>
+        <td>Metni sarı renkte ve uyarı ikonuyla yazar.</td>
+      </tr>
+      <tr>
+        <td><code>hata_yaz(metin)</code></td>
+        <td><code>metin</code> (Metin)</td>
+        <td>Metni kırmızı renkte ve hata ikonuyla yazar.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Kod Örneği</h2>
+  <pre><code>{codeUsage}</code></pre>
+</DocLayout>

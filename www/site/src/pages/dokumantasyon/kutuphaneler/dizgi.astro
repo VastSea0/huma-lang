@@ -1,0 +1,58 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+
+const codeUsage = `"dizgi.hb"'yi yükle
+
+b = büyük_mü("A") olsun    // 1 (doğru)
+k = küçük_mü("a") olsun    // 1 (doğru)
+s = boşluk_mu(" ") olsun   // 1 (doğru)
+
+"Büyük mü?: " + b'yi yazdır`;
+---
+
+<DocLayout title="dizgi.hb Kütüphanesi" currentPage="kutuphaneler" activeTab="kutuphaneler">
+  <h1><code>dizgi.hb</code> — Metin ve Karakter Denetim Kütüphanesi</h1>
+  
+  <p>
+    <code>dizgi.hb</code>, metin karakterlerinin harf büyüklüğü ve boşluk durumu denetimlerini sağlayan yardımcı kütüphanedir.
+  </p>
+
+  <h2>Modülü Yükleme</h2>
+  <pre><code>"dizgi.hb"'yi yükle</code></pre>
+
+  <h2>Detaylı API Referansı</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Fonksiyon</th>
+        <th>Parametreler</th>
+        <th>Dönüş Değeri</th>
+        <th>Açıklama</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>büyük_mü(karakter)</code></td>
+        <td><code>karakter</code> (Metin)</td>
+        <td>Mantıksal (1 / 0)</td>
+        <td>Karakterin büyük harf (A-Z, Ç, Ğ, İ, Ö, Ş, Ü) olup olmadığını denetler.</td>
+      </tr>
+      <tr>
+        <td><code>küçük_mü(karakter)</code></td>
+        <td><code>karakter</code> (Metin)</td>
+        <td>Mantıksal (1 / 0)</td>
+        <td>Karakterin küçük harf (a-z, ç, ğ, ı, ö, ş, ü) olup olmadığını denetler.</td>
+      </tr>
+      <tr>
+        <td><code>boşluk_mu(karakter)</code></td>
+        <td><code>karakter</code> (Metin)</td>
+        <td>Mantıksal (1 / 0)</td>
+        <td>Karakterin boşluk, tab veya satır sonu olup olmadığını denetler.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Kod Örneği</h2>
+  <pre><code>{codeUsage}</code></pre>
+</DocLayout>

@@ -1,0 +1,65 @@
+---
+import DocLayout from '../../../layouts/DocLayout.astro';
+
+const codeUsage = `"rastgele.hb"'yi yükle
+
+// 1 ile 100 arasında rastgele tamsayı
+sayı = r_tamsayı(1, 100) olsun
+"Zar sonucu: " + sayı'yı yazdır
+
+// Listeden rastgele eleman seçimi
+meyveler = ["Elma", "Armut", "Muz", "Çilek"] olsun
+seçilen = r_seç(meyveler) olsun
+"Seçilen meyve: " + seçilen'i yazdır
+
+// Listeyi karıştırma
+karışık = r_karıştır(meyveler) olsun
+karışık'ı yazdır`;
+---
+
+<DocLayout title="rastgele.hb Kütüphanesi" currentPage="kutuphaneler" activeTab="kutuphaneler">
+  <h1><code>rastgele.hb</code> — Rastgelelik ve Seçim Kütüphanesi</h1>
+  
+  <p>
+    <code>rastgele.hb</code>, rastgele tamsayı üretimi, liste elemanı seçimi ve dizileri karıştırma işlevlerini sağlar.
+  </p>
+
+  <h2>Modülü Yükleme</h2>
+  <pre><code>"rastgele.hb"'yi yükle</code></pre>
+
+  <h2>Detaylı API Referansı</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Fonksiyon</th>
+        <th>Parametreler</th>
+        <th>Dönüş Değeri</th>
+        <th>Açıklama</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>r_tamsayı(min, maks)</code></td>
+        <td><code>min, maks</code> (Tamsayı)</td>
+        <td>Sayı (Tamsayı)</td>
+        <td><code>[min, maks]</code> kapalı aralığında rastgele tamsayı üretir.</td>
+      </tr>
+      <tr>
+        <td><code>r_seç(liste)</code></td>
+        <td><code>liste</code> (Liste)</td>
+        <td>Eleman</td>
+        <td>Verilen listeden rastgele bir eleman seçip döndürür.</td>
+      </tr>
+      <tr>
+        <td><code>r_karıştır(liste)</code></td>
+        <td><code>liste</code> (Liste)</td>
+        <td>Yeni Liste</td>
+        <td>Listenin elemanlarını Fisher-Yates karıştırma ile rasgele sıraya koyar.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Kod Örneği</h2>
+  <pre><code>{codeUsage}</code></pre>
+</DocLayout>
