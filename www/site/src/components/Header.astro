@@ -4,7 +4,12 @@ const { activeTab = '' } = Astro.props;
 
 <header class="header">
   <div class="header-container">
-    <div class="brand">
+    <div class="brand-group">
+      <a href="https://egehankahraman.vercel.app" class="creator-badge" title="Egehan Kahraman Portfolyosuna Dön">
+        <span class="back-arrow">←</span>
+        <span class="creator-name">Egehan Kahraman</span>
+      </a>
+      <span class="brand-divider">/</span>
       <a href="/" class="logo">
         <span class="logo-title">Hüma</span>
         <span class="version-badge">v0.6.0</span>
@@ -18,7 +23,7 @@ const { activeTab = '' } = Astro.props;
       <a href="/dokumantasyon/kutuphaneler" class={activeTab === 'kutuphaneler' ? 'active' : ''}>Kütüphaneler</a>
       <a href="/dokumantasyon/ornekler" class={activeTab === 'ornekler' ? 'active' : ''}>Örnekler</a>
       <a href="https://github.com/vastsea0/huma-lang" target="_blank" rel="noopener noreferrer" class="github-icon-link" aria-label="GitHub Deposu">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
         </svg>
       </a>
@@ -28,26 +33,65 @@ const { activeTab = '' } = Astro.props;
 
 <style>
   .header {
-    background-color: var(--bg-primary);
+    background-color: rgba(250, 248, 245, 0.88);
     border-bottom: 1px solid var(--border-color);
     position: sticky;
     top: 0;
     z-index: 100;
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    transition: all 0.2s ease;
   }
 
   .header-container {
-    max-width: 1100px;
+    max-width: 1140px;
     margin: 0 auto;
-    padding: 1.25rem 1.5rem;
+    padding: 0.95rem 1.5rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
   }
 
-  .brand {
+  .brand-group {
     display: flex;
     align-items: center;
+    gap: 0.65rem;
+  }
+
+  .creator-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.82rem;
+    font-family: var(--font-sans);
+    color: var(--text-muted);
+    padding: 0.25rem 0.6rem;
+    border-radius: 9999px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+    text-decoration: none;
+  }
+
+  .creator-badge:hover {
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+    background-color: var(--accent-light);
+  }
+
+  .back-arrow {
+    font-size: 0.75rem;
+    transition: transform 0.2s ease;
+  }
+
+  .creator-badge:hover .back-arrow {
+    transform: translateX(-2px);
+  }
+
+  .brand-divider {
+    color: var(--border-color);
+    font-size: 1rem;
+    font-weight: 300;
   }
 
   .logo {
@@ -57,31 +101,35 @@ const { activeTab = '' } = Astro.props;
     color: var(--text-heading);
     font-family: var(--font-serif);
     font-weight: 700;
-    font-size: 1.6rem;
+    font-size: 1.55rem;
     letter-spacing: -0.02em;
+    text-decoration: none;
   }
 
   .version-badge {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-family: var(--font-mono);
     color: var(--accent-color);
     background-color: var(--accent-light);
-    padding: 0.15rem 0.5rem;
+    padding: 0.12rem 0.5rem;
     border-radius: 9999px;
+    font-weight: 500;
   }
 
   .nav {
     display: flex;
     align-items: center;
-    gap: 1.5rem;
+    gap: 1.4rem;
   }
 
   .nav a:not(.github-icon-link) {
     color: var(--text-primary);
-    font-size: 0.95rem;
+    font-size: 0.92rem;
     font-weight: 400;
     position: relative;
     padding: 0.25rem 0;
+    text-decoration: none;
+    transition: color 0.2s ease;
   }
 
   .nav a:not(.github-icon-link):hover,
@@ -105,28 +153,41 @@ const { activeTab = '' } = Astro.props;
     align-items: center;
     justify-content: center;
     color: var(--text-heading);
-    padding: 0.4rem;
+    padding: 0.45rem;
     border-radius: 50%;
-    transition: background-color 0.2s ease, color 0.2s ease;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+    text-decoration: none;
   }
 
   .github-icon-link:hover {
-    background-color: var(--bg-secondary);
-    color: var(--accent-color);
+    background-color: var(--text-heading);
+    color: #ffffff;
+    border-color: var(--text-heading);
+    transform: translateY(-1px);
   }
 
   @media (max-width: 768px) {
     .header-container {
-      padding: 1rem;
+      padding: 0.85rem 1rem;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.75rem;
+    }
+
+    .brand-group {
+      justify-content: space-between;
     }
 
     .nav {
       gap: 0.85rem;
       overflow-x: auto;
+      padding-bottom: 0.25rem;
     }
 
     .nav a:not(.github-icon-link) {
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       white-space: nowrap;
     }
   }
