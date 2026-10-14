@@ -1,0 +1,86 @@
+.nav {
+  height: var(--nav-h);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--bg);
+}
+
+.inner {
+  max-width: var(--w);
+  margin: 0 auto;
+  padding: 0 var(--px);
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+
+.logo {
+  font-family: var(--mono);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.logo span {
+  color: var(--accent);
+}
+
+.links {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex: 1;
+}
+
+.links a {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  transition: color 0.1s;
+}
+
+.links a:hover {
+  color: var(--text);
+}
+
+/* separator dot between links */
+.sep {
+  color: var(--text-dim);
+  user-select: none;
+  font-size: 0.8rem;
+}
+
+/* Language switcher — right side of nav */
+.langSwitch {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
+
+.langActive {
+  color: var(--text);
+}
+
+.langSep {
+  color: var(--text-dim);
+  padding: 0 0.25rem;
+}
+
+.langSwitch a {
+  color: var(--text-muted);
+  transition: color 0.1s;
+}
+
+.langSwitch a:hover {
+  color: var(--text);
+}

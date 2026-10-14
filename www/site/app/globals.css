@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* ── Palette ─────────────────────────────────────────── */
+  --bg:         #141412;
+  --bg-code:    #1c1a18;
+  --border:     #252220;
+  --text:       #e0dbd2;
+  --text-muted: #6e6560;
+  --text-dim:   #302c2a;
+  --accent:     #d33c28;
+
+  /* ── Typography ──────────────────────────────────────── */
+  --sans: 'Inter', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', 'Fira Mono', monospace;
+
+  /* ── Layout ──────────────────────────────────────────── */
+  --w:  1080px;
+  --px: 1.5rem;
+
+  /* ── Nav height ──────────────────────────────────────── */
+  --nav-h: 48px;
+}
+
+html { font-size: 16px; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+a { color: inherit; text-decoration: none; }
+code { font-family: var(--mono); }
+img, svg { display: block; }

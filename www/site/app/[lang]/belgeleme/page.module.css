@@ -1,0 +1,152 @@
+/* Belgeleme sayfa stilleri */
+
+.layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  max-width: var(--w);
+  margin: 0 auto;
+  min-height: calc(100vh - 48px);
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  border-right: 1px solid var(--border);
+  padding: 2.5rem 1.5rem 2.5rem 0;
+  position: sticky;
+  top: 48px;
+  height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+.sidebarTitle {
+  font-size: 0.69rem;
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+
+.sidebarNav {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.sidebarNav a {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  padding: 0.3rem 0;
+  transition: color 0.1s;
+  line-height: 1.4;
+}
+
+.sidebarNav a:hover {
+  color: var(--text);
+}
+
+.sidebarNav .active {
+  color: var(--text);
+}
+
+/* ── İçerik ── */
+.content {
+  padding: 2.5rem 0 4rem 3rem;
+  max-width: 65ch;
+}
+
+.pageTitle {
+  font-size: 1.625rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #ede9e1;
+  margin-bottom: 0.5rem;
+}
+
+.pageVersion {
+  font-size: 0.8rem;
+  font-family: var(--mono);
+  color: var(--text-muted);
+  margin-bottom: 2.5rem;
+}
+
+.docSection {
+  margin-bottom: 3rem;
+}
+
+.docSection h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #ede9e1;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  scroll-margin-top: 1rem;
+}
+
+.docSection p {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.75;
+  margin-bottom: 0.85rem;
+}
+
+.docSection p:last-child {
+  margin-bottom: 0;
+}
+
+.docSection p code,
+.docSection li code {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--accent);
+  background: rgba(192, 57, 43, 0.06);
+  padding: 0.1rem 0.3rem;
+  border-radius: 2px;
+}
+
+.docSection ul,
+.docSection ol {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.75;
+  padding-left: 1.5rem;
+  margin-bottom: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.docSection .codeWrap {
+  margin: 1rem 0;
+}
+
+.note {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  border-left: 2px solid var(--border);
+  padding-left: 1rem;
+  margin: 1rem 0;
+  font-style: italic;
+}
+
+/* ── Responsive ── */
+@media (max-width: 700px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 1.5rem 0;
+  }
+
+  .content {
+    padding: 2rem 0;
+  }
+}

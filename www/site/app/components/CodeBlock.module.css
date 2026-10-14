@@ -1,0 +1,53 @@
+/* Code block — no fake OS chrome */
+.wrap {
+  position: relative;
+}
+
+.filename {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+  display: block;
+  letter-spacing: 0.01em;
+}
+
+.pre {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1.1rem 1.25rem;
+  overflow-x: auto;
+  line-height: 1.65;
+}
+
+.line {
+  display: flex;
+  min-height: 1.45rem;
+}
+
+.ln {
+  user-select: none;
+  width: 2.25rem;
+  flex-shrink: 0;
+  text-align: right;
+  padding-right: 1rem;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  line-height: 1.65;
+}
+
+.code {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  white-space: pre;
+  flex: 1;
+}
+
+/* ── Token renkleri — net, ayırt edilebilir ── */
+.kw  { color: #d63c2c; }              /* anahtar kelimeler — kırmızı */
+.fn  { color: #6ab4e0; }              /* fonksiyon adları  — mavi    */
+.str { color: #54a872; }              /* metin literalleri — yeşil   */
+.num { color: #d4963c; }              /* sayılar           — kehribar */
+.cm  { color: #3d3830; font-style: italic; } /* yorumlar — soluk     */
+.op  { color: #6a6058; }              /* operatörler       — gri     */

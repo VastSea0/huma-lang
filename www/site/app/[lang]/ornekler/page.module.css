@@ -1,0 +1,86 @@
+/* Örnekler sayfa stilleri */
+
+.layout {
+  max-width: var(--w);
+  margin: 0 auto;
+  padding: 0 var(--px);
+}
+
+.header {
+  padding: 3.5rem 0 2.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.pageTitle {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #ede9e1;
+  margin-bottom: 0.5rem;
+}
+
+.pageDesc {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.examples {
+  display: flex;
+  flex-direction: column;
+}
+
+.example {
+  padding: 3rem 0;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 3rem;
+  align-items: start;
+}
+
+.example:last-child {
+  border-bottom: none;
+}
+
+.exMeta {
+  padding-top: 0.15rem;
+}
+
+.exName {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #ede9e1;
+  margin-bottom: 0.4rem;
+}
+
+.exDesc {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.65;
+  margin-bottom: 1rem;
+}
+
+.exConcepts {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.exConcepts li {
+  font-size: 0.75rem;
+  font-family: var(--mono);
+  color: var(--text-muted);
+}
+
+.exConcepts li::before {
+  content: '→ ';
+  color: var(--accent);
+}
+
+@media (max-width: 700px) {
+  .example {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+}

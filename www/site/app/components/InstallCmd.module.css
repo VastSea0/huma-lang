@@ -1,0 +1,46 @@
+.wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0.5rem 0.85rem;
+  cursor: pointer;
+  position: relative;
+}
+
+.wrap:hover {
+  border-color: #333;
+}
+
+.dollar {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  user-select: none;
+}
+
+.cmd {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text);
+}
+
+.copyBtn {
+  all: unset;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  transition: color 0.15s;
+}
+
+.copyBtn:hover {
+  color: var(--text);
+}
+
+.copyBtn.copied {
+  color: var(--green);
+}

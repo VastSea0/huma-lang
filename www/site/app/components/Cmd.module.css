@@ -1,0 +1,35 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+}
+
+.dollar {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.text {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  color: var(--text);
+}
+
+.btn {
+  all: unset;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  border: 1px solid var(--border);
+  padding: 0.1rem 0.45rem;
+  border-radius: 2px;
+  transition: color 0.1s, border-color 0.1s;
+}
+
+.btn:hover {
+  color: var(--text);
+  border-color: #3a3835;
+}
