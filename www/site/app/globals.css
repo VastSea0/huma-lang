@@ -4,13 +4,13 @@
 
 :root {
   /* ── Palette ─────────────────────────────────────────── */
-  --bg:         #141412;
-  --bg-code:    #1c1a18;
-  --border:     #252220;
-  --text:       #e0dbd2;
-  --text-muted: #6e6560;
-  --text-dim:   #302c2a;
-  --accent:     #d33c28;
+  --bg:         #f6f2ec;
+  --bg-code:    #edeae4;
+  --border:     #d8d3cc;
+  --text:       #1c1916;
+  --text-muted: #6a6258;
+  --text-dim:   #c0b8ae;
+  --accent:     #b82b1a;
 
   /* ── Typography ──────────────────────────────────────── */
   --sans: 'Inter', system-ui, sans-serif;

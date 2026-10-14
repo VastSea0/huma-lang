@@ -44,10 +44,10 @@
   flex: 1;
 }
 
-/* ── Token renkleri — net, ayırt edilebilir ── */
-.kw  { color: #d63c2c; }              /* anahtar kelimeler — kırmızı */
-.fn  { color: #6ab4e0; }              /* fonksiyon adları  — mavi    */
-.str { color: #54a872; }              /* metin literalleri — yeşil   */
-.num { color: #d4963c; }              /* sayılar           — kehribar */
-.cm  { color: #3d3830; font-style: italic; } /* yorumlar — soluk     */
-.op  { color: #6a6058; }              /* operatörler       — gri     */
+/* ── Token renkleri — açık arka plan için ── */
+.kw  { color: #b82b1a; }                     /* anahtar kelimeler — koyu kırmızı */
+.fn  { color: #1a5f8a; }                     /* fonksiyon adları  — lacivert     */
+.str { color: #1a6e3a; }                     /* metin literalleri — koyu yeşil   */
+.num { color: #8a5500; }                     /* sayılar           — kahve amber  */
+.cm  { color: #b0a89e; font-style: italic; } /* yorumlar          — soluk        */
+.op  { color: #7a7268; }                     /* operatörler       — gri          */
