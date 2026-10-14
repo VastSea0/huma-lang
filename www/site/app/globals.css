@@ -3,24 +3,19 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  /* ── Palette ─────────────────────────────────────────── */
-  --bg:         #f6f2ec;
-  --bg-code:    #edeae4;
-  --border:     #d8d3cc;
-  --text:       #1c1916;
-  --text-muted: #6a6258;
-  --text-dim:   #c0b8ae;
-  --accent:     #b82b1a;
+  --bg:         #ffffff;
+  --bg-code:    #f7f7f7;
+  --border:     #e2e2e2;
+  --text:       #111111;
+  --text-muted: #666666;
+  --text-dim:   #cccccc;
+  --accent:     #c0392b;
 
-  /* ── Typography ──────────────────────────────────────── */
   --sans: 'Inter', system-ui, sans-serif;
   --mono: 'JetBrains Mono', 'Fira Mono', monospace;
 
-  /* ── Layout ──────────────────────────────────────────── */
-  --w:  1080px;
-  --px: 1.5rem;
-
-  /* ── Nav height ──────────────────────────────────────── */
+  --w:    1080px;
+  --px:   1.5rem;
   --nav-h: 48px;
 }
 
