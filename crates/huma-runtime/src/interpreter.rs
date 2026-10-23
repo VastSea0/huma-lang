@@ -6791,6 +6791,12 @@ impl Yorumlayici {
                         }),
                     }),
                 );
+                // Yerleşiklerin döndürdüğü hata çağrı konumuyla kaydedilir
+                // (VM ile aynı); kullanıcı fonksiyonu hataları zaten içeride
+                // kendi konumlarıyla kaydedilmiştir.
+                if let Deger::Hata(message) = &result {
+                    self.runtime_error_ekle(message.clone());
+                }
                 self.current_location = previous_location;
                 result
             }
