@@ -21,8 +21,10 @@ Otomatik test ve kod kabul kapılarıyla korunan zemin:
   çıkarılabilen köklerde ünlü uyumu, kaynaştırma ve ünsüz benzeşmesi
 - Paylaşılan normatif doğruluk, sonlu `f64`, aritmetik, karşılaştırma, eşitlik
   ve döngü güvenli koleksiyon semantiği
-- Tam fonksiyon argüman sayısı, sözcüksel closure, özyineleme sınırı ve
-  yorumlayıcı/VM hata eşliği
+- Tam fonksiyon argüman sayısı, sözcüksel closure ve özyineleme sınırı
+- Yorumlayıcı/VM çıktı ve hata eşliği: `tests/golden` korpusundaki her program
+  iki arka uçta ayrı çalıştırılıp aynı beklentiyle karşılaştırılır; VM'in
+  desteklemediği yapıları kullanan programlar gerekçeyle işaretlenir
 - AST’ye geri dönmeyen bytecode fonksiyonları, bağımsız VM frame/closure
   yığınları ve kontrol akışı/yığın doğrulaması
 - Sürümlü, boyut sınırlı, SHA-256 bütünlük denetimli `.hbc` v4 kapsayıcısı
@@ -31,8 +33,6 @@ Otomatik test ve kod kabul kapılarıyla korunan zemin:
 - Varsayılan kapalı dosya, ağ, süreç, FFI, veritabanı ve GUI yetenekleri
 - AI ve dosya/CSV/JSONL işlevlerinin çekirdekten fiziksel olarak ayrılmış,
   isteğe bağlı alan adaptörlerinde tutulması
-- Bakımı bırakılmış transitive font ayrıştırıcısı taşıyan eski aynı-süreç GUI
-  prototipinin varsayılan workspace/CLI ve güvenlik kapısından karantinaya alınması
 - Kararlı `Gc` tutamaçlı iki nesilli çevrim toplama, yazma bariyeri ve ayrı
   iş parçacıklarında paylaşılmayan heap ile çalışan isolate'lar
 - Sürümlü `DiagnosticEnvelope`: kararlı kod, konum, çağrı izi, güvenli
@@ -50,11 +50,8 @@ Otomatik test ve kod kabul kapılarıyla korunan zemin:
   platform yayın hattı ve build provenance üretimi
 - Kaynak/bytecode/AOT çıktılarında aynı dizinde hazırlama, `sync` ve atomik
   etkinleştirme; başarısızlıkta eski çıktıyı geri yükleme
-- İzlenen Hüma kaynak havuzu, üretilmiş yorumlayıcı/VM diferansiyel
-  regresyonları ve parser, HMI çerçevesi, bytecode doğrulayıcı libFuzzer hedefleri
-- Adanmış runner'da medyan/p95/RSS gerileme kapısı; başlangıç, parser,
-  fonksiyon/closure, liste/sözlük, Unicode, modül, GC, yorumlayıcı ve VM ölçümleri
-- Zamanlanmış çevrim/çoklu-isolate soak ve protokol/paket hata enjeksiyonu
+- İzlenen Hüma kaynak havuzunun ayrıştırılabilirliği ve üretilmiş
+  yorumlayıcı/VM diferansiyel regresyonları
 - RustSec bağımlılık denetimi ve Linux, macOS, Windows derleme matrisi
 
 “Doğrulanmış”, kapsanan davranışın testle tekrar üretilebildiği ve hatanın
@@ -67,6 +64,16 @@ hatasızdır” veya “işletim sistemi sandbox’ı vardır” anlamına gelme
   Hüma değer modeli değildir.
 - Dil dinamiktir. Statik tip denetleyici ve dil içi etkiler sistemi henüz
   yoktur; dış modül imza/etki sözleşmesi HMI'da bulunur.
+- Tanımlı fakat henüz kanıt üretmemiş iş akışları (2026-10-23 itibarıyla
+  GitHub'da hiç çalıştırma kaydı yok): `fuzz.yml` (parser, HMI çerçevesi,
+  bytecode doğrulayıcı libFuzzer hedefleri), `soak.yml` (çevrim/isolate soak,
+  HMI ve paket hata enjeksiyonu; soak testleri yerelde geçiyor) ve
+  `performance.yml` (`[self-hosted, huma-perf]` çalıştırıcısı gerektirir).
+  `release.yml` son çalıştırmalarında (2026-03-30…2026-04-08) başarısız oldu.
+- Eski aynı-süreç GUI adaptörü (`huma-stdlib-gui`) hâlâ workspace üyesi ve
+  `huma-cli` bağımlılığıdır; bakımı bırakılmış `ttf-parser` zinciri bu yüzden
+  kök kilit dosyasında ve `cargo audit` uyarılarında görünür. Karantina
+  planlanmıştır, uygulanmamıştır.
 - Yetenek modeli en az ayrıcalığı sağlar ancak işletim sistemi yalıtımı değildir.
   HMI çocuk süreci kullanıcı haklarıyla çalışır. Yalnız açık güven bayrağıyla
   açılan süreç içi FFI'da yanlış ABI ev sahibi süreci çökertebilir.
@@ -97,7 +104,8 @@ hatasızdır” veya “işletim sistemi sandbox’ı vardır” anlamına gelme
 
 - İki nesilli çevrim toplayıcı, isolate tabanlı eşzamanlılık ve soak testleri
 - VM'nin ilan edilen alt kümesinde sürekli diferansiyel üretim testi
-- Fuzz, hata enjeksiyonu, soak ve adanmış performans iş akışları
+- Fuzz, hata enjeksiyonu, soak ve adanmış performans iş akışları tanımlandı;
+  henüz çalıştırma geçmişi yok (bkz. bilinen sınırlar)
 - Sürümlü yapılandırılmış hata ABI'si
 
 Eksik olan tek seferlik mekanizma değil, farklı donanım/sürümler üzerinde uzun

@@ -18,9 +18,9 @@ are defined in the [Engineering Constitution](docs/MUHENDISLIK_ANAYASASI.md)
 | Component | Status | Verified scope |
 |---|---|---|
 | Interpreter | Canonical execution path | Functions, recursion, classes, lists/maps, modules, loops, `dene/yakala`, bundled libraries |
-| Bytecode VM | Verified subset | Independent frames/closures, functions, collections, and control flow; unsupported AST is rejected |
+| Bytecode VM | Verified subset | Functions, closures, collection reads, conditionals, loops (including `devam`/`kır`) and `dene/yakala`; parity is measured by the `tests/golden` corpus. Classes, module loading, indexed assignment and natural list append are not compiled yet (explicit compile error) |
 | Cranelift AOT | Experimental numeric subset | Numeric expressions and supported control flow; strings, modules, and classes fail explicitly |
-| LSP | Basic tooling | Parser diagnostics, completion, hover, and go-to-definition |
+| LSP | Basic tooling | Parser diagnostics, completion, hover, and AST-based go-to-definition (functions, classes, variables); `crates/huma-lsp/tests/lsp_oturumu.rs` |
 | HMI | Versioned out-of-process boundary | Signature/effect/error catalog, API compatibility checks, framed limits, and timeout termination |
 | Heap/isolate | Generational cycle collector | Stable `Gc` handles, a young generation with a write barrier, major cycle collection, and unshared isolate heaps |
 | Domain libraries | Experimental / unstable | Not part of the stable core contract; may be rewritten or removed |

@@ -31,9 +31,20 @@
   düşerken iptal edilen yaşam döngüsü eklendi.
 - CI ve yayın iş akışlarındaki üçüncü taraf GitHub Actions bağımlılıkları
   değişmez commit özetlerine sabitlendi.
-- Bakımı bırakılmış `ttf-parser` zincirini taşıyan deneysel aynı-süreç GUI
-  adaptörü varsayılan workspace ve CLI dağıtımından karantinaya alındı; kök
-  kilit dosyası/güvenlik kapısı artık bu zinciri içermez.
+- Düzeltme: önceki bir girdi deneysel GUI adaptörünün workspace ve CLI'dan
+  karantinaya alındığını söylüyordu; adaptör hâlâ `huma-cli` bağımlılığıdır ve
+  `ttf-parser` zinciri kök kilit dosyasındadır (bkz. DURUM_VE_YOL_HARITASI).
+- Dil: değeri kullanılmayan çağrı-dışı ifade komutları, döngü dışındaki
+  `devam`/`kır`, 200 düzeyi aşan iç içe geçme ve yeni satırda önceki ifadeye
+  yapışan `yazdır`/`döndür`/`yükle`/`(`/`[` artık sözdizimi hatasıdır.
+- VM: `devam`/`kır` derleniyor; yakalanan hata metin olarak bağlanıyor;
+  standart kütüphaneler VM'e de kaydediliyor; koleksiyon indeks hataları
+  yorumlayıcıyla aynı.
+- CLI: `huma test` `.beklenen`/`.hata` golden sözleşmesini uyguluyor;
+  `--json` sürümlü tanı zarfı yazıyor; eksik dosya 2 koduyla, paket betiği alt
+  sürecin koduyla çıkıyor; HTTP sunucusu varsayılan olarak 127.0.0.1'i dinliyor.
+- Güvenlik: `cargo audit`'in raporladığı 12 açık (rustls, quinn-proto,
+  rustls-webpki, webpki-roots, h2) kapatıldı.
 - Paket kurulumu geçerli Ed25519 imzasını varsayılan zorunluluk yaptı. İmzasız
   yerel geliştirme istisnası yalnız açık `--güvenilir` onayıyla çalışıyor ve
   kilit dosyasına ayrı provenans olarak kaydediliyor; native kodu açmıyor.

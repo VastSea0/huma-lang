@@ -17,9 +17,9 @@ Anayasası](docs/MUHENDISLIK_ANAYASASI.md) belgesinde tanımlıdır.
 | Bileşen | Durum | Doğrulanan kapsam |
 |---|---|---|
 | Yorumlayıcı | Kanonik yürütme yolu | Fonksiyon, özyineleme, sınıf, liste/sözlük, modül, döngü, `dene/yakala`, yerleşik kütüphaneler |
-| Bytecode VM | Doğrulanmış alt küme | Bağımsız frame/closure’lar, fonksiyonlar, koleksiyonlar ve kontrol akışı; desteklenmeyen AST açık derleme hatası verir |
+| Bytecode VM | Doğrulanmış alt küme | Fonksiyon, closure, koleksiyon okuma, koşul, döngüler (`devam`/`kır` dahil) ve `dene/yakala`; eşlik `tests/golden` korpusuyla ölçülür. Sınıf, modül yükleme, indeksli atama ve doğal liste ekleme henüz derlenmez (açık derleme hatası) |
 | Cranelift AOT | Deneysel sayısal alt küme | Sayısal ifadeler ve desteklenen kontrol akışı; metin, modül, sınıf ve benzeri yapılar sessiz sonuç üretmek yerine reddedilir |
-| LSP | Temel araç desteği | Ayrıştırıcı tanıları, tamamlama, hover ve tanıma gitme |
+| LSP | Temel araç desteği | Ayrıştırıcı tanıları, tamamlama, hover ve AST tabanlı tanıma gitme (fonksiyon, sınıf, değişken); `crates/huma-lsp/tests/lsp_oturumu.rs` |
 | HMI | Sürümlü süreç dışı sınır | İmza/etki/hata kataloğu, API uyumluluk denetimi, çerçeve sınırları ve zaman aşımında süreç sonlandırma |
 | Heap/isolate | Nesilsel çevrim toplayıcı | Kararlı `Gc` tutamaçları, genç nesil + yazma bariyeri, major çevrim toplama ve paylaşılmayan isolate heap'leri |
 | Alan kütüphaneleri | Deneysel / kararsız | Çekirdek kabulünün parçası değildir; yeniden yazılabilir veya kaldırılabilir |
