@@ -1,0 +1,3 @@
+f fonksiyon olsun {
+    kır
+}

@@ -181,7 +181,10 @@ j = 1'den 5'e kadar {
 }
 ```
 
-Aralık iki sınırı da içerir. `devam` ve `kır` yalnızca döngü içinde geçerlidir.
+Aralık iki sınırı da içerir. `devam` ve `kır` yalnızca döngü içinde geçerlidir;
+döngü dışında kullanılmaları sözdizimi hatasıdır. Fonksiyon ve sınıf gövdeleri
+çevreleyen döngüyü görmez: döngü içinde tanımlanan bir fonksiyondaki `kır`
+dıştaki döngüyü kıramaz.
 
 ## 8. Fonksiyonlar ve kapsam
 

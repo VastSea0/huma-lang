@@ -28,6 +28,9 @@ pub struct Parser {
     durduruldu: bool,
     /// Bir önceki token'ın başladığı satır.
     onceki_satir: usize,
+    /// Mevcut fonksiyon gövdesi içinde açık döngü sayısı; `devam`/`kır`
+    /// yalnız sıfırdan büyükken geçerlidir.
+    dongu_derinligi: usize,
 }
 
 impl Parser {
@@ -77,7 +80,37 @@ impl Parser {
             son_derinlik: 0,
             durduruldu: false,
             onceki_satir: 0,
+            dongu_derinligi: 0,
         }
+    }
+
+    fn dongu_govdesi(&mut self) -> Vec<Komut> {
+        self.dongu_derinligi += 1;
+        let govde = self.parse_blok();
+        self.dongu_derinligi -= 1;
+        govde
+    }
+
+    /// Fonksiyon ve sınıf gövdeleri çevreleyen döngüyü görmez: içlerindeki
+    /// `devam`/`kır` dıştaki döngüye ulaşamaz.
+    fn dongu_disi<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+        let onceki = std::mem::replace(&mut self.dongu_derinligi, 0);
+        let sonuc = f(self);
+        self.dongu_derinligi = onceki;
+        sonuc
+    }
+
+    fn dongu_kontrolu(&mut self, komut: Komut, ad: &str) -> Option<Komut> {
+        if self.dongu_derinligi == 0 {
+            self.error(&format!("{ad} komutu yalnızca döngü içinde kullanılabilir"));
+            self.next_token();
+            return None;
+        }
+        self.next_token();
+        if self.current_token == Token::NoktaliVirgul {
+            self.next_token();
+        }
+        Some(komut)
     }
 
     /// Mevcut token önceki token'la aynı satırda mı? Komut başlatabilen
@@ -261,21 +294,9 @@ impl Parser {
                 None
             }
 
-            Token::Devam => {
-                self.next_token();
-                if self.current_token == Token::NoktaliVirgul {
-                    self.next_token();
-                }
-                Some(Komut::Devam)
-            }
+            Token::Devam => self.dongu_kontrolu(Komut::Devam, "devam"),
 
-            Token::Kir => {
-                self.next_token();
-                if self.current_token == Token::NoktaliVirgul {
-                    self.next_token();
-                }
-                Some(Komut::Kir)
-            }
+            Token::Kir => self.dongu_kontrolu(Komut::Kir, "kır"),
 
             // Identifier ile başlayan komutlar — özel kalıpları kontrol et
             Token::Tanimlayici(_) => {
@@ -555,7 +576,7 @@ impl Parser {
                         if self.current_token == Token::AcikSuskun {
                             self.next_token(); // '{' yut
                         }
-                        let govde = self.parse_blok();
+                        let govde = self.dongu_govdesi();
                         return Some(Komut::AralikDongusu {
                             degisken: ad,
                             baslangic,
@@ -688,7 +709,7 @@ impl Parser {
         }
 
         self.consume(Token::AcikSuskun);
-        let govde = self.parse_blok();
+        let govde = self.dongu_disi(Self::parse_blok);
         Some(Komut::FonksiyonTanimla {
             ad,
             parametreler: params,
@@ -702,12 +723,16 @@ impl Parser {
         self.consume(Token::Olsun);
         self.consume(Token::AcikSuskun);
 
-        let mut metotlar = Vec::new();
-        while self.current_token != Token::KapaliSuskun && self.current_token != Token::Son {
-            if let Some(m) = self.parse_komut() {
-                metotlar.push(m);
+        let metotlar = self.dongu_disi(|parser| {
+            let mut metotlar = Vec::new();
+            while parser.current_token != Token::KapaliSuskun && parser.current_token != Token::Son
+            {
+                if let Some(m) = parser.parse_komut() {
+                    metotlar.push(m);
+                }
             }
-        }
+            metotlar
+        });
         self.consume(Token::KapaliSuskun);
         Some(Komut::SinifTanimla { ad, metotlar })
     }
@@ -742,7 +767,7 @@ impl Parser {
         self.consume(Token::Oldugu);
         self.consume(Token::Surece);
         self.consume(Token::AcikSuskun);
-        let govde = self.parse_blok();
+        let govde = self.dongu_govdesi();
         Some(Komut::DonguKomutu { kosul, govde })
     }
 
@@ -1236,7 +1261,7 @@ impl Parser {
         self.consume(Token::AcikSuskun);
         // Gövde komutları kendi yuvalama sayımıyla ayrıştırılır; ifade
         // ağacına tek düğüm olarak katılır.
-        let govde = self.parse_blok();
+        let govde = self.dongu_disi(Self::parse_blok);
         self.son_derinlik = 1;
         Ifade::FonksiyonIfadesi {
             parametreler: params,
@@ -1431,6 +1456,31 @@ mod tests {
             &program[1],
             Komut::DondurKomutu(Ifade::ListeErisim { .. })
         ));
+    }
+
+    #[test]
+    fn dongu_disindaki_devam_ve_kir_reddedilir() {
+        for kaynak in [
+            "kır",
+            "devam",
+            "doğru ise { kır }",
+            "f fonksiyon olsun { kır }",
+            "i = 1'den 3'e kadar { f = fonksiyon olsun { devam } olsun }",
+            "doğru olduğu sürece { a sınıf olsun { kır } }",
+        ] {
+            let (_, tanilar) = komutlar(kaynak);
+            assert_eq!(tanilar.len(), 1, "{kaynak}: {tanilar:?}");
+            assert!(tanilar[0].contains("yalnızca döngü içinde"), "{tanilar:?}");
+        }
+        for kaynak in [
+            "doğru olduğu sürece { kır }",
+            "i = 1'den 3'e kadar { doğru ise { devam } }",
+            "doğru olduğu sürece { dene { kır } yakala { devam } }",
+            "f fonksiyon olsun { doğru olduğu sürece { kır } }",
+        ] {
+            let (_, tanilar) = komutlar(kaynak);
+            assert!(tanilar.is_empty(), "{kaynak}: {tanilar:?}");
+        }
     }
 
     #[test]
