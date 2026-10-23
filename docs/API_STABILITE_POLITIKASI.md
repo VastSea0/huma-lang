@@ -27,8 +27,11 @@ ile reddeder.
 Makine tüketimine açık tanılar `DiagnosticEnvelope` şema sürümü, kararlı kod,
 kategori, Türkçe ileti, isteğe bağlı kaynak konumu, çağrı izi, güvenli metinsel
 ayrıntılar ve yeniden dallanmayan neden zinciri taşır. Yeni isteğe bağlı alanlar
-eski v1 zarflarını bozmadan eklenir. Yeni hata kodları eklenebilir; mevcut kodun
-anlamı farklı bir hataya taşınamaz. HMI uzak hataları kendi kararlı kod
+eski v1 zarflarını bozmadan eklenir. Yeni hata kodları ve kategorileri
+eklenebilir; tüketiciler bilinmeyen kategoriyi genel hata saymalıdır. Mevcut
+kodun anlamı farklı bir hataya taşınamaz. `huma --json` tanıyı stderr'e tek
+satırlık zarf olarak yazar; dil dışı araç hataları `arac` kategorisinde
+`HUMA-CLI-0001`, ham G/Ç hataları `HUMA-IO-0001` kodunu taşır. HMI uzak hataları kendi kararlı kod
 kataloğuna sahiptir.
 
 ## Değişiklik kabulü

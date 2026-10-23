@@ -26,4 +26,5 @@ Yalnız ekleme. Her yineleme bir satır.
 | 2026-10-23 #20 | affffdd | B-020 (1/3) | `huma_core::standart_kutuphaneleri_kaydet` tek liste; CLI'nin run/REPL/run --vm/exec yolları kullanıyor. VM'de artık dosya/ağ/AI/SQLite/süreç/native yerleşikleri var (önceden yalnız varsayılanlar) | — |
 | 2026-10-23 #21 | 1f377d0 | B-020 (3/3) | Koleksiyon indeks okuması `semantics::koleksiyon_erisimi`'de tek uygulama; yorumlayıcı ve VM'deki sapmış iki kopya silindi. `koleksiyon_erisimi` golden'ı iki arka uçta aynı | — |
 | 2026-10-23 #22 | 5d23b20 | B-020 (2/3) | Yorumlayıcı yerleşik çağrı hatasını komut yerine çağrı konumuyla kaydediyor (VM ile aynı); iki golden iki arka uçta aynı konum ve izi doğruluyor | — |
-| 2026-10-23 #23 | (bu commit) | B-012 | www/site: hiçbir yerden başvurulmayan 5 şablon SVG silindi, create-next-app README'si sitenin gerçek yapısını anlatan belgeyle değişti | — |
+| 2026-10-23 #23 | d941648 | B-012 | www/site: hiçbir yerden başvurulmayan 5 şablon SVG silindi, create-next-app README'si sitenin gerçek yapısını anlatan belgeyle değişti | — |
+| 2026-10-23 #24 | (bu commit) | B-032 | `--json` artık tek satırlık `DiagnosticEnvelope` yazıyor (dil hataları kendi kodu/konumu/iziyle, G/Ç `HUMA-IO-0001`, araç `HUMA-CLI-0001`/`arac`); paket betiklerine `HUMA_JSON_TANI` ile taşınıyor | — |

@@ -17,6 +17,8 @@ pub enum ErrorCategory {
     Compile,
     Io,
     Serialization,
+    /// Dil dışı araç hatası: paket yöneticisi, CLI argümanı, proje yapısı.
+    Arac,
 }
 
 /// IDE, CLI JSON çıktısı ve HMI istemcileri için sürümlü hata zarfı.

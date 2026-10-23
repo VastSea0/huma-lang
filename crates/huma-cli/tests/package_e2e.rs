@@ -243,6 +243,39 @@ fn cikis_kodlari_hata_sinifini_yansitir() {
             "{arguments:?}: {stderr}"
         );
     }
+
+    // `--json` tek satırlık sürümlü tanı zarfı yazar; paket betiklerine de taşınır.
+    let cases: [(&[&str], &str, &str); 3] = [
+        (
+            &["run", "--json", "calisma.hb"],
+            "HUMA-RUNTIME-0001",
+            "runtime",
+        ),
+        (&["--json", "run", "yok.hb"], "HUMA-IO-0001", "io"),
+        (
+            &["--json", "paket", "run", "sozdizimi"],
+            "HUMA-SYNTAX-0001",
+            "syntax",
+        ),
+    ];
+    for (arguments, code, category) in cases {
+        let output = Command::new(env!("CARGO_BIN_EXE_huma"))
+            .args(arguments)
+            .current_dir(&project)
+            .env("HUMA_MANAGED_RUN_ROOT", &root)
+            .output()
+            .expect("Hüma CLI başlatılmalı");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let json_lines: Vec<&str> = stderr
+            .lines()
+            .filter(|line| line.starts_with('{'))
+            .collect();
+        assert_eq!(json_lines.len(), 1, "{arguments:?}: {stderr}");
+        let envelope: Value = serde_json::from_str(json_lines[0]).expect("tanı JSON olmalı");
+        assert_eq!(envelope["schema_version"], 1, "{envelope}");
+        assert_eq!(envelope["code"], code, "{envelope}");
+        assert_eq!(envelope["category"], category, "{envelope}");
+    }
     fs::remove_dir_all(&project).expect("Geçici proje temizlenmeli");
 }
 

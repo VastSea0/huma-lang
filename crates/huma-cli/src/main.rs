@@ -313,7 +313,14 @@ fn main() {
     std::process::exit(exit_code);
 }
 
+/// `--json` paket betiklerinin alt süreçlerine bu değişkenle taşınır.
+const JSON_TANI_ENV: &str = "HUMA_JSON_TANI";
+
 fn run(cli: Cli) -> i32 {
+    let json_diagnostics = cli.json || std::env::var_os(JSON_TANI_ENV).is_some_and(|v| v == "1");
+    if json_diagnostics {
+        std::env::set_var(JSON_TANI_ENV, "1");
+    }
     let trusted_in_process_ffi = cli.trusted_in_process_ffi;
     let capability_set = if cli.allow_all {
         huma_core::capability::CapabilitySet::allow_all()
@@ -460,10 +467,60 @@ fn run(cli: Cli) -> i32 {
     match result {
         Ok(()) => exit_codes::SUCCESS,
         Err(e) => {
-            error!("{}", format!("{:#}", e).bright_red());
+            if json_diagnostics {
+                // Başarısız paket betiğinin alt süreci kendi tanısını zaten
+                // JSON olarak yazdı; ikinci bir zarf akışı bozardı.
+                if e.downcast_ref::<package_manager::BetikCikisKodu>()
+                    .is_none()
+                {
+                    eprintln!("{}", tani_json(&e));
+                }
+            } else {
+                error!("{}", format!("{:#}", e).bright_red());
+            }
             hata_cikis_kodu(&e)
         }
     }
+}
+
+/// `--json` için tek satırlık `DiagnosticEnvelope`. Dil hataları kendi
+/// kod/kategori/konumunu taşır; diğer araç hataları `HUMA-CLI-0001` olur.
+fn tani_json(e: &anyhow::Error) -> String {
+    use huma_core::error::{DiagnosticEnvelope, ErrorCategory};
+    let arac_tanisi = |code: &str, category, details| DiagnosticEnvelope {
+        schema_version: DiagnosticEnvelope::SCHEMA_VERSION,
+        code: code.to_string(),
+        category,
+        message: format!("{e:#}"),
+        location: None,
+        stack: Box::default(),
+        details: Box::new(details),
+        causes: Box::default(),
+    };
+    let envelope = e
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<huma_core::HumaError>())
+        .map(huma_core::HumaError::diagnostic)
+        .or_else(|| {
+            e.chain()
+                .find_map(|cause| cause.downcast_ref::<std::io::Error>())
+                .map(|io| {
+                    let details = [("io_kind".to_string(), format!("{:?}", io.kind()))].into();
+                    arac_tanisi("HUMA-IO-0001", ErrorCategory::Io, details)
+                })
+        })
+        .unwrap_or_else(|| arac_tanisi("HUMA-CLI-0001", ErrorCategory::Arac, Default::default()));
+    serde_json::to_string(&envelope).unwrap_or_else(|error| {
+        // Zarf yalnız metin ve sayılardan oluşur; serileştirme hatası
+        // beklenmez, yine de çıktı JSON olarak kalır.
+        serde_json::json!({
+            "schema_version": 1,
+            "code": "HUMA-CLI-0002",
+            "category": "arac",
+            "message": error.to_string(),
+        })
+        .to_string()
+    })
 }
 
 fn dosya_bulunamadi(hedef: &str) -> anyhow::Error {
