@@ -33,6 +33,13 @@ fn izlenen_huma_kaynaklarinin_tumu_ayristirilabilir() {
         if !path.exists() {
             continue;
         }
+        // Golden negatif testleri kasıtlı olarak ayrıştırılamaz; beklenen
+        // sözdizimi hatası `.hata` dosyasında tanımlıdır ve golden koşucusu
+        // tarafından birebir doğrulanır.
+        let expected_error = std::fs::read_to_string(path.with_extension("hata")).ok();
+        if expected_error.is_some_and(|error| error.starts_with("[Sözdizimi Hatası]")) {
+            continue;
+        }
         let source = std::fs::read_to_string(&path)
             .unwrap_or_else(|error| panic!("{} okunamadı: {}", path.display(), error));
         let mut parser = Parser::new(Lexer::new(&source));
