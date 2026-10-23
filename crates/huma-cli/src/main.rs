@@ -164,6 +164,12 @@ enum Commands {
         target: Option<String>,
     },
 
+    /// `huma test`'in her test dosyası için başlattığı iç alt süreç. Test
+    /// koşucusu yöneten ebeveyn olduğundan paket yöneticisi denetimi
+    /// uygulanmaz; yetenekler kapalı kalır.
+    #[command(name = "__test-dosyasi", hide = true)]
+    TestDosyasi { file: String },
+
     /// Paket yöneticisi (yerel kütüphane kurma, silme ve doğrulama)
     #[command(alias = "package")]
     Paket {
@@ -386,6 +392,7 @@ fn run(cli: Cli) -> i32 {
         Some(Commands::Repl) => commands::start_repl(trusted_in_process_ffi),
 
         Some(Commands::Test { target }) => commands::run_tests(target.as_deref()),
+        Some(Commands::TestDosyasi { file }) => commands::run_file(&file, false),
         Some(Commands::Paket { action }) => match action {
             PackageAction::Kur { name, trusted } => {
                 package_manager::install_package(name.as_deref(), trusted)

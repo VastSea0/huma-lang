@@ -81,6 +81,17 @@ jobs:
       - name: Run canonical Hüma test suite
         run: cargo run --locked -p huma-cli -- test tests
 
+      - name: Install example package dependencies
+        shell: bash
+        # Örnek paketler kaynak ağacındaki birinci taraf paketlere bağlıdır;
+        # testleri kendi paket kökünde kurulu bağımlılıklarla çalışır.
+        run: |
+          set -euo pipefail
+          cargo build --locked -p huma-cli
+          for manifest in examples/*/huma.json; do
+            (cd "$(dirname "$manifest")" && "$GITHUB_WORKSPACE/target/debug/huma" kur --güvenilir)
+          done
+
       - name: Run Hüma example smoke tests
         run: cargo run --locked -p huma-cli -- test examples
 

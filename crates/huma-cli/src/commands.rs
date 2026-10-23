@@ -332,9 +332,22 @@ fn run_test_file(path: &Path) -> Result<TestOutcome> {
 
     let executable =
         std::env::current_exe().with_context(|| "Hüma test yürütülebilirinin yolu bulunamadı")?;
-    let mut child = Command::new(executable)
-        .arg("run")
-        .arg(path)
+    let path = path
+        .canonicalize()
+        .with_context(|| format!("'{}' test yolu çözümlenemedi", path.display()))?;
+    // Paket testleri modüllerini paket kökünden çözer (`huma paket run test`
+    // ile aynı); paket dışındaki dosyalar çağıranın dizininde çalışır.
+    let package_root = path
+        .ancestors()
+        .skip(1)
+        .find(|dir| dir.join("huma.json").is_file());
+    let mut command = Command::new(executable);
+    if let Some(root) = package_root {
+        command.current_dir(root);
+    }
+    let mut child = command
+        .arg("__test-dosyasi")
+        .arg(&path)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

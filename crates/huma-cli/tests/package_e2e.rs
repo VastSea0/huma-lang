@@ -217,3 +217,47 @@ fn cikis_kodlari_hata_sinifini_yansitir() {
     }
     fs::remove_dir_all(&project).expect("Geçici proje temizlenmeli");
 }
+
+#[test]
+fn test_komutu_paket_disi_ve_paket_testlerini_calistirir() {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Sistem saati Unix epoch sonrasında olmalı")
+        .as_nanos();
+    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|path| path.parent())
+        .expect("Workspace kökü bulunmalı")
+        .to_path_buf();
+    let root = workspace.join("target").join(format!(
+        "huma_test_command_e2e_{}_{}",
+        std::process::id(),
+        nonce
+    ));
+    let package = root.join("paket");
+    fs::create_dir_all(package.join("tests")).expect("Geçici dizinler oluşturulmalı");
+    assert_success(&run_huma(&package, &["ilkle"]), "Paket ilkleme");
+    fs::write(root.join("gecer_test.hb"), "\"Başarısız: 0\"'ı yazdır").expect("Test yazılmalı");
+    // Paket testi modülünü paket kökünden çözmelidir.
+    fs::write(package.join("yardimci.hb"), "deger = 0 olsun").expect("Modül yazılmalı");
+    fs::write(
+        package.join("tests/paket.hb"),
+        "\"yardimci.hb\"'yi yükle\n(\"Başarısız: \" + deger)'i yazdır",
+    )
+    .expect("Paket testi yazılmalı");
+
+    let passing = run_huma(&root, &["test", "."]);
+    assert_success(&passing, "Geçen testler");
+    let stdout = String::from_utf8_lossy(&passing.stdout);
+    assert!(stdout.contains("Başarılı: 2"), "{stdout}");
+
+    fs::write(root.join("kalir_test.hb"), "\"Başarısız: 1\"'i yazdır").expect("Test yazılmalı");
+    let failing = run_huma(&root, &["test", "."]);
+    assert!(
+        !failing.status.success(),
+        "Başarısız test raporu komutu başarısız kılmalı"
+    );
+    let stdout = String::from_utf8_lossy(&failing.stdout);
+    assert!(stdout.contains("kalir_test.hb ... FAIL"), "{stdout}");
+    fs::remove_dir_all(&root).expect("Geçici dizin temizlenmeli");
+}
