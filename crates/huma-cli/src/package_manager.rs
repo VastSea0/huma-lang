@@ -2401,7 +2401,8 @@ pub fn run_script(name: &str) -> Result<()> {
             // [9] Güvenlik: Tehlikeli karakter kontrolü
             check_script_safety(komut)?;
 
-            println!(
+            // Bilgi satırı stderr'e gider; stdout yalnız programındır.
+            eprintln!(
                 "{} {} betiği çalıştırılıyor: {}",
                 "Hüma:".bright_cyan(),
                 name.bold(),

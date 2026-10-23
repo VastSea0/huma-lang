@@ -308,6 +308,8 @@ fn bagimliliksiz_projede_kur_kilit_uretir_ve_proje_calisir() {
     );
     let after = run_huma(&project, &["paket", "run", "baslat"]);
     assert_success(&after, "Kilitli proje");
-    assert!(String::from_utf8_lossy(&after.stdout).contains("çalıştı"));
+    // stdout yalnız programın çıktısını taşımalı; betik bilgisi stderr'dedir.
+    assert_eq!(String::from_utf8_lossy(&after.stdout), "çalıştı\n");
+    assert!(String::from_utf8_lossy(&after.stderr).contains("baslat betiği çalıştırılıyor"));
     fs::remove_dir_all(&project).expect("Geçici proje temizlenmeli");
 }
