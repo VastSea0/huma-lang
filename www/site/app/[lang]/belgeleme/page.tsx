@@ -111,9 +111,9 @@ function TrSections() {
         <p>Tanımlayıcılar Unicode harf, rakam ve <code>_</code> içerebilir; ilk karakter harf veya <code>_</code> olmalıdır. Lexer tanımlayıcıları Unicode NFC biçimine getirir. Türkçe karakterler doğrudan kullanılabilir: <code>değer</code>, <code>öğrenci_sayısı</code>.</p>
         <p>Anahtar sözcükler tanımlayıcı olarak kullanılamaz. <code>doğru</code>, <code>yanlış</code>, <code>liste</code>, <code>devam</code>, <code>kır</code> ve ASCII eşdeğerleri ayrılmıştır.</p>
         <ul>
-          <li><code>//</code> ile satır sonuna kadar yorum yazılır.</li>
+          <li><code>{"//"}</code> ile satır sonuna kadar yorum yazılır.</li>
           <li>Noktalı virgül isteğe bağlıdır.</li>
-          <li>Kaçış dizileri: <code>\n \r \t \\ \" \xNN</code>. Bilinmeyen kaçışlar hatadır.</li>
+          <li>Kaçış dizileri: <code>{'\\n \\r \\t \\\\ \\" \\xNN'}</code>. Bilinmeyen kaçışlar hatadır.</li>
         </ul>
       </div>
 
@@ -216,9 +216,9 @@ function EnSections() {
         <p>Identifiers may contain Unicode letters, digits, and <code>_</code>; the first character must be a letter or <code>_</code>. The lexer normalises identifiers to Unicode NFC. Turkish characters are used directly: <code>değer</code>, <code>öğrenci_sayısı</code>.</p>
         <p>Keywords cannot be used as identifiers. <code>doğru</code>, <code>yanlış</code>, <code>liste</code>, <code>devam</code>, <code>kır</code> and their ASCII equivalents are reserved.</p>
         <ul>
-          <li><code>//</code> begins a line comment.</li>
+          <li><code>{"//"}</code> begins a line comment.</li>
           <li>Semicolons are optional.</li>
-          <li>Escape sequences: <code>\n \r \t \\ \" \xNN</code>. Unknown escapes are errors.</li>
+          <li>Escape sequences: <code>{'\\n \\r \\t \\\\ \\" \\xNN'}</code>. Unknown escapes are errors.</li>
         </ul>
       </div>
 
