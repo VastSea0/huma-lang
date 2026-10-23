@@ -18,19 +18,6 @@ mod tests {
     use huma_vm::VM;
     use std::{cell::RefCell, rc::Rc};
 
-    fn compile_and_run(kod: &str) {
-        let lexer = Lexer::new(kod);
-        let mut parser = Parser::new(lexer);
-        let (ast, diagnostics) = parser.parse_program_with_diagnostics();
-        assert!(diagnostics.is_empty());
-        let mut derleyici = Derleyici::new();
-        let prog = derleyici
-            .derle_kontrollu(ast)
-            .expect("Kaynak bytecode'a derlenmeli");
-        let mut vm = VM::new(prog);
-        vm.run_checked().expect("Bytecode hatasız çalışmalı");
-    }
-
     fn vm_output(kod: &str) -> String {
         let program = pipeline::compile_source(kod).expect("kaynak bytecode'a derlenmeli");
         let output = Rc::new(RefCell::new(String::new()));
@@ -112,13 +99,12 @@ mod tests {
 
     #[test]
     fn compiler_vm_sayi_yazdirma() {
-        // Panik atmadan çalışmalı
-        compile_and_run("42'yi yazdır");
+        assert_eq!(vm_output("42'yi yazdır"), "42\n");
     }
 
     #[test]
     fn compiler_vm_degisken_atama() {
-        compile_and_run("x = 100 olsun");
+        assert_eq!(vm_output("x = 100 olsun\nx'i yazdır"), "100\n");
     }
 
     #[test]
@@ -129,7 +115,7 @@ mod tests {
             }
             merhaba()
         "#;
-        compile_and_run(kod);
+        assert_eq!(vm_output(kod), "Selam!\n");
     }
 
     #[test]
@@ -138,18 +124,25 @@ mod tests {
             ic fonksiyon olsun { "iç"'i yazdır }
             dis fonksiyon olsun { ic() }
             dis()
+            dis()
         "#;
-        compile_and_run(kod);
+        assert_eq!(vm_output(kod), "iç\niç\n");
     }
 
     #[test]
     fn compiler_derle_kontrollu_basarili() {
-        let lexer = Lexer::new("x = 5 olsun");
-        let mut parser = Parser::new(lexer);
-        let ast = parser.parse_program();
-        let mut derleyici = Derleyici::new();
-        let sonuc = derleyici.derle_kontrollu(ast);
-        assert!(sonuc.is_ok(), "Kontrollü derleme başarılı olmalı");
+        let mut parser = Parser::new(Lexer::new("x = 5 olsun\nx'i yazdır"));
+        let (ast, diagnostics) = parser.parse_program_with_diagnostics();
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        let program = Derleyici::new()
+            .derle_kontrollu(ast)
+            .expect("Kontrollü derleme başarılı olmalı");
+        let output = Rc::new(RefCell::new(String::new()));
+        VM::new(program)
+            .with_output_buffer(output.clone())
+            .run_checked()
+            .expect("Program çalışmalı");
+        assert_eq!(output.borrow().as_str(), "5\n");
     }
 
     #[test]
