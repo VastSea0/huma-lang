@@ -69,18 +69,23 @@ eşlik kanıtlanana kadar deneysel kalır.
 cargo build --release --locked -p huma-cli
 ```
 
+`benchmarks/` bir Hüma paketidir; iş yükleri `huma.json` betikleriyle çalışır.
+Ölçüm, betiği başlatan paket yöneticisi sürecini de kapsar.
+
 macOS:
 
 ```bash
-/usr/bin/time -l target/release/huma run benchmarks/core_loop.hb
-/usr/bin/time -l target/release/huma run benchmarks/core_loop.hb --vm
+cd benchmarks
+/usr/bin/time -l ../target/release/huma paket run cekirdek
+/usr/bin/time -l ../target/release/huma paket run cekirdek-vm
 ```
 
 Linux:
 
 ```bash
-/usr/bin/time -v target/release/huma run benchmarks/core_loop.hb
-/usr/bin/time -v target/release/huma run benchmarks/core_loop.hb --vm
+cd benchmarks
+/usr/bin/time -v ../target/release/huma paket run cekirdek
+/usr/bin/time -v ../target/release/huma paket run cekirdek-vm
 ```
 
 Kanonik dış süreç iş yükü 100.000 aralık yinelemesi yapar ve

@@ -91,8 +91,8 @@ const CODE: Record<string, L[]> = {
     [t('hesap.topla('), num('2'), t(', '), num('3'), t(")'ü "), kw('yazdır')],
   ],
   guvenlik: [
-    [cm('# yalnızca dosya okuma ve ağ istemcisine izin ver')],
-    [t('huma run uygulama.hb --izin dosya-okuma --izin ağ-istemci')],
+    [cm('# huma.json → "veri": "huma run uygulama.hb --izin dosya-okuma --izin ağ-istemci"')],
+    [t('huma paket run veri')],
   ],
 };
 

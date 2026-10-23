@@ -1,0 +1,14 @@
+{
+  "aciklama": "Hüma yorumlayıcı ve VM için tekrarlanabilir dış süreç ölçüm iş yükleri.",
+  "ad": "huma_olcumleri",
+  "bagimliliklar": {},
+  "betikler": {
+    "cekirdek": "huma run core_loop.hb",
+    "cekirdek-vm": "huma run core_loop.hb --vm"
+  },
+  "giris": "core_loop.hb",
+  "huma_surum": ">=0.6.0",
+  "lisans": "MIT",
+  "surum": "0.1.0",
+  "yazar": "Hüma Ekibi"
+}

@@ -284,12 +284,15 @@ alt kümedir.
 ## 13. Yetenek ve güvenlik modeli
 
 Dosya okuma/yazma, ağ istemcisi/sunucusu, süreç, FFI, veritabanı ve GUI
-yetenekleri varsayılan olarak kapalıdır. CLI’da yalnız gereken yetenek açıkça
-verilir:
+yetenekleri varsayılan olarak kapalıdır. Programlar `huma.json` içindeki bir
+betikle çalıştırılır ve betikte yalnız gereken yetenek açıkça verilir:
 
 ```bash
-huma run uygulama.hb --izin dosya-okuma --izin ağ-istemci
+# huma.json → "betikler": { "veri": "huma run uygulama.hb --izin dosya-okuma --izin ağ-istemci" }
+huma paket run veri
 ```
+
+`huma run <dosya.hb>` paket yöneticisi betiğinin dışında çağrılırsa reddedilir.
 
 `--tüm-izinler` yalnız güvenilen kod içindir. Yetenek denetimi işletim sistemi
 sandbox’ı değildir: izin verilen işlem, Hüma sürecinin işletim sistemi

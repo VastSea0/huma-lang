@@ -1,12 +1,13 @@
 //! # Hüma CLI — Unified Entry Point
 //!
 //! ```text
-//! hüma run   <dosya.hb>              # Interpreter modunda çalıştır
-//! hüma build <dosya.hb> [çıktı.hbc]  # Bytecode'a derle
-//! hüma exec  <dosya.hbc>             # Bytecode çalıştır
-//! hüma repl                          # Etkileşimli REPL
-//! hüma test  [yol]                   # Testleri çalıştır (tests/ veya *_test.hb)
-//! hüma version                       # Sürüm bilgisi
+//! huma paket run <betik>            # huma.json betiğini çalıştır (programlar için tek yol)
+//! huma run   <dosya.hb>             # Yalnız bir paket betiğinin içinden
+//! huma build <dosya.hb> [çıktı.hbc] # Bytecode'a derle (yalnız paket betiğinden)
+//! huma exec  <dosya.hbc>            # Bytecode çalıştır (yalnız paket betiğinden)
+//! huma repl                         # Etkileşimli REPL
+//! huma test  [yol]                  # Testleri çalıştır (tests/ veya *_test.hb)
+//! huma version                      # Sürüm bilgisi
 //! ```
 
 mod commands;
@@ -105,7 +106,7 @@ impl From<CapabilityArg> for huma_core::capability::Capability {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Bir Hüma kaynak dosyasını veya projedeki bir betiği çalıştır
+    /// Projedeki bir betiği veya (yalnız bir paket betiğinin içinden) bir .hb dosyasını çalıştır
     #[command(alias = "çalıştır")]
     Run {
         /// .hb dosyası veya huma.json içindeki betik adı

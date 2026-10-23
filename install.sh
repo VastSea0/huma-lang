@@ -127,8 +127,8 @@ if command -v huma > /dev/null 2>&1; then
   huma --version 2>/dev/null || true
   printf "\n"
   info "Quick start:"
-  printf "  ${CYAN}echo 'isim = \"Dünya\" olsun' > merhaba.hb${RESET}\n"
-  printf "  ${CYAN}huma run merhaba.hb${RESET}\n"
+  printf "  ${CYAN}huma yeni merhaba && cd merhaba${RESET}\n"
+  printf "  ${CYAN}huma paket run baslat${RESET}\n"
   printf "\n"
   info "Documentation: https://github.com/${REPO}#readme\n"
 else
