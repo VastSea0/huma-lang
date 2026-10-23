@@ -674,12 +674,17 @@ impl VM {
             if let Some((handler_address, stack_height)) = self.error_stack.pop() {
                 self.stack.truncate(stack_height);
                 self.ip = handler_address;
+                // Yorumlayıcıyla aynı: iz, hatanın oluştuğu andaki çağrı
+                // yığınının tamamıdır; işleyiciyi içeren çerçeve ve onu
+                // çağıranlar da eklenir.
+                trace.extend(self.etkin_cerceveler());
                 let diagnostic = RuntimeDiagnostic {
                     message,
                     location: error_location,
                     stack: trace,
                 };
-                self.stack.push(Deger::Hata(diagnostic.to_string()));
+                // Yorumlayıcıyla aynı: yakalanan hata, tanı metni olarak bağlanır.
+                self.stack.push(Deger::Metin(diagnostic.to_string()));
                 return;
             }
 
@@ -732,6 +737,32 @@ impl VM {
                 }
             }
         }
+    }
+
+    /// Mevcut çerçeveden en dıştakine doğru fonksiyon çerçeveleri.
+    fn etkin_cerceveler(&self) -> Vec<StackFrame> {
+        let current = (
+            self.function_index,
+            self.function_name.as_ref(),
+            self.function_location,
+        );
+        std::iter::once(current)
+            .chain(self.frames.iter().rev().map(|frame| {
+                (
+                    frame.function_index,
+                    frame.function_name.as_ref(),
+                    frame.function_location,
+                )
+            }))
+            .filter_map(|(index, name, location)| {
+                let function = match (name, index) {
+                    (Some(name), _) => name.clone(),
+                    (None, Some(index)) => format!("<anonim:{index}>"),
+                    (None, None) => return None,
+                };
+                Some(StackFrame { function, location })
+            })
+            .collect()
     }
 
     fn degisken_tanimla(&mut self, name: String, value: Deger) {
