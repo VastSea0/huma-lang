@@ -274,9 +274,16 @@ pub fn run_tests(target: Option<&str>) -> Result<()> {
                     println!("{}", "OK".bright_green().bold());
                 }
             }
+            Ok(TestOutcome::Golden) => {
+                passed_files += 1;
+                println!("{}", "OK (çıktı doğrulandı)".bright_green().bold());
+            }
             Ok(TestOutcome::Unknown) => {
                 passed_files += 1;
-                println!("{}", "OK".bright_green().bold());
+                println!(
+                    "{}",
+                    "OK (yalnız çalıştı; çıktı doğrulanmadı)".bright_yellow()
+                );
             }
             Err(e) => {
                 failed_files += 1;
@@ -311,6 +318,8 @@ pub fn run_tests(target: Option<&str>) -> Result<()> {
 enum TestOutcome {
     /// We detected a `birim_test.hb` report, and parsed failed test count.
     Passed { failed_tests: usize },
+    /// Çıktı `.beklenen`/`.hata` dosyalarıyla birebir doğrulandı.
+    Golden,
     /// Test ran without panic, but we couldn't detect a report.
     Unknown,
 }
@@ -412,6 +421,42 @@ fn run_test_file(path: &Path) -> Result<TestOutcome> {
         String::from_utf8(stdout).with_context(|| "Test standart çıktısı geçerli UTF-8 değil")?;
     let stderr =
         String::from_utf8(stderr).with_context(|| "Test standart hatası geçerli UTF-8 değil")?;
+
+    // Golden test: yanındaki `.beklenen` tam stdout'u, `.hata` beklenen hata
+    // iletisini tanımlar (tests/golden_tests.rs ile aynı sözleşme).
+    let expected_stdout = read_optional_text(&path.with_extension("beklenen"))?;
+    let expected_error = read_optional_text(&path.with_extension("hata"))?;
+    if expected_stdout.is_some() || expected_error.is_some() {
+        let mut mismatches = Vec::new();
+        if out != expected_stdout.clone().unwrap_or_default() {
+            mismatches.push(format!(
+                "stdout beklenenden farklı:\n--- beklenen\n{}--- gelen\n{}",
+                expected_stdout.unwrap_or_default(),
+                out
+            ));
+        }
+        match expected_error {
+            Some(error) if status.success() => mismatches.push(format!(
+                "'{}' hatası bekleniyordu, program başarılı bitti",
+                error.trim()
+            )),
+            Some(error) if !stderr.contains(error.trim()) => mismatches.push(format!(
+                "hata beklenenden farklı:\n--- beklenen\n{}\n--- gelen\n{}",
+                error.trim(),
+                stderr.trim()
+            )),
+            None if !status.success() => {
+                mismatches.push(format!("beklenmeyen hata: {}", stderr.trim()))
+            }
+            _ => {}
+        }
+        return if mismatches.is_empty() {
+            Ok(TestOutcome::Golden)
+        } else {
+            anyhow::bail!("{}", mismatches.join("\n"))
+        };
+    }
+
     if !status.success() {
         let detail = if stderr.trim().is_empty() {
             out.trim()
@@ -439,6 +484,15 @@ fn run_test_file(path: &Path) -> Result<TestOutcome> {
     }
 
     Ok(TestOutcome::Unknown)
+}
+
+fn read_optional_text(path: &Path) -> Result<Option<String>> {
+    if !path.is_file() {
+        return Ok(None);
+    }
+    std::fs::read_to_string(path)
+        .map(Some)
+        .with_context(|| format!("'{}' okunamadı", path.display()))
 }
 
 fn parse_birim_test_failed_count(output: &str) -> Option<usize> {

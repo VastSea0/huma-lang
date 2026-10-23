@@ -1,0 +1,1 @@
+olmayan'ı yazdır

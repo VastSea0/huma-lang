@@ -1,0 +1,11 @@
+[TEST] Kare Testi ...
+  -> BAŞARILI
+[TEST] Liste Eşleme Testi ...
+  -> BAŞARILI
+[TEST] Liste Filtreleme Testi ...
+  -> BAŞARILI
+-----------------------------
+Toplam Test: 3
+Başarılı: 3
+Başarısız: 0
+-----------------------------

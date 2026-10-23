@@ -43,3 +43,7 @@ path = "../../tests/module_tests.rs"
 [[test]]
 name = "source_corpus_tests"
 path = "../../tests/source_corpus_tests.rs"
+
+[[test]]
+name = "golden_tests"
+path = "../../tests/golden_tests.rs"

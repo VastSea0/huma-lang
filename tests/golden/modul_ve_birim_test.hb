@@ -1,3 +1,4 @@
+// golden: yalnız-yorumlayıcı VM modül yüklemeyi derlemiyor (B-021)
 yükle "liste.hb";
 yükle "birim_test.hb";
 yükle "matematik.hb";

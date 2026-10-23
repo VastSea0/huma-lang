@@ -1,3 +1,4 @@
+// golden: yalnız-yorumlayıcı VM sınıf tanımını ve nesne alanı atamasını derlemiyor (B-021)
 // Türkçe Karakter Desteği Testi
 
 değişkenimiz = "merhaba" olsun

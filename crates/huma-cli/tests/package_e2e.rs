@@ -268,6 +268,35 @@ fn test_komutu_paket_disi_ve_paket_testlerini_calistirir() {
     );
     let stdout = String::from_utf8_lossy(&failing.stdout);
     assert!(stdout.contains("kalir_test.hb ... FAIL"), "{stdout}");
+    fs::remove_file(root.join("kalir_test.hb")).expect("Test silinmeli");
+
+    // Golden sözleşmesi: `.beklenen` tam stdout'u, `.hata` beklenen hatayı tanımlar.
+    let golden = root.join("tests");
+    fs::create_dir_all(&golden).expect("Golden dizini oluşturulmalı");
+    fs::write(golden.join("cikti.hb"), "1'i yazdır").expect("Golden yazılmalı");
+    fs::write(golden.join("cikti.beklenen"), "1\n").expect("Beklenen yazılmalı");
+    fs::write(golden.join("hata.hb"), "(1 / 0)'ı yazdır").expect("Golden yazılmalı");
+    fs::write(golden.join("hata.hata"), "Sıfıra bölme hatası").expect("Beklenen yazılmalı");
+    let verified = run_huma(&root, &["test", "."]);
+    assert_success(&verified, "Golden testler");
+    let stdout = String::from_utf8_lossy(&verified.stdout);
+    assert!(
+        stdout.contains("cikti.hb ... OK (çıktı doğrulandı)"),
+        "{stdout}"
+    );
+    assert!(
+        stdout.contains("hata.hb ... OK (çıktı doğrulandı)"),
+        "{stdout}"
+    );
+
+    fs::write(golden.join("cikti.beklenen"), "2\n").expect("Beklenen yazılmalı");
+    let mismatch = run_huma(&root, &["test", "."]);
+    assert!(
+        !mismatch.status.success(),
+        "Çıktı uyuşmazlığı başarısız olmalı"
+    );
+    let stdout = String::from_utf8_lossy(&mismatch.stdout);
+    assert!(stdout.contains("cikti.hb ... ERROR"), "{stdout}");
     fs::remove_dir_all(&root).expect("Geçici dizin temizlenmeli");
 }
 
