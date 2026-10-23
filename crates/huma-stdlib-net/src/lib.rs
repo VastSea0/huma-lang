@@ -373,35 +373,57 @@ fn parse_request_headers(
         .collect()
 }
 
-fn server_start(args: Vec<Deger>) -> Deger {
-    if let Some(error) = capability_error(Capability::NetworkServer, "dahili_sunucu_baslat") {
-        return error;
-    }
-    let port = match args.as_slice() {
-        [Deger::Sayi(port)]
+/// `(port)` yalnız yerel döngü arayüzünü (127.0.0.1) dinler; başka bir
+/// arayüz, ör. tüm arayüzler için `"0.0.0.0"`, ikinci argümanla açıkça
+/// istenmelidir.
+fn sunucu_adresi(args: &[Deger]) -> Result<std::net::SocketAddr, String> {
+    let (port, host) = match args {
+        [port] => (port, None),
+        [port, host] => (port, Some(host)),
+        _ => {
+            return Err(format!(
+                "1 veya 2 argüman (port[, adres]) bekleniyordu; {} geldi",
+                args.len()
+            ))
+        }
+    };
+    let port = match port {
+        Deger::Sayi(port)
             if port.is_finite()
                 && port.fract() == 0.0
                 && (1.0..=u16::MAX as f64).contains(port) =>
         {
             *port as u16
         }
-        [other] => {
-            return Deger::Hata(format!(
-                "dahili_sunucu_baslat: 1..65535 arasında tamsayı port bekleniyordu; {other} geldi"
-            ))
-        }
-        _ => {
-            return Deger::Hata(format!(
-                "dahili_sunucu_baslat: tam olarak 1 argüman bekleniyordu; {} geldi",
-                args.len()
+        other => {
+            return Err(format!(
+                "1..65535 arasında tamsayı port bekleniyordu; {other} geldi"
             ))
         }
     };
+    let ip = match host {
+        None => std::net::IpAddr::from([127, 0, 0, 1]),
+        Some(Deger::Metin(host)) => host
+            .parse()
+            .map_err(|_| format!("geçerli bir IP adresi bekleniyordu; '{host}' geldi"))?,
+        Some(other) => return Err(format!("adres metin olmalıdır; {other} geldi")),
+    };
+    Ok(std::net::SocketAddr::new(ip, port))
+}
+
+fn server_start(args: Vec<Deger>) -> Deger {
+    if let Some(error) = capability_error(Capability::NetworkServer, "dahili_sunucu_baslat") {
+        return error;
+    }
+    let address = match sunucu_adresi(&args) {
+        Ok(address) => address,
+        Err(error) => return Deger::Hata(format!("dahili_sunucu_baslat: {error}")),
+    };
+    let port = address.port();
     let server_id = match next_id() {
         Ok(id) => id,
         Err(error) => return Deger::Hata(format!("dahili_sunucu_baslat: {error}")),
     };
-    let address: std::net::SocketAddr = ([0, 0, 0, 0], port).into();
     // Dinleyiciyi eşzamanlı olarak ayır; Hyper sunucusunu ise Tokio geleceği
     // ilk kez poll edildiğinde çalışma zamanı bağlamı içinde oluştur.
     let listener = match TcpListener::bind(address) {
@@ -793,6 +815,18 @@ mod tests {
             server_close(vec![Deger::Sayi(f64::NAN)]),
             Deger::Hata(_)
         ));
+    }
+
+    #[test]
+    fn sunucu_varsayilan_olarak_yalniz_yerel_arayuzu_dinler() {
+        let local = sunucu_adresi(&[Deger::Sayi(8080.0)]).expect("adres çözülmeli");
+        assert_eq!(local.to_string(), "127.0.0.1:8080");
+        let all = sunucu_adresi(&[Deger::Sayi(8080.0), Deger::Metin("0.0.0.0".to_string())])
+            .expect("açık adres çözülmeli");
+        assert_eq!(all.to_string(), "0.0.0.0:8080");
+        assert!(sunucu_adresi(&[Deger::Sayi(8080.0), Deger::Metin("yerel".to_string())]).is_err());
+        assert!(sunucu_adresi(&[Deger::Sayi(0.0)]).is_err());
+        assert!(sunucu_adresi(&[]).is_err());
     }
 
     #[test]

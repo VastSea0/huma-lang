@@ -317,6 +317,10 @@ huma paket run veri
 
 `huma run <dosya.hb>` paket yöneticisi betiğinin dışında çağrılırsa reddedilir.
 
+`ağ-sunucu` yeteneğiyle açılan HTTP sunucusu (`dahili_sunucu_baslat(port)`)
+varsayılan olarak yalnız yerel döngü arayüzünü (127.0.0.1) dinler; başka bir
+arayüz ikinci argümanla açıkça istenir: `dahili_sunucu_baslat(8080, "0.0.0.0")`.
+
 `--tüm-izinler` yalnız güvenilen kod içindir. Yetenek denetimi işletim sistemi
 sandbox’ı değildir: izin verilen işlem, Hüma sürecinin işletim sistemi
 haklarıyla çalışır. Özellikle FFI yanlış bir C ABI imzasıyla çağrılırsa Rust
