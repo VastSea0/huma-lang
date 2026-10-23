@@ -17,7 +17,7 @@ Başlangıç durumu (2026-10-23): `cargo clippy -D warnings` temiz,
 | B-003 | P2 | runtime | `interpreter.rs` 6887 satır, yalnızca 56 `fn` — devasa fonksiyonlar/`match` blokları. Karakterizasyon testleriyle modüllere böl | `crates/huma-runtime/src/interpreter.rs` | açık |
 | B-004 | P1 | tests | `tests/*.hb` (kutuphane_test, test_derle, test_faktoriyel, test_list2, test_mimari, test_sinif, test_turkce, tum_ozellikler_test) hiçbir Rust testinde adıyla çağrılmıyor; `source_corpus_tests.rs` görünüşe göre yalnız ayrıştırma yapıyor, çıktı doğrulamıyor. Golden-output koşucusu gerekli (yorumlayıcı + VM) | `tests/source_corpus_tests.rs:19` | açık |
 | B-005 | P1 | runtime | Üretim kodunda 223 `unwrap()/expect()` ve çok sayıda `panic!`. Kullanıcı girdisiyle tetiklenebilenleri tanıya çevir | `rg -n 'unwrap\(\)\|expect\(\|panic!' crates` | açık |
-| B-006 | P1 | syntax | `ast.rs` içinde `#[allow(dead_code)]` ile susturulmuş enum varyantları (ör. `NesneOlustur`). Ya kullan ya sil | `crates/huma-syntax/src/ast.rs:28,63` | bitti (bkz. LOG 2026-10-23 #4) |
+| B-006 | P1 | syntax | `ast.rs` içinde `#[allow(dead_code)]` ile susturulmuş enum varyantları (ör. `NesneOlustur`). Ya kullan ya sil | `crates/huma-syntax/src/ast.rs:28,63` | bitti (e18095c) |
 | B-007 | P1 | cli | `exit_codes` modülü `#[allow(dead_code)]` ile susturulmuş; tanımlı çıkış kodları gerçekten kullanılmıyor olabilir | `crates/huma-cli/src/main.rs:21` | bitti (4fbd7d3) |
 | B-008 | P2 | runtime | `#[allow(unpredictable_function_pointer_comparisons)]` — değer eşitliğinde fonksiyon işaretçisi karşılaştırması; semantik olarak tanımsız sonuç riski | `crates/huma-runtime/src/value.rs:59` | açık |
 | B-009 | P2 | modules | `nlp_temel` modülünün en az 3 kopyası var ve birbirinden sapmış (`huma_modulleri/`, `examples/tor-qurtu/huma_modulleri/`, `examples/musteri_geri_bildirim_analizci/huma_modulleri/`). Vendoring yerine paket yöneticisi/yol bağımlılığı kullan | `diff -rq` | açık |
@@ -45,6 +45,11 @@ Başlangıç durumu (2026-10-23): `cargo clippy -D warnings` temiz,
 | B-031 | P2 | syntax | `Parser::parse_program()` genel API'si sözdizimi tanılarını sessizce atıyor; üretimde kullanılmıyor ama testlerde kullanılıyor (`tests/integration_tests.rs` derin özyineleme testi). Kaldır veya tanıları döndürsün | `crates/huma-syntax/src/parser.rs` `parse_program` | açık |
 | B-032 | P1 | cli | `huma run --json` "Output diagnostics in JSON" diyor fakat çalışma zamanı tanısı yine `tracing` metni olarak basılıyor; JSON çıktı yok | `huma run --json sifir.hb` | açık |
 | B-033 | P3 | cli | `huma build x.hb` çıktı adı verilmezse `x.hbc` yerine sabit `cikti.hbc` yazıyor; aynı dizinde iki derleme birbirini ezer | `huma build sifir.hb` → `cikti.hbc` | açık |
+| B-034 | P0 | ci | Main CI kırmızı: `rust-quality` Linux'a özgü `cfg` bloğunda `clippy::needless_return` ile düşüyor (`huma-perf/src/main.rs:301`); macOS'ta yerel clippy bu bloğu görmediğinden yakalanmadı. Ayrıca CI `tests` işi `needs: rust-quality` olduğu için hiç çalışmadı | `gh run view 39922940847 --log-failed` | bitti (bkz. LOG 2026-10-23 #5) |
+| B-035 | P0 | security | `cargo audit` 12 açık buluyor: rustls 0.23.42 (4), quinn-proto 0.11.16 (5), rustls-webpki 0.103.13, webpki-roots 1.0.9, h2 0.3.27; ayrıca yanked chacha20 0.10.1, bakımsız ttf-parser | `cargo audit` | açık |
+| B-036 | P0 | ci | `security-audit` işi kendi aracını kuramıyor: `rustsec/audit-check` cargo-audit'i `--locked` olmadan derliyor, kstring 1.96 istiyor, depo 1.94.1'e pinli → iş her zaman kırmızı ve açıkları raporlamıyor | CI log: `kstring@2.0.5 requires rustc 1.96.0` | açık |
+| B-037 | P2 | perf | `huma-perf` RSS okunamazsa `unwrap_or(0)` ile 0 KiB raporluyor; performans kapısı sahte bellek değeri karşılaştırır | `crates/huma-perf/src/main.rs:287` | açık |
+| B-038 | P1 | ci | `performance.yml` `[self-hosted, huma-perf]` etiketli çalıştırıcı istiyor; böyle bir çalıştırıcı yoksa iş PR'larda sonsuza kadar kuyrukta kalır, kapı fiilen yok | `.github/workflows/performance.yml:18` | açık |
 
 ## Keşif kaydı
 
@@ -54,3 +59,4 @@ Ajan derinlemesine taradığı her alanı buraya işler.
 |---|---|---|---|
 | 2026-10-23 | Genel yüzey taraması (ilk teşhis) | B-001…B-016 | Derin okuma yapılmadı; tüm crate'ler yeniden taranmalı |
 | 2026-10-23 | CLI düşmanca girdi bataryası + yorumlayıcı/VM çapraz yürütme | B-018…B-029 | Boş dosya, BOM, geçersiz UTF-8, derin yuvalama, sıfıra bölme, büyük sayı, sonsuz döngü/özyineleme, döngüsel liste, kapalı yetenek, NFC denendi. NFC, sıfıra bölme, adım/özyineleme sınırları iki arka uçta da doğru |
+| 2026-10-23 | .github/workflows (CI gerçekten neyi koruyor?) — kısmi | B-034…B-038 | Push sonrası `gh run list` ile CI durumu denetlendi; son 4 main çalışması kırmızıydı |
