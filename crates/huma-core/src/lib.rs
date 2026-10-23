@@ -194,7 +194,8 @@ mod tests {
         let mut interp = interpreter::Yorumlayici::new();
         let lx = lexer::Lexer::new(kod);
         let mut p = parser::Parser::new(lx);
-        let program = p.parse_program();
+        let (program, diagnostics) = p.parse_program_with_diagnostics();
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
         let error = interp
             .yorumla_kontrollu(program)
             .expect_err("Sınırsız özyineleme çalışma zamanı hatası vermeli");
@@ -211,7 +212,8 @@ mod tests {
         let mut interp = interpreter::Yorumlayici::new();
         let lx = lexer::Lexer::new(kod);
         let mut p = parser::Parser::new(lx);
-        let program = p.parse_program();
+        let (program, diagnostics) = p.parse_program_with_diagnostics();
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
         let error = interp
             .yorumla_kontrollu(program)
             .expect_err("Çağrılamayan değer çalışma zamanı hatası vermeli");

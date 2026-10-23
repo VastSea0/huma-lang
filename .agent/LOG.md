@@ -29,4 +29,5 @@ Yalnız ekleme. Her yineleme bir satır.
 | 2026-10-23 #23 | d941648 | B-012 | www/site: hiçbir yerden başvurulmayan 5 şablon SVG silindi, create-next-app README'si sitenin gerçek yapısını anlatan belgeyle değişti | — |
 | 2026-10-23 #24 | 32f9e86 | B-032 | `--json` artık tek satırlık `DiagnosticEnvelope` yazıyor (dil hataları kendi kodu/konumu/iziyle, G/Ç `HUMA-IO-0001`, araç `HUMA-CLI-0001`/`arac`); paket betiklerine `HUMA_JSON_TANI` ile taşınıyor | — |
 | 2026-10-23 #25 | 2c68051 | B-056 | LSP tanım/hover AST tabanlı (`tanimlari_topla`: fonksiyon, sınıf, değişken, aralık değişkeni) ve belirlenimli sıralı. `tests/lsp_oturumu.rs` gerçek ikiliyle tanı, tanım (3 tekrar), değişken, çalışma alanı ve hover'ı doğruluyor; eski kodda düşüyor | B-057, B-058 |
-| 2026-10-23 #26 | (bu commit) | B-030 | Derleyici VM testlerinden 5'i yalnız hata olmamasına bakıyordu; hepsi tam çıktıyı doğruluyor, `compile_and_run` silindi | — |
+| 2026-10-23 #26 | 54b68f2 | B-030 | Derleyici VM testlerinden 5'i yalnız hata olmamasına bakıyordu; hepsi tam çıktıyı doğruluyor, `compile_and_run` silindi | — |
+| 2026-10-23 #27 | (bu commit) | B-031 | `Parser::parse_program` özel; tek genel giriş tanıları döndüren `parse_program_with_diagnostics`. 6 test çağrısı tanıların boş olduğunu artık denetliyor | — |

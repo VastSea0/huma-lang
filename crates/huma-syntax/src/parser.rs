@@ -191,7 +191,10 @@ impl Parser {
         }
     }
 
-    pub fn parse_program(&mut self) -> Vec<Komut> {
+    /// Tanılar `errors` içinde birikir; dışarıya yalnız
+    /// `parse_program_with_diagnostics` açıktır, böylece hiçbir çağıran
+    /// sözdizimi hatalarını sessizce atamaz.
+    fn parse_program(&mut self) -> Vec<Komut> {
         let mut komutlar = Vec::new();
         while self.current_token != Token::Son {
             let start_pos = self.current_pos;
@@ -207,8 +210,9 @@ impl Parser {
         komutlar
     }
 
-    /// Parse and also return any collected syntax errors.
-    /// This is intended for tooling (LSP/IDE) use.
+    /// Programı ayrıştırır ve toplanan tüm sözdizimi tanılarını döndürür.
+    /// Tanı listesi boş değilse AST yalnız araç desteği (LSP) içindir;
+    /// yürütülmemelidir.
     pub fn parse_program_with_diagnostics(&mut self) -> (Vec<Komut>, Vec<HumaError>) {
         let program = self.parse_program();
         let errors = std::mem::take(&mut self.errors);

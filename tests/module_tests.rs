@@ -435,7 +435,8 @@ fn basarisiz_modul_duzeltildikten_sonra_yeniden_yuklenebilir() {
         .insert(0, dizin.to_string_lossy().to_string());
 
     let mut parser = Parser::new(Lexer::new(r#"yükle "duzelt.hb""#));
-    let program = parser.parse_program();
+    let (program, diagnostics) = parser.parse_program_with_diagnostics();
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
     assert!(yorumlayici.yorumla_kontrollu(program).is_err());
     assert!(
         yorumlayici.yuklenen_dosyalar.is_empty(),
@@ -444,7 +445,8 @@ fn basarisiz_modul_duzeltildikten_sonra_yeniden_yuklenebilir() {
 
     std::fs::write(&modul, r#""düzeltildi"'yi yazdır"#).expect("Modül düzeltilmeli");
     let mut parser = Parser::new(Lexer::new(r#"yükle "duzelt.hb""#));
-    let program = parser.parse_program();
+    let (program, diagnostics) = parser.parse_program_with_diagnostics();
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
     yorumlayici
         .yorumla_kontrollu(program)
         .expect("Düzeltilen modül yeniden yüklenebilmeli");

@@ -142,7 +142,8 @@ fn test_derin_rekursiyon_hatasi() {
     let mut interp = Yorumlayici::new();
     let lexer = Lexer::new(kod);
     let mut parser = Parser::new(lexer);
-    let program = parser.parse_program();
+    let (program, diagnostics) = parser.parse_program_with_diagnostics();
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let error = interp
         .yorumla_kontrollu(program)
         .expect_err("Sınırsız özyineleme hata vermeli");
@@ -206,7 +207,8 @@ fn test_cagrilamayan_deger_hatasi() {
     let mut interp = Yorumlayici::new();
     let lexer = Lexer::new(kod);
     let mut parser = Parser::new(lexer);
-    let program = parser.parse_program();
+    let (program, diagnostics) = parser.parse_program_with_diagnostics();
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let error = interp
         .yorumla_kontrollu(program)
         .expect_err("Çağrılamayan değer hata vermeli");
