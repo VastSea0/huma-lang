@@ -401,6 +401,13 @@ pub fn koleksiyon_erisimi(koleksiyon: Deger, indeks: Deger) -> Result<Deger, Str
             let indeks = sayisal_indeks(sayi, ogeler.len(), "Liste erişimi")?;
             Ok(ogeler[indeks].clone())
         }
+        (Deger::Vektor(ogeler), Deger::Sayi(sayi)) => {
+            let ogeler = ogeler
+                .try_borrow()
+                .map_err(|_| "Vektör erişimi: hedef kullanımda".to_string())?;
+            let indeks = sayisal_indeks(sayi, ogeler.len(), "Vektör erişimi")?;
+            Ok(Deger::Sayi(ogeler[indeks]))
+        }
         (Deger::Metin(metin), Deger::Sayi(sayi)) => {
             let indeks = sayisal_indeks(sayi, metin.chars().count(), "Metin erişimi")?;
             metin

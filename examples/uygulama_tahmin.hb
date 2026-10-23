@@ -11,7 +11,7 @@ baslat fonksiyon olsun {
     
     tahmin != hedef olduğu sürece {
         deneme = deneme + 1 olsun
-        tahmin = oku(deneme + ". Tahmininiz: ") olsun
+        tahmin = sayıya_çevir(oku(deneme + ". Tahmininiz: ")) olsun
         
         tahmin < hedef ise {
             renkli_yaz("Daha BÜYÜK bir sayı girin.", MAVI)

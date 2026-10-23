@@ -1,3 +1,4 @@
+// golden: yalnız-yorumlayıcı VM modül yüklemeyi derlemiyor (B-021)
 yükle "dizgi.hb";
 
 hecele fonksiyon olsun kelime alsın {
@@ -8,7 +9,7 @@ hecele fonksiyon olsun kelime alsın {
 
     // 1. ADIM: Ünlülerin yerlerini tespit et
     i < boy olduğu sürece {
-        içeriyor_mu(ünlüler, kelime[i]) ise {
+        içeriyor(ünlüler, kelime[i]) ise {
             konumlar'a [i]'yi ekle
         }
         i = i + 1 olsun

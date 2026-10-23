@@ -40,6 +40,7 @@ fn yorumlayicida_calistir(kaynak: &str, kok: &Path) -> Sonuc {
         .expect("Test yetenekleri kurulmalı");
     let buffer = Rc::new(RefCell::new(String::new()));
     let mut yorumlayici = Yorumlayici::new().with_output_buffer(Rc::clone(&buffer));
+    huma::standart_kutuphaneleri_kaydet(&mut yorumlayici.global_degiskenler, false);
     yorumlayici
         .arama_yolları
         .insert(0, kok.join("lib").to_string_lossy().to_string());
@@ -77,11 +78,9 @@ fn vm_de_calistir(kaynak: &str) -> Sonuc {
         }
     };
     let buffer = Rc::new(RefCell::new(String::new()));
-    let hata = huma::vm::VM::new(program)
-        .with_output_buffer(Rc::clone(&buffer))
-        .run_checked()
-        .err()
-        .map(|hata| hata.to_string());
+    let mut vm = huma::vm::VM::new(program).with_output_buffer(Rc::clone(&buffer));
+    huma::standart_kutuphaneleri_kaydet(vm.global_degiskenler_mut(), false);
+    let hata = vm.run_checked().err().map(|hata| hata.to_string());
     let cikti = buffer.borrow().clone();
     Sonuc { cikti, hata }
 }
@@ -120,6 +119,21 @@ fn golden_programlar_yorumlayici_ve_vm_de_beklenen_sonucu_verir() {
         .expect("tests/golden okunmalı")
         .map(|girdi| girdi.expect("dizin girdisi okunmalı").path())
         .collect();
+    // Örnek programlar beklenen çıktı dosyasıyla isteğe bağlı olarak katılır.
+    for girdi in std::fs::read_dir(kok.join("examples")).expect("examples okunmalı") {
+        let yol = girdi.expect("dizin girdisi okunmalı").path();
+        let uzanti = yol.extension().and_then(|uzanti| uzanti.to_str());
+        let katilir = match uzanti {
+            Some("hb") => {
+                yol.with_extension("beklenen").is_file() || yol.with_extension("hata").is_file()
+            }
+            Some("beklenen" | "hata") => true,
+            _ => false,
+        };
+        if katilir {
+            programlar.push(yol);
+        }
+    }
     programlar.sort();
 
     let mut hatalar = Vec::new();

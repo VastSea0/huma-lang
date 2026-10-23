@@ -6167,6 +6167,32 @@ impl Yorumlayici {
                                         };
                                     values[index] = d.clone();
                                 }
+                                (Deger::Vektor(v), Deger::Sayi(i)) => {
+                                    let Deger::Sayi(sayi) = d else {
+                                        self.runtime_error_ekle(format!(
+                                            "Vektör ataması: değer sayı olmalı; {d} geldi"
+                                        ));
+                                        return;
+                                    };
+                                    let mut values = match v.try_borrow_mut() {
+                                        Ok(values) => values,
+                                        Err(_) => {
+                                            self.runtime_error_ekle(
+                                                "Vektör ataması hedefi kullanımda".to_string(),
+                                            );
+                                            return;
+                                        }
+                                    };
+                                    let index =
+                                        match indeks_dogrula(i, values.len(), "Vektör ataması") {
+                                            Ok(index) => index,
+                                            Err(error) => {
+                                                self.runtime_error_ekle(error);
+                                                return;
+                                            }
+                                        };
+                                    values[index] = sayi;
+                                }
                                 (Deger::Sozluk(m), Deger::Metin(key)) => {
                                     if let Err(error) = insert_keyed_value(
                                         &m,
