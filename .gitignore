@@ -1,29 +1,24 @@
+# Rust derleme çıktıları
 /target
 /fuzz/target
+/fuzz/artifacts
+/fuzz/corpus/*/*
+!/fuzz/corpus/*/empty
+**/target/
 /benchmarks/cross_language/.build
-/src-tauri/target
+
+# Hüma derleme çıktıları (`huma build` varsayılanı cikti.hbc, `huma aot` varsayılanı program)
 *.hbc
-!lib/*.hb
-!examples/*.hb
-!tests/*.hb
 program
-uygulama
-merhaba_dunya
-*.png
-!src-tauri/icons/*.png
-*.jpg
+
+# Günlükler
 *.log
-*.txt
 
-huma-ide-linux-amd64
-huma-linux-amd64
-
-release-binaries/
-
-# Dependencies & Build Cache
+# Node / web sitesi
 node_modules/
 .next/
 .vercel/
-.DS_Store
 .env.local
-**/target/
+
+# İşletim sistemi
+.DS_Store
