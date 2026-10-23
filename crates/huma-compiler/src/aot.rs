@@ -402,12 +402,6 @@ fn validate_aot_commands(
                 validate_aot_expression(deger, scope, function_names)?;
                 scope.insert(ad.clone());
             }
-            Komut::Atama { ad, deger } => {
-                if !scope.contains(ad) {
-                    return Err(format!("tanımsız değişkene atama: {}", ad));
-                }
-                validate_aot_expression(deger, scope, function_names)?;
-            }
             Komut::YazdirKomutu(expression) | Komut::DondurKomutu(expression) => {
                 validate_aot_expression(expression, scope, function_names)?;
             }
@@ -636,7 +630,7 @@ impl<'a, 'b> Emitter<'a, 'b> {
     fn emit_stmt(&mut self, komut: &Komut, module: &mut ObjectModule) {
         let komut = bare_command(komut);
         match komut {
-            Komut::DegiskenTanimla { ad, deger } | Komut::Atama { ad, deger } => {
+            Komut::DegiskenTanimla { ad, deger } => {
                 if let Some(val) = self.emit_expr(deger, module) {
                     let var = self.get_or_create_var(ad);
                     self.builder.def_var(var, val);

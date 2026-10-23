@@ -5730,12 +5730,6 @@ impl Yorumlayici {
                     self.degisken_tanimla(ad, res);
                 }
             }
-            Komut::Atama { ad, deger } => {
-                let res = self.ifade_hesapla(deger);
-                if self.runtime_errors.is_empty() {
-                    self.degisken_ata(ad, res);
-                }
-            }
             Komut::EgerKomutu {
                 kosul,
                 govde,
@@ -6665,10 +6659,6 @@ impl Yorumlayici {
                 yakalanan_kapsamlar: self.yerel_scopes.clone(),
                 module_kimligi: self.active_module_calls.last().cloned(),
             },
-            Ifade::NesneOlustur { sinif_adi, .. } => Deger::Hata(format!(
-                "Eski nesne oluşturma AST biçimi desteklenmiyor: {}",
-                sinif_adi
-            )),
             Ifade::Cagri {
                 fonksiyon,
                 argumanlar,

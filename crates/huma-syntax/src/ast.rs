@@ -25,11 +25,6 @@ pub enum Ifade {
         nesne: Box<Ifade>,
         ozellik: String,
     },
-    #[allow(dead_code)]
-    NesneOlustur {
-        sinif_adi: String,
-        argumanlar: Vec<Ifade>,
-    },
     Cagri {
         fonksiyon: Box<Ifade>,
         argumanlar: Vec<Ifade>,
@@ -57,11 +52,6 @@ pub enum Komut {
         sutun: usize,
     },
     DegiskenTanimla {
-        ad: String,
-        deger: Ifade,
-    },
-    #[allow(dead_code)]
-    Atama {
         ad: String,
         deger: Ifade,
     },
