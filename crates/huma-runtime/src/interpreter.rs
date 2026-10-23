@@ -6558,48 +6558,9 @@ impl Yorumlayici {
                 Deger::Sozluk(Gc::from_cell(RefCell::new(map)))
             }
             Ifade::ListeErisim { liste, indeks } => {
-                let l_val = self.ifade_hesapla(*liste);
-                let i_val = self.ifade_hesapla(*indeks);
-                match (l_val, i_val) {
-                    (Deger::Liste(l), Deger::Sayi(i)) if i >= 0.0 && i.fract() == 0.0 => {
-                        let values = match l.try_borrow() {
-                            Ok(values) => values,
-                            Err(_) => return Deger::Hata("Liste kullanımda".to_string()),
-                        };
-                        let index = match indeks_dogrula(i, values.len(), "Liste erişimi") {
-                            Ok(index) => index,
-                            Err(error) => return Deger::Hata(error),
-                        };
-                        values[index].clone()
-                    }
-                    (Deger::Metin(s), Deger::Sayi(i)) if i >= 0.0 && i.fract() == 0.0 => {
-                        let length = s.chars().count();
-                        let index = match indeks_dogrula(i, length, "Metin erişimi") {
-                            Ok(index) => index,
-                            Err(error) => return Deger::Hata(error),
-                        };
-                        match s.chars().nth(index) {
-                            Some(character) => Deger::Metin(character.to_string()),
-                            None => Deger::Hata("Metin indeksi çözülemedi".to_string()),
-                        }
-                    }
-                    (Deger::Sozluk(m), Deger::Metin(key)) => {
-                        match get_keyed_value(&m, &key, "Sözlük erişimi") {
-                            Ok(value) => value.unwrap_or(Deger::Bos),
-                            Err(error) => Deger::Hata(error),
-                        }
-                    }
-                    (Deger::Nesne { alanlar, .. }, Deger::Metin(key)) => {
-                        match get_keyed_value(&alanlar, &key, "Nesne erişimi") {
-                            Ok(value) => value.unwrap_or(Deger::Bos),
-                            Err(error) => Deger::Hata(error),
-                        }
-                    }
-                    (container, index) => Deger::Hata(format!(
-                        "{} değeri {} indeksiyle erişilemez",
-                        container, index
-                    )),
-                }
+                let koleksiyon = self.ifade_hesapla(*liste);
+                let indeks = self.ifade_hesapla(*indeks);
+                crate::semantics::koleksiyon_erisimi(koleksiyon, indeks).unwrap_or_else(Deger::Hata)
             }
             Ifade::NesneErisim { nesne, ozellik } => {
                 let inst = self.ifade_hesapla(*nesne);

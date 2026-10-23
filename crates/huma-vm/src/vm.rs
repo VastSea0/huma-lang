@@ -350,7 +350,7 @@ impl VM {
                 let Some(container) = self.pop_value("koleksiyon erişimi") else {
                     return;
                 };
-                match self.koleksiyon_erisimi(container, index) {
+                match crate::semantics::koleksiyon_erisimi(container, index) {
                     Ok(value) => self.stack.push(value),
                     Err(error) => self.hata_firlat(error),
                 }
@@ -830,49 +830,6 @@ impl VM {
                 .map(|borrowed| borrowed.len())
                 .map_err(|_| "Vektör uzunluğu alınırken vektör kullanımda".to_string()),
             other => Err(format!("{other} değerinin uzunluğu alınamaz")),
-        }
-    }
-
-    fn sayisal_indeks(value: f64, length: usize) -> Result<usize, String> {
-        if !value.is_finite() || value < 0.0 || value.fract() != 0.0 {
-            return Err("Koleksiyon indeksi negatif olmayan sonlu tamsayı olmalı".to_string());
-        }
-        if value >= length as f64 {
-            return Err(format!(
-                "Koleksiyon indeksi sınır dışında: {value} (uzunluk {length})"
-            ));
-        }
-        Ok(value as usize)
-    }
-
-    fn koleksiyon_erisimi(&self, container: Deger, index: Deger) -> Result<Deger, String> {
-        match (container, index) {
-            (Deger::Liste(items), Deger::Sayi(number)) => {
-                let borrowed = items
-                    .try_borrow()
-                    .map_err(|_| "Liste erişimi sırasında liste kullanımda".to_string())?;
-                let index = Self::sayisal_indeks(number, borrowed.len())?;
-                Ok(borrowed[index].clone())
-            }
-            (Deger::Metin(text), Deger::Sayi(number)) => {
-                let length = text.chars().count();
-                let index = Self::sayisal_indeks(number, length)?;
-                text.chars()
-                    .nth(index)
-                    .map(|character| Deger::Metin(character.to_string()))
-                    .ok_or_else(|| "Metin indeksi çözülemedi".to_string())
-            }
-            (Deger::Sozluk(map), Deger::Metin(key)) => map
-                .try_borrow()
-                .map_err(|_| "Sözlük erişimi sırasında sözlük kullanımda".to_string())
-                .map(|borrowed| borrowed.get(&key).cloned().unwrap_or(Deger::Bos)),
-            (Deger::Nesne { alanlar, .. }, Deger::Metin(key)) => alanlar
-                .try_borrow()
-                .map_err(|_| "Nesne erişimi sırasında nesne kullanımda".to_string())
-                .map(|borrowed| borrowed.get(&key).cloned().unwrap_or(Deger::Bos)),
-            (container, index) => Err(format!(
-                "{container} değerine {index} indeksiyle erişilemez"
-            )),
         }
     }
 

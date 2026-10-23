@@ -376,6 +376,53 @@ pub fn ikili_islem(operator: &Token, sol: Deger, sag: Deger) -> Result<Deger, St
     }
 }
 
+/// `koleksiyon[indeks]` okumasının normatif sonucu. Liste ve metin sıfır
+/// tabanlı tamsayı indeks, sözlük ve nesne metin anahtar alır; bulunmayan
+/// anahtar `boş` döner.
+pub fn koleksiyon_erisimi(koleksiyon: Deger, indeks: Deger) -> Result<Deger, String> {
+    fn sayisal_indeks(deger: f64, uzunluk: usize, islem: &str) -> Result<usize, String> {
+        if !deger.is_finite() || deger < 0.0 || deger.fract() != 0.0 {
+            return Err(format!(
+                "{islem}: indeks negatif olmayan tamsayı olmalı; {deger} geldi"
+            ));
+        }
+        if deger >= uzunluk as f64 {
+            return Err(format!(
+                "{islem}: indeks sınır dışında: {deger} (uzunluk {uzunluk})"
+            ));
+        }
+        Ok(deger as usize)
+    }
+    match (koleksiyon, indeks) {
+        (Deger::Liste(ogeler), Deger::Sayi(sayi)) => {
+            let ogeler = ogeler
+                .try_borrow()
+                .map_err(|_| "Liste erişimi: hedef kullanımda".to_string())?;
+            let indeks = sayisal_indeks(sayi, ogeler.len(), "Liste erişimi")?;
+            Ok(ogeler[indeks].clone())
+        }
+        (Deger::Metin(metin), Deger::Sayi(sayi)) => {
+            let indeks = sayisal_indeks(sayi, metin.chars().count(), "Metin erişimi")?;
+            metin
+                .chars()
+                .nth(indeks)
+                .map(|karakter| Deger::Metin(karakter.to_string()))
+                .ok_or_else(|| "Metin erişimi: indeks çözülemedi".to_string())
+        }
+        (Deger::Sozluk(alanlar), Deger::Metin(anahtar)) => alanlar
+            .try_borrow()
+            .map_err(|_| "Sözlük erişimi: hedef kullanımda".to_string())
+            .map(|alanlar| alanlar.get(&anahtar).cloned().unwrap_or(Deger::Bos)),
+        (Deger::Nesne { alanlar, .. }, Deger::Metin(anahtar)) => alanlar
+            .try_borrow()
+            .map_err(|_| "Nesne erişimi: hedef kullanımda".to_string())
+            .map(|alanlar| alanlar.get(&anahtar).cloned().unwrap_or(Deger::Bos)),
+        (koleksiyon, indeks) => Err(format!(
+            "{koleksiyon} değerine {indeks} indeksiyle erişilemez"
+        )),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{dogru_mu, esit_mi, ikili_islem};

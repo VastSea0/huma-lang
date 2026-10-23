@@ -1,0 +1,8 @@
+10
+ü
+Hüma
+Boş
+Satır 7, Sütun 8: Liste erişimi: indeks negatif olmayan tamsayı olmalı; -1 geldi
+Satır 8, Sütun 8: Liste erişimi: indeks negatif olmayan tamsayı olmalı; 1.5 geldi
+Satır 9, Sütun 8: Metin erişimi: indeks sınır dışında: 2 (uzunluk 2)
+Satır 10, Sütun 8: 5 değerine 0 indeksiyle erişilemez
