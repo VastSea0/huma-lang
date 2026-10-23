@@ -23,6 +23,8 @@ jobs:
 
       - name: Install cargo-fuzz
         uses: taiki-e/install-action@82fc405565b9cf90abfe700ba43b4751ce2fe422 # cargo-fuzz
+        with:
+          tool: cargo-fuzz@0.13.2
 
       # cargo-fuzz `--locked` kabul etmez; kilit tazeliği ayrıca denetlenir.
       - name: Verify fuzz lock file

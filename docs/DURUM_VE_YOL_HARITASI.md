@@ -64,11 +64,11 @@ hatasızdır” veya “işletim sistemi sandbox’ı vardır” anlamına gelme
   Hüma değer modeli değildir.
 - Dil dinamiktir. Statik tip denetleyici ve dil içi etkiler sistemi henüz
   yoktur; dış modül imza/etki sözleşmesi HMI'da bulunur.
-- Tanımlı fakat henüz kanıt üretmemiş iş akışları (2026-10-23 itibarıyla
-  GitHub'da hiç çalıştırma kaydı yok): `fuzz.yml` (parser, HMI çerçevesi,
-  bytecode doğrulayıcı libFuzzer hedefleri), `soak.yml` (çevrim/isolate soak,
-  HMI ve paket hata enjeksiyonu; soak testleri yerelde geçiyor) ve
-  `performance.yml` (`[self-hosted, huma-perf]` çalıştırıcısı gerektirir).
+- `soak.yml` ilk kez 2026-10-23'te el ile tetiklendi ve geçti. `fuzz.yml`
+  (parser, HMI çerçevesi, bytecode doğrulayıcı libFuzzer hedefleri) o tarihe
+  kadar hiç çalışmamıştı ve üç kusur nedeniyle çalışamazdı; düzeltildi, üç
+  hedef yerelde 60'ar saniye çökmesiz koştu. `performance.yml`
+  (`[self-hosted, huma-perf]` çalıştırıcısı gerektirir) hiç çalışmadı.
   `release.yml` son çalıştırmalarında (2026-03-30…2026-04-08) başarısız oldu.
 - Eski aynı-süreç GUI adaptörü (`huma-stdlib-gui`) hâlâ workspace üyesi ve
   `huma-cli` bağımlılığıdır; bakımı bırakılmış `ttf-parser` zinciri bu yüzden
