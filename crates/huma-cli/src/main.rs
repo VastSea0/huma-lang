@@ -18,7 +18,6 @@ use colored::Colorize;
 use tracing::error;
 
 /// Standardised exit codes for CI/CD compatibility.
-#[allow(dead_code)]
 pub mod exit_codes {
     pub const SUCCESS: i32 = 0;
     pub const GENERAL_ERROR: i32 = 1;
@@ -36,7 +35,9 @@ pub mod exit_codes {
     about = "Hüma Programlama Dili — Birleşik Araç Takımı (Bilingual CLI)",
     long_about = "Hüma diline ait tüm araçları tek bir komut altında birleştirir.\n\
                   Tüm komutlar hem Türkçe hem İngilizce olarak kullanılabilir.\n\
-                  Örn: 'huma run' veya 'huma çalıştır', 'huma build' veya 'huma derle'."
+                  Örn: 'huma run' veya 'huma çalıştır', 'huma build' veya 'huma derle'.",
+    after_help = "Çıkış kodları: 0 başarı, 1 genel hata, 2 dosya bulunamadı, \
+                  3 sözdizimi/derleme hatası, 4 çalışma zamanı hatası."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -336,11 +337,9 @@ fn run(cli: Cli) -> i32 {
                 } else {
                     match package_manager::has_local_script(&t) {
                         Ok(true) => package_manager::run_script(&t),
-                        Ok(false) => {
-                            Err(anyhow!("'{}' adlı dosya veya proje betiği bulunamadı.", t))
-                        }
+                        Ok(false) => Err(dosya_bulunamadi(&t)),
                         Err(error) if std::path::Path::new("huma.json").exists() => Err(error),
-                        Err(_) => Err(anyhow!("'{}' adlı dosya veya proje betiği bulunamadı.", t)),
+                        Err(_) => Err(dosya_bulunamadi(&t)),
                     }
                 }
             } else {
@@ -438,15 +437,9 @@ fn run(cli: Cli) -> i32 {
                 } else {
                     match package_manager::has_local_script(&file) {
                         Ok(true) => package_manager::run_script(&file),
-                        Ok(false) => Err(anyhow!(
-                            "'{}' adlı dosya veya proje betiği bulunamadı.",
-                            file
-                        )),
+                        Ok(false) => Err(dosya_bulunamadi(&file)),
                         Err(error) if std::path::Path::new("huma.json").exists() => Err(error),
-                        Err(_) => Err(anyhow!(
-                            "'{}' adlı dosya veya proje betiği bulunamadı.",
-                            file
-                        )),
+                        Err(_) => Err(dosya_bulunamadi(&file)),
                     }
                 }
             } else {
@@ -459,31 +452,39 @@ fn run(cli: Cli) -> i32 {
     match result {
         Ok(()) => exit_codes::SUCCESS,
         Err(e) => {
-            // Try to determine the right exit code from the error chain.
-            if let Some(he) = e.downcast_ref::<huma_core::HumaError>() {
-                match he {
-                    huma_core::HumaError::IoError(_) => {
-                        error!("{}", format!("{:#}", e).bright_red());
-                        exit_codes::FILE_NOT_FOUND
-                    }
-                    huma_core::HumaError::CompileError(_)
-                    | huma_core::HumaError::SyntaxError { .. } => {
-                        error!("{}", format!("{:#}", e).bright_red());
-                        exit_codes::COMPILATION_ERROR
-                    }
-                    huma_core::HumaError::RuntimeError(_) => {
-                        error!("{}", format!("{:#}", e).bright_red());
-                        exit_codes::RUNTIME_ERROR
-                    }
-                    _ => {
-                        error!("{}", format!("{:#}", e).bright_red());
-                        exit_codes::GENERAL_ERROR
-                    }
-                }
-            } else {
-                error!("{}", format!("{:#}", e).bright_red());
-                exit_codes::GENERAL_ERROR
-            }
+            error!("{}", format!("{:#}", e).bright_red());
+            hata_cikis_kodu(&e)
         }
     }
+}
+
+fn dosya_bulunamadi(hedef: &str) -> anyhow::Error {
+    std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        format!("'{hedef}' adlı dosya veya proje betiği bulunamadı."),
+    )
+    .into()
+}
+
+/// Hata zincirindeki ilk tanınan nedene göre çıkış kodu seçer.
+fn hata_cikis_kodu(e: &anyhow::Error) -> i32 {
+    for cause in e.chain() {
+        if let Some(io) = cause.downcast_ref::<std::io::Error>() {
+            if io.kind() == std::io::ErrorKind::NotFound {
+                return exit_codes::FILE_NOT_FOUND;
+            }
+        }
+        if let Some(he) = cause.downcast_ref::<huma_core::HumaError>() {
+            return match he {
+                huma_core::HumaError::IoError(io) if io.kind() == std::io::ErrorKind::NotFound => {
+                    exit_codes::FILE_NOT_FOUND
+                }
+                huma_core::HumaError::CompileError(_)
+                | huma_core::HumaError::SyntaxError { .. } => exit_codes::COMPILATION_ERROR,
+                huma_core::HumaError::RuntimeError(_) => exit_codes::RUNTIME_ERROR,
+                _ => exit_codes::GENERAL_ERROR,
+            };
+        }
+    }
+    exit_codes::GENERAL_ERROR
 }

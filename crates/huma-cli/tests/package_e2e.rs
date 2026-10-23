@@ -170,3 +170,50 @@ fn program_yalniz_paket_yoneticisi_betigiyle_calistirilir() {
     );
     fs::remove_dir_all(&project).expect("Geçici proje temizlenmeli");
 }
+
+#[test]
+fn cikis_kodlari_hata_sinifini_yansitir() {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Sistem saati Unix epoch sonrasında olmalı")
+        .as_nanos();
+    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|path| path.parent())
+        .expect("Workspace kökü bulunmalı")
+        .to_path_buf();
+    let project = workspace.join("target").join(format!(
+        "huma_exit_codes_e2e_{}_{}",
+        std::process::id(),
+        nonce
+    ));
+    fs::create_dir_all(&project).expect("Geçici proje dizini oluşturulmalı");
+    assert_success(&run_huma(&project, &["ilkle"]), "Proje ilkleme");
+    fs::write(project.join("sozdizimi.hb"), "x = (").expect("Kaynak yazılmalı");
+    fs::write(project.join("calisma.hb"), "(1 / 0)'ı yazdır").expect("Kaynak yazılmalı");
+    let root = project.canonicalize().expect("Proje kökü çözülmeli");
+
+    let cases: [(&[&str], i32); 6] = [
+        (&["run", "calisma.hb"], 4),
+        (&["run", "--vm", "calisma.hb"], 4),
+        (&["run", "sozdizimi.hb"], 3),
+        (&["run", "yok.hb"], 2),
+        (&["exec", "yok.hbc"], 2),
+        (&["yok.hb"], 2),
+    ];
+    for (arguments, expected) in cases {
+        let output = Command::new(env!("CARGO_BIN_EXE_huma"))
+            .args(arguments)
+            .current_dir(&project)
+            .env("HUMA_MANAGED_RUN_ROOT", &root)
+            .output()
+            .expect("Hüma CLI başlatılmalı");
+        assert_eq!(
+            output.status.code(),
+            Some(expected),
+            "{arguments:?}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    fs::remove_dir_all(&project).expect("Geçici proje temizlenmeli");
+}
