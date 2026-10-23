@@ -31,4 +31,5 @@ jobs:
         run: cargo metadata --locked --format-version 1 --manifest-path fuzz/Cargo.toml > /dev/null
 
       - name: Fuzz ${{ matrix.target }}
-        run: cargo fuzz run ${{ matrix.target }} -- -max_total_time=300 -max_len=65536
+        # Kökteki rust-toolchain.toml 1.94.1'e sabitler; libFuzzer nightly ister.
+        run: cargo +nightly-2026-07-26 fuzz run ${{ matrix.target }} -- -max_total_time=300 -max_len=65536

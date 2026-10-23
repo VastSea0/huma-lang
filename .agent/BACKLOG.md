@@ -73,6 +73,7 @@ Başlangıç durumu (2026-10-23): `cargo clippy -D warnings` temiz,
 | B-059 | P1 | ci | `fuzz.yml`, `soak.yml`, `performance.yml` GitHub'da hiç çalışmamış (çalıştırma kaydı yok); `release.yml` son 6 çalıştırmada başarısız. Belgeler bunları "uygulandı/korunan" diye sunuyordu (B-011'de düzeltildi). Fuzz hedefleri yerelde de hiç koşturulmadı | `gh run list --workflow <ad>` | devam: soak CI'da geçti (run 39946017305); fuzz 3. kusur (araç kurulmuyordu) düzeltildi, yeniden tetiklenecek; performance self-hosted çalıştırıcı bekliyor; release başarısız (incelenmedi) |
 | B-060 | P1 | ci | `fuzz.yml` komutu `cargo fuzz run <hedef> --locked` cargo-fuzz 0.13 tarafından reddediliyor ("unexpected argument '--locked'"); iş akışı çalışsaydı her hedefte düşerdi | yerelde aynı komut | bitti (6fdfce4) |
 | B-061 | P1 | fuzz | `fuzz/Cargo.lock` 13b463a'dan (B-018, `huma-syntax`'a stacker eklendi) beri eskiydi; fuzz ayrı workspace olduğundan kök `--locked` kapıları bunu görmüyordu | `cargo metadata --locked --manifest-path fuzz/Cargo.toml` | bitti (6fdfce4) |
+| B-062 | P1 | packages | Yönetilen çalıştırma kurulu paketin kilitteki sürüm/özetle eşleştiğini doğrulamıyor: kilit `nlp_temel 3.1.0` (eski özet) derken kurulu 3.2.0 ile program çalıştı. DURUM belgesi "SemVer/kilit/özet doğrulayan" diyor | `examples/nlp_uygulamasi`: eski kilit + `huma kur` sonrası `paket run baslat` | açık |
 
 ## Keşif kaydı
 
