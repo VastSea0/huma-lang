@@ -16,22 +16,33 @@ const MAX_TEST_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_REPL_INPUT_BYTES: usize = 1024 * 1024;
 const MAX_TEST_FILES: usize = 10_000;
 
+/// Yorumlayıcıya standart kütüphaneleri, GUI'yi ve ağ görev bekleyicisini kurar.
+fn yorumlayiciyi_hazirla(interp: &mut Yorumlayici, trusted_in_process_ffi: bool) {
+    huma_core::standart_kutuphaneleri_kaydet(
+        &mut interp.global_degiskenler,
+        trusted_in_process_ffi,
+    );
+    huma_stdlib_gui::kayit_et(&mut interp.global_degiskenler);
+    huma_stdlib_net::yorumlayiciyi_yapilandir(interp);
+}
+
+/// VM'e yorumlayıcıyla aynı standart kütüphaneleri kurar (GUI hariç).
+fn vm_hazirla(program: huma_core::bytecode::Program, trusted_in_process_ffi: bool) -> VM {
+    let mut vm = VM::new(program).with_task_host(huma_stdlib_net::vm_task_host());
+    huma_core::standart_kutuphaneleri_kaydet(vm.global_degiskenler_mut(), trusted_in_process_ffi);
+    if trusted_in_process_ffi {
+        vm = vm.with_native_call_host(huma_stdlib_native::vm_call_host());
+    }
+    vm
+}
+
 /// Run a `.hb` source file through the tree-walking interpreter.
 pub fn run_file(path: &str, trusted_in_process_ffi: bool) -> Result<()> {
     let source = huma_compiler::pipeline::read_source_file(path)
         .with_context(|| format!("'{}' dosyası okunamadı", path))?;
 
     let mut interp = Yorumlayici::new();
-    huma_stdlib_ai::kayit_et(&mut interp.global_degiskenler);
-    huma_stdlib_file::kayit_et(&mut interp.global_degiskenler);
-    huma_stdlib_gui::kayit_et(&mut interp.global_degiskenler);
-    huma_stdlib_native::kayit_et(&mut interp.global_degiskenler);
-    if trusted_in_process_ffi {
-        huma_stdlib_native::guvenilir_ffi_kayit_et(&mut interp.global_degiskenler);
-    }
-    huma_stdlib_net::yorumlayiciyi_yapilandir(&mut interp);
-    huma_stdlib_process::kayit_et(&mut interp.global_degiskenler);
-    huma_stdlib_sqlite::kayit_et(&mut interp.global_degiskenler);
+    yorumlayiciyi_hazirla(&mut interp, trusted_in_process_ffi);
     execute_source(&source, &mut interp)?;
 
     if huma_stdlib_gui::gui_istegi_var_mi().map_err(anyhow::Error::msg)? {
@@ -59,10 +70,7 @@ pub fn run_vm_file(path: &str, trusted_in_process_ffi: bool) -> Result<()> {
         .derle_kontrollu(program_ast)
         .map_err(huma_core::HumaError::CompileError)?;
 
-    let mut vm = VM::new(bytecode_prog).with_task_host(huma_stdlib_net::vm_task_host());
-    if trusted_in_process_ffi {
-        vm = vm.with_native_call_host(huma_stdlib_native::vm_call_host());
-    }
+    let mut vm = vm_hazirla(bytecode_prog, trusted_in_process_ffi);
     vm.run_checked()?;
     Ok(())
 }
@@ -92,10 +100,7 @@ pub fn exec_bytecode(path: &str, trusted_in_process_ffi: bool) -> Result<()> {
     let program = huma_compiler::pipeline::load_bytecode(path)
         .with_context(|| format!("'{}' bytecode dosyası yüklenirken hata oluştu", path))?;
 
-    let mut vm = VM::new(program).with_task_host(huma_stdlib_net::vm_task_host());
-    if trusted_in_process_ffi {
-        vm = vm.with_native_call_host(huma_stdlib_native::vm_call_host());
-    }
+    let mut vm = vm_hazirla(program, trusted_in_process_ffi);
     vm.run_checked()?;
     Ok(())
 }
@@ -137,16 +142,7 @@ pub fn start_repl(trusted_in_process_ffi: bool) -> Result<()> {
     println!();
 
     let mut interp = Yorumlayici::new();
-    huma_stdlib_ai::kayit_et(&mut interp.global_degiskenler);
-    huma_stdlib_file::kayit_et(&mut interp.global_degiskenler);
-    huma_stdlib_gui::kayit_et(&mut interp.global_degiskenler);
-    huma_stdlib_native::kayit_et(&mut interp.global_degiskenler);
-    if trusted_in_process_ffi {
-        huma_stdlib_native::guvenilir_ffi_kayit_et(&mut interp.global_degiskenler);
-    }
-    huma_stdlib_net::yorumlayiciyi_yapilandir(&mut interp);
-    huma_stdlib_process::kayit_et(&mut interp.global_degiskenler);
-    huma_stdlib_sqlite::kayit_et(&mut interp.global_degiskenler);
+    yorumlayiciyi_hazirla(&mut interp, trusted_in_process_ffi);
     let mut input = String::new();
     let stdin = io::stdin();
     let mut stdin = stdin.lock();

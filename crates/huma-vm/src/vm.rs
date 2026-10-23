@@ -101,6 +101,11 @@ impl VM {
         }
     }
 
+    /// Ek yerleşiklerin (standart kütüphaneler) kaydedileceği genel değişkenler.
+    pub fn global_degiskenler_mut(&mut self) -> &mut HashMap<String, Deger> {
+        &mut self.globals
+    }
+
     pub fn with_output_buffer(mut self, buffer: Rc<RefCell<String>>) -> Self {
         self.output_buffer = Some(buffer);
         self

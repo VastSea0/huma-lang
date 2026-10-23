@@ -191,6 +191,8 @@ fn cikis_kodlari_hata_sinifini_yansitir() {
     assert_success(&run_huma(&project, &["ilkle"]), "Proje ilkleme");
     fs::write(project.join("sozdizimi.hb"), "x = (").expect("Kaynak yazılmalı");
     fs::write(project.join("calisma.hb"), "(1 / 0)'ı yazdır").expect("Kaynak yazılmalı");
+    fs::write(project.join("dosya.hb"), "dosya_oku(\"yok.txt\")'yu yazdır")
+        .expect("Kaynak yazılmalı");
     let manifest_path = project.join("huma.json");
     let mut manifest: Value =
         serde_json::from_slice(&fs::read(&manifest_path).expect("Manifest okunmalı"))
@@ -222,6 +224,23 @@ fn cikis_kodlari_hata_sinifini_yansitir() {
             Some(expected),
             "{arguments:?}\nstderr:\n{}",
             String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    // Standart kütüphaneler VM'e de kaydedilir: yetenek kapalıyken iki arka
+    // uç aynı yetenek hatasını verir (önceden VM "Tanımsız değişken" diyordu).
+    for arguments in [&["run", "dosya.hb"][..], &["run", "--vm", "dosya.hb"][..]] {
+        let output = Command::new(env!("CARGO_BIN_EXE_huma"))
+            .args(arguments)
+            .current_dir(&project)
+            .env("HUMA_MANAGED_RUN_ROOT", &root)
+            .output()
+            .expect("Hüma CLI başlatılmalı");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert_eq!(output.status.code(), Some(4), "{arguments:?}: {stderr}");
+        assert!(
+            stderr.contains("dosya_oku: 'dosya-okuma' yeteneği verilmedi"),
+            "{arguments:?}: {stderr}"
         );
     }
     fs::remove_dir_all(&project).expect("Geçici proje temizlenmeli");

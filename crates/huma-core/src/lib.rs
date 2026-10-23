@@ -106,6 +106,26 @@ pub mod builtin_files {
     pub use huma_stdlib::*;
 }
 
+/// Yorumlayıcı ve VM'in ortak standart kütüphane yerleşiklerini kaydeder:
+/// AI, dosya, native/HMI, ağ, süreç ve SQLite. Yetenek denetimleri her
+/// yerleşiğin içindedir; kayıt yeteneği açmaz. Süreç içi FFI yalnız
+/// `guvenilir_ffi` ile eklenir. GUI yorumlayıcının olay döngüsünü
+/// gerektirdiğinden burada değildir.
+pub fn standart_kutuphaneleri_kaydet(
+    globals: &mut std::collections::HashMap<String, value::Deger>,
+    guvenilir_ffi: bool,
+) {
+    huma_stdlib_ai::kayit_et(globals);
+    huma_stdlib_file::kayit_et(globals);
+    huma_stdlib_native::kayit_et(globals);
+    if guvenilir_ffi {
+        huma_stdlib_native::guvenilir_ffi_kayit_et(globals);
+    }
+    huma_stdlib_net::kayit_et(globals);
+    huma_stdlib_process::kayit_et(globals);
+    huma_stdlib_sqlite::kayit_et(globals);
+}
+
 /// Re-export most-used items at the crate root for convenience.
 pub use error::{HumaError, HumaResult, RuntimeDiagnostic, SourceSpan, StackFrame};
 
