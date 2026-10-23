@@ -2305,6 +2305,17 @@ pub fn init_project() -> Result<()> {
     Ok(())
 }
 
+/// Başarısız paket betiğinin alt süreç çıkış kodu; CLI bunu kendi çıkış
+/// kodu olarak yayar (ör. sözdizimi 3, çalışma zamanı 4).
+#[derive(Debug)]
+pub struct BetikCikisKodu(pub i32);
+
+impl std::fmt::Display for BetikCikisKodu {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "betik süreci {} koduyla çıktı", self.0)
+    }
+}
+
 /// Mevcut dizindeki huma.json dosyasını okur
 pub fn get_local_metadata() -> Result<PaketMetadata> {
     if !Path::new(PROJECT_FILE).exists() {
@@ -2446,7 +2457,11 @@ pub fn run_script(name: &str) -> Result<()> {
             };
 
             if !status.success() {
-                return Err(anyhow!("Betik '{}' hata ile sonlandı.", name));
+                let error = anyhow!("Betik '{}' hata ile sonlandı.", name);
+                return Err(match status.code() {
+                    Some(code) => error.context(BetikCikisKodu(code)),
+                    None => error,
+                });
             }
             Ok(())
         } else {

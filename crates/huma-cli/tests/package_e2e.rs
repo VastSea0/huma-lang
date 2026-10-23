@@ -191,9 +191,18 @@ fn cikis_kodlari_hata_sinifini_yansitir() {
     assert_success(&run_huma(&project, &["ilkle"]), "Proje ilkleme");
     fs::write(project.join("sozdizimi.hb"), "x = (").expect("Kaynak yazılmalı");
     fs::write(project.join("calisma.hb"), "(1 / 0)'ı yazdır").expect("Kaynak yazılmalı");
+    let manifest_path = project.join("huma.json");
+    let mut manifest: Value =
+        serde_json::from_slice(&fs::read(&manifest_path).expect("Manifest okunmalı"))
+            .expect("Manifest JSON olmalı");
+    manifest["betikler"]["calisma"] = Value::from("huma run calisma.hb");
+    manifest["betikler"]["sozdizimi"] = Value::from("huma run sozdizimi.hb");
+    fs::write(&manifest_path, manifest.to_string()).expect("Manifest yazılmalı");
     let root = project.canonicalize().expect("Proje kökü çözülmeli");
 
-    let cases: [(&[&str], i32); 6] = [
+    let cases: [(&[&str], i32); 8] = [
+        (&["paket", "run", "calisma"], 4),
+        (&["paket", "run", "sozdizimi"], 3),
         (&["run", "calisma.hb"], 4),
         (&["run", "--vm", "calisma.hb"], 4),
         (&["run", "sozdizimi.hb"], 3),

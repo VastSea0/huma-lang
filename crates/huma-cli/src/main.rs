@@ -476,6 +476,9 @@ fn dosya_bulunamadi(hedef: &str) -> anyhow::Error {
 
 /// Hata zincirindeki ilk tanınan nedene göre çıkış kodu seçer.
 fn hata_cikis_kodu(e: &anyhow::Error) -> i32 {
+    if let Some(package_manager::BetikCikisKodu(code)) = e.downcast_ref() {
+        return *code;
+    }
     for cause in e.chain() {
         if let Some(io) = cause.downcast_ref::<std::io::Error>() {
             if io.kind() == std::io::ErrorKind::NotFound {
