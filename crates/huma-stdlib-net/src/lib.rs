@@ -815,4 +815,82 @@ mod tests {
         ));
         drop(guard);
     }
+    #[test]
+    fn sunucu_http1_istegini_uctan_uca_yanitlar() {
+        use std::io::{Read, Write};
+
+        let guard = capability::install(
+            capability::CapabilitySet::deny_all().allow(Capability::NetworkServer),
+        )
+        .expect("Ağ sunucusu yeteneği kurulmalı");
+        let probe = TcpListener::bind("127.0.0.1:0").expect("Boş port bulunmalı");
+        let port = probe.local_addr().expect("Yerel adres okunmalı").port();
+        drop(probe);
+        let Deger::Sayi(server_id) = server_start(vec![Deger::Sayi(f64::from(port))]) else {
+            panic!("Sunucu başlamalı");
+        };
+
+        let client_done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let client_done_writer = client_done.clone();
+        let client = std::thread::spawn(move || {
+            let mut stream =
+                std::net::TcpStream::connect(("127.0.0.1", port)).expect("Sunucuya bağlanılmalı");
+            stream
+                .write_all(
+                    b"POST /yol?a=1 HTTP/1.1\r\nHost: yerel\r\nContent-Length: 6\r\nConnection: close\r\n\r\nmerhab",
+                )
+                .expect("İstek yazılmalı");
+            let mut response = String::new();
+            stream
+                .read_to_string(&mut response)
+                .expect("Yanıt okunmalı");
+            client_done_writer.store(true, Ordering::Release);
+            response
+        });
+
+        let Deger::GorevId(task) = server_wait(vec![Deger::Sayi(server_id)]) else {
+            panic!("Bekleme görevi dönmeli");
+        };
+        let Deger::Nesne { alanlar, .. } = gorev_bekle(task) else {
+            panic!("İstek nesnesi dönmeli");
+        };
+        let (request_id, url, method, body) = {
+            let alanlar = alanlar.borrow();
+            (
+                alanlar["id"].clone(),
+                alanlar["url"].to_string(),
+                alanlar["metot"].to_string(),
+                alanlar["gövde"].to_string(),
+            )
+        };
+        assert_eq!(
+            (url.as_str(), method.as_str(), body.as_str()),
+            ("/yol?a=1", "POST", "merhab")
+        );
+        assert!(matches!(
+            server_respond(vec![request_id, Deger::Metin("tamam".to_string())]),
+            Deger::Sayi(1.0)
+        ));
+
+        // Bağlantı görevleri yalnız bir görev beklenirken sürülür (B-039);
+        // yanıtın yazılması için istemci bitene kadar çalışma zamanı sürülür.
+        let Deger::GorevId(drive) = spawn_task(async move {
+            for _ in 0..500 {
+                if client_done.load(Ordering::Acquire) {
+                    return Deger::Bos;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            Deger::Hata("istemci yanıtı 5 sn içinde almadı".to_string())
+        }) else {
+            panic!("Sürme görevi dönmeli");
+        };
+        assert!(matches!(gorev_bekle(drive), Deger::Bos));
+
+        let response = client.join().expect("İstemci paniklememeli");
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+        assert!(response.ends_with("tamam"), "{response}");
+        server_close(vec![Deger::Sayi(server_id)]);
+        drop(guard);
+    }
 }
