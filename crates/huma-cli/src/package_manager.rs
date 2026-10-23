@@ -1946,119 +1946,7 @@ pub fn verify_package() -> Result<()> {
         }
     }
 
-    let mut installed_metadata = HashMap::with_capacity(lock.paketler.len());
-    for (package_name, lock_info) in &lock.paketler {
-        sanitize_package_name(package_name)?;
-        if lock_info.hash.len() != 64
-            || !lock_info
-                .hash
-                .bytes()
-                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
-        {
-            return Err(anyhow!(
-                "Kilitteki '{}' paketi geçerli küçük harfli SHA-256 özeti taşımıyor.",
-                package_name
-            ));
-        }
-        if lock_info
-            .kaynak
-            .as_deref()
-            .is_none_or(|source| source.trim().is_empty())
-        {
-            return Err(anyhow!(
-                "Kilitteki '{}' paketinin kaynak/provenans bilgisi eksik.",
-                package_name
-            ));
-        }
-        let package_dir = PathBuf::from(PACKAGE_DIR).join(package_name);
-        let metadata_path = package_metadata_path(&package_dir)?;
-        let metadata_content =
-            read_text_limited(&metadata_path, MAX_METADATA_BYTES, "Paket metadata'sı")?;
-        let package_meta: PaketMetadata =
-            serde_json::from_str(&metadata_content).with_context(|| {
-                format!(
-                    "Paket metadata'sı parse edilemedi: {}",
-                    metadata_path.display()
-                )
-            })?;
-        validate_package_metadata(&package_meta, Some(package_name))?;
-        validate_package_tree(&package_dir, &package_meta)?;
-        let computed_hash = calculate_package_hash(&package_dir, &package_meta)?;
-        if lock_info.hash != computed_hash {
-            return Err(anyhow!(
-                "Bütünlük hatası: '{}' paketinin özeti uyuşmuyor (lock: {}, hesaplanan: {}).",
-                package_name,
-                &lock_info.hash[..16],
-                &computed_hash[..16]
-            ));
-        }
-        let signature_on_disk = read_package_signature(&package_dir)?;
-        match (&lock_info.imza, signature_on_disk) {
-            (Some(locked), Some(on_disk)) => {
-                if locked != &on_disk {
-                    return Err(anyhow!(
-                        "Bütünlük hatası: '{}' paketinin imza zarfı kilitle uyuşmuyor.",
-                        package_name
-                    ));
-                }
-                verify_package_signature(&package_meta, &computed_hash, &on_disk).with_context(
-                    || format!("'{}' paketinin Ed25519 imzası geçersiz", package_name),
-                )?;
-            }
-            (Some(_), None) => {
-                return Err(anyhow!(
-                    "Bütünlük hatası: '{}' paketinin kilitli imza zarfı kayıp.",
-                    package_name
-                ));
-            }
-            (None, Some(_)) => {
-                return Err(anyhow!(
-                    "Bütünlük hatası: '{}' paketinde kilitlenmemiş imza zarfı var.",
-                    package_name
-                ));
-            }
-            (None, None) => {
-                if lock_info.kaynak.as_deref() != Some("yerel-imzasız-güvenilir") {
-                    return Err(anyhow!(
-                        "Paket '{}' doğrulanmış Ed25519 imzası veya açık yerel-imzasız provenansı taşımıyor.",
-                        package_name
-                    ));
-                }
-            }
-        }
-        if lock_info.surum != package_meta.surum {
-            return Err(anyhow!(
-                "Sürüm uyuşmazlığı: lock '{}' için {} diyor, paket metadata {}.",
-                package_name,
-                lock_info.surum,
-                package_meta.surum
-            ));
-        }
-        installed_metadata.insert(package_name.clone(), package_meta);
-    }
-
-    for (package_name, package_meta) in &installed_metadata {
-        for (dependency, requirement) in package_meta.bagimliliklar.as_ref().into_iter().flatten() {
-            let dependency_meta = installed_metadata.get(dependency).ok_or_else(|| {
-                anyhow!(
-                    "'{}' paketinin '{}' bağımlılığı kilitli ve kurulu değil.",
-                    package_name,
-                    dependency
-                )
-            })?;
-            let requirement = VersionReq::parse(requirement)?;
-            let version = Version::parse(&dependency_meta.surum)?;
-            if !requirement.matches(&version) {
-                return Err(anyhow!(
-                    "'{}' paketi '{}' için {} gerektiriyor; {} kurulu.",
-                    package_name,
-                    dependency,
-                    requirement,
-                    version
-                ));
-            }
-        }
-    }
+    kurulu_paketleri_dogrula(&lock)?;
 
     if let Some(signature) = read_package_signature(&project_root)? {
         let project_hash = calculate_package_hash(&project_root, &meta)?;
@@ -2333,6 +2221,125 @@ pub fn get_local_metadata() -> Result<PaketMetadata> {
     Ok(meta)
 }
 
+/// Kilitteki her paketin `huma_modulleri/` altında kurulu, özeti, imzası,
+/// sürümü ve geçişli bağımlılık kısıtlarıyla kilide uygun olduğunu doğrular.
+fn kurulu_paketleri_dogrula(lock: &PaketKilit) -> Result<()> {
+    let mut installed_metadata = HashMap::with_capacity(lock.paketler.len());
+    for (package_name, lock_info) in &lock.paketler {
+        sanitize_package_name(package_name)?;
+        if lock_info.hash.len() != 64
+            || !lock_info
+                .hash
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        {
+            return Err(anyhow!(
+                "Kilitteki '{}' paketi geçerli küçük harfli SHA-256 özeti taşımıyor.",
+                package_name
+            ));
+        }
+        if lock_info
+            .kaynak
+            .as_deref()
+            .is_none_or(|source| source.trim().is_empty())
+        {
+            return Err(anyhow!(
+                "Kilitteki '{}' paketinin kaynak/provenans bilgisi eksik.",
+                package_name
+            ));
+        }
+        let package_dir = PathBuf::from(PACKAGE_DIR).join(package_name);
+        let metadata_path = package_metadata_path(&package_dir)?;
+        let metadata_content =
+            read_text_limited(&metadata_path, MAX_METADATA_BYTES, "Paket metadata'sı")?;
+        let package_meta: PaketMetadata =
+            serde_json::from_str(&metadata_content).with_context(|| {
+                format!(
+                    "Paket metadata'sı parse edilemedi: {}",
+                    metadata_path.display()
+                )
+            })?;
+        validate_package_metadata(&package_meta, Some(package_name))?;
+        validate_package_tree(&package_dir, &package_meta)?;
+        let computed_hash = calculate_package_hash(&package_dir, &package_meta)?;
+        if lock_info.hash != computed_hash {
+            return Err(anyhow!(
+                "Bütünlük hatası: '{}' paketinin özeti uyuşmuyor (lock: {}, hesaplanan: {}).",
+                package_name,
+                &lock_info.hash[..16],
+                &computed_hash[..16]
+            ));
+        }
+        let signature_on_disk = read_package_signature(&package_dir)?;
+        match (&lock_info.imza, signature_on_disk) {
+            (Some(locked), Some(on_disk)) => {
+                if locked != &on_disk {
+                    return Err(anyhow!(
+                        "Bütünlük hatası: '{}' paketinin imza zarfı kilitle uyuşmuyor.",
+                        package_name
+                    ));
+                }
+                verify_package_signature(&package_meta, &computed_hash, &on_disk).with_context(
+                    || format!("'{}' paketinin Ed25519 imzası geçersiz", package_name),
+                )?;
+            }
+            (Some(_), None) => {
+                return Err(anyhow!(
+                    "Bütünlük hatası: '{}' paketinin kilitli imza zarfı kayıp.",
+                    package_name
+                ));
+            }
+            (None, Some(_)) => {
+                return Err(anyhow!(
+                    "Bütünlük hatası: '{}' paketinde kilitlenmemiş imza zarfı var.",
+                    package_name
+                ));
+            }
+            (None, None) => {
+                if lock_info.kaynak.as_deref() != Some("yerel-imzasız-güvenilir") {
+                    return Err(anyhow!(
+                        "Paket '{}' doğrulanmış Ed25519 imzası veya açık yerel-imzasız provenansı taşımıyor.",
+                        package_name
+                    ));
+                }
+            }
+        }
+        if lock_info.surum != package_meta.surum {
+            return Err(anyhow!(
+                "Sürüm uyuşmazlığı: lock '{}' için {} diyor, paket metadata {}.",
+                package_name,
+                lock_info.surum,
+                package_meta.surum
+            ));
+        }
+        installed_metadata.insert(package_name.clone(), package_meta);
+    }
+
+    for (package_name, package_meta) in &installed_metadata {
+        for (dependency, requirement) in package_meta.bagimliliklar.as_ref().into_iter().flatten() {
+            let dependency_meta = installed_metadata.get(dependency).ok_or_else(|| {
+                anyhow!(
+                    "'{}' paketinin '{}' bağımlılığı kilitli ve kurulu değil.",
+                    package_name,
+                    dependency
+                )
+            })?;
+            let requirement = VersionReq::parse(requirement)?;
+            let version = Version::parse(&dependency_meta.surum)?;
+            if !requirement.matches(&version) {
+                return Err(anyhow!(
+                    "'{}' paketi '{}' için {} gerektiriyor; {} kurulu.",
+                    package_name,
+                    dependency,
+                    requirement,
+                    version
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Bir Hüma programının yalnız paket yöneticisi betiği içinden ve paket
 /// kökünün dışına taşmadan çalıştırıldığını doğrular.
 pub fn require_managed_run(target: &Path) -> Result<()> {
@@ -2375,6 +2382,9 @@ pub fn require_managed_run(target: &Path) -> Result<()> {
             ));
         }
     }
+    // Kurulu paketler kilitten sapmışsa (elle değiştirilmiş, eski kopya)
+    // program çalıştırılmaz.
+    kurulu_paketleri_dogrula(&lock)?;
 
     let candidate = if target.is_absolute() {
         target.to_path_buf()

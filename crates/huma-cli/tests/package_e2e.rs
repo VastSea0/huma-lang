@@ -403,3 +403,48 @@ fn bagimliliksiz_projede_kur_kilit_uretir_ve_proje_calisir() {
     assert!(String::from_utf8_lossy(&after.stderr).contains("baslat betiği çalıştırılıyor"));
     fs::remove_dir_all(&project).expect("Geçici proje temizlenmeli");
 }
+
+#[test]
+fn yonetilen_calistirma_kilitten_sapan_kurulu_paketi_reddeder() {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Sistem saati Unix epoch sonrasında olmalı")
+        .as_nanos();
+    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|path| path.parent())
+        .expect("Workspace kökü bulunmalı")
+        .to_path_buf();
+    let project = workspace.join("target").join(format!(
+        "huma_lock_integrity_e2e_{}_{}",
+        std::process::id(),
+        nonce
+    ));
+    fs::create_dir_all(&project).expect("Geçici proje dizini oluşturulmalı");
+    assert_success(&run_huma(&project, &["ilkle"]), "Proje ilkleme");
+    assert_success(
+        &run_huma(&project, &["kur", "nlp_temel", "--güvenilir"]),
+        "Paket kurulumu",
+    );
+    assert_success(
+        &run_huma(&project, &["paket", "run", "baslat"]),
+        "Kilitle uyumlu proje",
+    );
+
+    // Kurulu paketin bir dosyası kilitten sonra değiştirilir.
+    let package_dir = project.join("huma_modulleri/nlp_temel");
+    let entry = fs::read_dir(&package_dir)
+        .expect("Paket dizini okunmalı")
+        .map(|entry| entry.expect("Girdi okunmalı").path())
+        .find(|path| path.extension().and_then(|ext| ext.to_str()) == Some("hb"))
+        .expect("Pakette .hb dosyası olmalı");
+    let mut source = fs::read_to_string(&entry).expect("Kaynak okunmalı");
+    source.push_str("\n// kurcalandı\n");
+    fs::write(&entry, source).expect("Kaynak yazılmalı");
+
+    let tampered = run_huma(&project, &["paket", "run", "baslat"]);
+    assert!(!tampered.status.success(), "Kurcalanmış paket çalışmamalı");
+    let stderr = String::from_utf8_lossy(&tampered.stderr);
+    assert!(stderr.contains("Bütünlük hatası"), "{stderr}");
+    fs::remove_dir_all(&project).expect("Geçici proje temizlenmeli");
+}
