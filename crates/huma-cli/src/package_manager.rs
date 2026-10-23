@@ -1114,7 +1114,18 @@ pub fn install_package(input: Option<&str>, trusted: bool) -> Result<()> {
         None => {
             let dependencies = project.bagimliliklar.clone().unwrap_or_default();
             if dependencies.is_empty() {
-                println!("{} Kurulacak bağımlılık yok.", "Bilgi:".bright_yellow());
+                // Yönetilen çalıştırma kilit dosyası ister; bağımlılıksız
+                // projede de `kur` onu üretmelidir, yoksa proje çalıştırılamaz.
+                if Path::new(LOCK_FILE).exists() {
+                    println!("{} Kurulacak bağımlılık yok.", "Bilgi:".bright_yellow());
+                } else {
+                    atomic_write_str(Path::new(LOCK_FILE), &bos_kilit_json()?)?;
+                    println!(
+                        "{} Kurulacak bağımlılık yok; boş {} oluşturuldu.",
+                        "Bilgi:".bright_yellow(),
+                        LOCK_FILE
+                    );
+                }
                 return Ok(());
             }
             if dependencies.len() > MAX_DEPENDENCIES {
@@ -1845,6 +1856,13 @@ fn validate_lock(lock: &PaketKilit) -> Result<()> {
     Ok(())
 }
 
+fn bos_kilit_json() -> Result<String> {
+    canonical_json_pretty_string(&PaketKilit {
+        paketler: HashMap::new(),
+        guncelleme_zamani: chrono::Local::now().to_rfc3339(),
+    })
+}
+
 fn read_lock_or_default(path: &Path) -> Result<PaketKilit> {
     if path.exists() {
         let content = read_text_limited(path, MAX_METADATA_BYTES, "Kilit dosyası")?;
@@ -2232,11 +2250,7 @@ pub fn init_project() -> Result<()> {
             default_name
         )
     })?;
-    let initial_lock = PaketKilit {
-        paketler: HashMap::new(),
-        guncelleme_zamani: chrono::Local::now().to_rfc3339(),
-    };
-    let initial_lock_json = canonical_json_pretty_string(&initial_lock)?;
+    let initial_lock_json = bos_kilit_json()?;
     let meta_json = canonical_json_pretty_string(&meta)?;
 
     let hb_file = format!("{}.hb", default_name);

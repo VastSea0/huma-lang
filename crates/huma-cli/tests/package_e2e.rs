@@ -261,3 +261,53 @@ fn test_komutu_paket_disi_ve_paket_testlerini_calistirir() {
     assert!(stdout.contains("kalir_test.hb ... FAIL"), "{stdout}");
     fs::remove_dir_all(&root).expect("Geçici dizin temizlenmeli");
 }
+
+#[test]
+fn bagimliliksiz_projede_kur_kilit_uretir_ve_proje_calisir() {
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Sistem saati Unix epoch sonrasında olmalı")
+        .as_nanos();
+    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|path| path.parent())
+        .expect("Workspace kökü bulunmalı")
+        .to_path_buf();
+    let project =
+        workspace
+            .join("target")
+            .join(format!("huma_no_deps_e2e_{}_{}", std::process::id(), nonce));
+    fs::create_dir_all(&project).expect("Geçici proje dizini oluşturulmalı");
+    // `ilkle` kullanmadan elle yazılmış, bağımlılıksız ve kilitsiz manifest.
+    fs::write(
+        project.join("huma.json"),
+        r#"{
+  "ad": "kilitsiz",
+  "aciklama": "Kilitsiz test projesi",
+  "yazar": "Test",
+  "lisans": "MIT",
+  "surum": "0.1.0",
+  "giris": "ana.hb",
+  "huma_surum": ">=0.6.0",
+  "bagimliliklar": {},
+  "betikler": { "baslat": "huma run ana.hb" }
+}"#,
+    )
+    .expect("Manifest yazılmalı");
+    fs::write(project.join("ana.hb"), "\"çalıştı\"'yı yazdır").expect("Giriş yazılmalı");
+
+    let before = run_huma(&project, &["paket", "run", "baslat"]);
+    assert!(!before.status.success(), "Kilitsiz proje çalışmamalı");
+    let stderr = String::from_utf8_lossy(&before.stderr);
+    assert!(stderr.contains("huma.lock zorunludur"), "{stderr}");
+
+    assert_success(&run_huma(&project, &["kur"]), "Bağımlılıksız kurulum");
+    assert!(
+        project.join("huma.lock").is_file(),
+        "kur kilit dosyası üretmeli"
+    );
+    let after = run_huma(&project, &["paket", "run", "baslat"]);
+    assert_success(&after, "Kilitli proje");
+    assert!(String::from_utf8_lossy(&after.stdout).contains("çalıştı"));
+    fs::remove_dir_all(&project).expect("Geçici proje temizlenmeli");
+}
