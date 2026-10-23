@@ -199,6 +199,7 @@ function TrSections() {
           <li>İç içe çağrı derinliği: 32</li>
           <li>Dil çıktısı: 16 MiB</li>
           <li>Tek koleksiyon literali: 1.000.000 öğe</li>
+          <li>Komut/ifade iç içe geçmesi: 200 düzey (sözdizimi hatası)</li>
           <li>Kaynak ve bytecode payload: 64 MiB</li>
         </ul>
         <p>Sınır aşımı sessiz kısaltma değil, yakalanabilir hata üretir.</p>
@@ -304,6 +305,7 @@ function EnSections() {
           <li>Call depth: 32</li>
           <li>Language output: 16 MiB</li>
           <li>Single collection literal: 1,000,000 elements</li>
+          <li>Statement/expression nesting: 200 levels (syntax error)</li>
           <li>Source and bytecode payload: 64 MiB</li>
         </ul>
         <p>Exceeding a limit produces a catchable error, not silent truncation.</p>

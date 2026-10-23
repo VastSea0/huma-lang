@@ -2,6 +2,7 @@ use huma_bytecode::{validate_program, Constant, FunctionPrototype, OpCode, Progr
 use huma_syntax::ast::{Ifade, Komut};
 use huma_syntax::error::SourceSpan;
 use huma_syntax::token::Token;
+use huma_syntax::yigin::yigini_koru;
 
 pub struct Derleyici {
     constants: Vec<Constant>,
@@ -132,6 +133,10 @@ impl Derleyici {
     }
 
     fn ifade_derle(&mut self, ifade: Ifade) {
+        yigini_koru(|| self.ifade_derle_ic(ifade))
+    }
+
+    fn ifade_derle_ic(&mut self, ifade: Ifade) {
         match ifade {
             Ifade::Sayi(n) => {
                 let idx = self.constant_ekle(Constant::Sayi(n));
@@ -283,6 +288,10 @@ impl Derleyici {
     }
 
     fn komut_derle(&mut self, komut: Komut) {
+        yigini_koru(|| self.komut_derle_ic(komut))
+    }
+
+    fn komut_derle_ic(&mut self, komut: Komut) {
         match komut {
             Komut::Konumlu {
                 komut,

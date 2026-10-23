@@ -8,6 +8,7 @@ pub mod lexer;
 pub mod morphology;
 pub mod parser;
 pub mod token;
+pub mod yigin;
 
 pub use error::{
     DiagnosticCause, DiagnosticEnvelope, ErrorCategory, HumaError, HumaResult, RuntimeDiagnostic,

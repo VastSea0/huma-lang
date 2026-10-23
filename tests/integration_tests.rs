@@ -151,6 +151,50 @@ fn test_derin_rekursiyon_hatasi() {
     assert_eq!(interp.call_depth, 0);
 }
 
+/// REGRESYON: Ayrıştırıcının kabul ettiği en derin yuvalama, 31 Hüma
+/// çağrısının içinde ve 2 MiB'lık test iş parçacığı yığınında bile ev sahibi
+/// yığınını taşırmamalı. Önceden debug derlemede süreç yığın taşmasıyla
+/// düşüyordu.
+#[test]
+fn test_sinira_yakin_yuvalama_yigini_tasirmaz() {
+    let n = 190;
+    let bloklar = format!(
+        "{}y = ({}1) olsun\n{}",
+        "k > 0 ise {\n".repeat(n - 4),
+        "1 + ".repeat(3),
+        "}\n".repeat(n - 4)
+    );
+    let kod = format!(
+        "f fonksiyon olsun k alsın {{\n k > 30 ise {{\n{bloklar} y'yi döndür\n }}\n f(k + 1)'i döndür\n}}\nf(0)'ı yazdır\n"
+    );
+    assert_eq!(eval(&kod), "4\n");
+    assert_eq!(eval_vm(&kod), "4\n");
+
+    let ifade = format!("{}1{}", "(".repeat(n), ")".repeat(n));
+    let zincir = format!("1{}", " + 1".repeat(n - 5));
+    let kod = format!(
+        "f fonksiyon olsun k alsın {{\n k > 30 ise {{ ({ifade} + {zincir})'i döndür }}\n f(k + 1)'i döndür\n}}\nf(0)'ı yazdır\n"
+    );
+    assert_eq!(eval(&kod), format!("{}\n", n - 3));
+    assert_eq!(eval_vm(&kod), format!("{}\n", n - 3));
+}
+
+fn eval_vm(kod: &str) -> String {
+    let mut parser = Parser::new(Lexer::new(kod));
+    let (ast, diagnostics) = parser.parse_program_with_diagnostics();
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    let program = huma::compiler::Derleyici::new()
+        .derle_kontrollu(ast)
+        .expect("Kaynak bytecode'a derlenmeli");
+    let buffer = Rc::new(RefCell::new(String::new()));
+    huma::vm::VM::new(program)
+        .with_output_buffer(Rc::clone(&buffer))
+        .run_checked()
+        .expect("VM programı çalışmalı");
+    let sonuc = buffer.borrow().clone();
+    sonuc
+}
+
 /// REGRESYON: Sayı gibi çağrılamayan bir değer çağrıldığında panik değil,
 /// Deger::Hata döndürmeli; program sonlanabilmeli.
 #[test]

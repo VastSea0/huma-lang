@@ -5,6 +5,7 @@ use crate::gc::Gc;
 use crate::gc::HeapSweepGuard;
 use crate::token::Token;
 use crate::value::{BuiltinRuntime, Deger};
+use huma_syntax::yigin::yigini_koru;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 use regex::Regex;
@@ -5674,6 +5675,10 @@ impl Yorumlayici {
     }
 
     fn komut_calistir(&mut self, komut: Komut) {
+        yigini_koru(|| self.komut_calistir_ic(komut))
+    }
+
+    fn komut_calistir_ic(&mut self, komut: Komut) {
         if let Komut::Konumlu {
             komut,
             satir,
@@ -6495,7 +6500,7 @@ impl Yorumlayici {
     }
 
     fn ifade_hesapla(&mut self, ifade: Ifade) -> Deger {
-        let value = self.ifade_hesapla_ic(ifade);
+        let value = yigini_koru(|| self.ifade_hesapla_ic(ifade));
         if let Deger::Hata(message) = &value {
             self.runtime_error_ekle(message.clone());
         }

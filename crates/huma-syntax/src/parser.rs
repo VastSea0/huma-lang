@@ -2,6 +2,16 @@ use crate::ast::{Ifade, Komut};
 use crate::error::HumaError;
 use crate::lexer::Lexer;
 use crate::token::Token;
+use crate::yigin::yigini_koru;
+
+/// Ayrıştırıcının kabul ettiği en derin komut/ifade yuvalaması.
+///
+/// Ayrıştırıcı, yorumlayıcı, bytecode derleyicisi ve AST'nin `Drop`
+/// uygulaması ağacı ev sahibi yığınında özyinelemeli dolaşır. Sınır aşan
+/// kaynak, yığın taşmasıyla süreci düşürmek yerine konumlu sözdizimi
+/// hatasıyla reddedilir. Sayım tutucudur: bir düğümün derinliğine, onu
+/// çevreleyen blok ve alt ifade yuvalaması da eklenir.
+pub const MAKS_YUVALAMA_DERINLIGI: usize = 200;
 
 pub struct Parser {
     lexer: Lexer,
@@ -10,6 +20,12 @@ pub struct Parser {
     current_pos: (usize, usize),
     peek_pos: (usize, usize),
     errors: Vec<HumaError>,
+    /// Şu an açık olan komut ve birincil ifade çerçevelerinin sayısı.
+    yuvalama: usize,
+    /// En son ayrıştırılan ifade alt ağacının derinliği.
+    son_derinlik: usize,
+    /// Yuvalama sınırı aşıldığında ayrıştırma kaynağın sonuna atlanır.
+    durduruldu: bool,
 }
 
 impl Parser {
@@ -55,7 +71,44 @@ impl Parser {
             current_pos,
             peek_pos,
             errors: Vec::new(),
+            yuvalama: 0,
+            son_derinlik: 0,
+            durduruldu: false,
         }
+    }
+
+    /// Yuvalama sınırını aşan kaynağı tek bir tanıyla reddeder ve kalan
+    /// token'ları tüketir; böylece hiçbir katman sınırdan derin ağaç görmez.
+    fn yuvalama_siniri_asildi(&mut self) {
+        if !self.durduruldu {
+            self.error(&format!(
+                "İç içe geçme derinliği {} sınırını aşıyor; kodu ara değişkenlere veya fonksiyonlara bölün",
+                MAKS_YUVALAMA_DERINLIGI
+            ));
+            self.durduruldu = true;
+        }
+        while self.current_token != Token::Son {
+            self.next_token();
+        }
+    }
+
+    /// Çevreleyen yuvalamayla birlikte `derinlik` sınırı aşıyorsa ayrıştırmayı durdurur.
+    fn derinligi_denetle(&mut self, derinlik: usize) -> bool {
+        if self.yuvalama + derinlik > MAKS_YUVALAMA_DERINLIGI {
+            self.yuvalama_siniri_asildi();
+            false
+        } else {
+            true
+        }
+    }
+
+    fn yuvalamaya_gir(&mut self) -> bool {
+        if self.durduruldu || self.yuvalama >= MAKS_YUVALAMA_DERINLIGI {
+            self.yuvalama_siniri_asildi();
+            return false;
+        }
+        self.yuvalama += 1;
+        true
     }
 
     fn next_token(&mut self) {
@@ -66,6 +119,10 @@ impl Parser {
     }
 
     fn error(&mut self, msg: &str) {
+        // Durdurulmuş ayrıştırmadaki takip hataları yalnız gürültüdür.
+        if self.durduruldu {
+            return;
+        }
         self.errors.push(HumaError::SyntaxError {
             line: self.current_pos.0,
             col: self.current_pos.1,
@@ -113,7 +170,17 @@ impl Parser {
         (program, errors)
     }
 
+    /// Komut özyinelemesinin (blok, fonksiyon ve sınıf gövdesi) tek girişi.
     fn parse_komut(&mut self) -> Option<Komut> {
+        if !self.yuvalamaya_gir() {
+            return None;
+        }
+        let komut = yigini_koru(|| self.parse_komut_ic());
+        self.yuvalama -= 1;
+        komut
+    }
+
+    fn parse_komut_ic(&mut self) -> Option<Komut> {
         match self.current_token.clone() {
             // dene { } hata var ise { }
             Token::Dene => self.parse_dene(),
@@ -703,119 +770,101 @@ impl Parser {
         )
     }
 
-    fn parse_veya(&mut self) -> Ifade {
-        let mut sol = self.parse_ve();
-        while self.current_token == Token::Veya {
-            let op = self.current_token.clone();
+    /// Sol birleşimli ikili işlem zinciri: `alt (op alt)*`.
+    fn parse_ikili_zincir(&mut self, alt: fn(&mut Self) -> Ifade, operatorler: &[Token]) -> Ifade {
+        let mut sol = alt(self);
+        let mut derinlik = self.son_derinlik;
+        while operatorler.contains(&self.current_token) {
+            let operator = self.current_token.clone();
             self.next_token();
-            let sag = self.parse_ve();
+            let sag = alt(self);
+            derinlik = derinlik.max(self.son_derinlik) + 1;
+            if !self.derinligi_denetle(derinlik) {
+                self.son_derinlik = 1;
+                return Ifade::Bos;
+            }
             sol = Ifade::IkiliIslem {
                 sol: Box::new(sol),
-                operator: op,
+                operator,
                 sag: Box::new(sag),
             };
         }
+        self.son_derinlik = derinlik;
         sol
+    }
+
+    fn parse_veya(&mut self) -> Ifade {
+        self.parse_ikili_zincir(Self::parse_ve, &[Token::Veya])
     }
 
     fn parse_ve(&mut self) -> Ifade {
-        let mut sol = self.parse_esitlik();
-        while self.current_token == Token::Ve {
-            let op = self.current_token.clone();
-            self.next_token();
-            let sag = self.parse_esitlik();
-            sol = Ifade::IkiliIslem {
-                sol: Box::new(sol),
-                operator: op,
-                sag: Box::new(sag),
-            };
-        }
-        sol
+        self.parse_ikili_zincir(Self::parse_esitlik, &[Token::Ve])
     }
 
+    /// `=` koşulda eşitlik denetimidir; atama yalnız cümle sonundaki `olsun` ile olur.
     fn parse_esitlik(&mut self) -> Ifade {
-        let mut sol = self.parse_karsilastirma();
-        // = operatörü koşulda eşitlik kontrolü yapar, olsun ile birlikte atama olur
-        while matches!(
-            self.current_token,
-            Token::EsitEsittir | Token::EsitDegil | Token::Esittir
-        ) {
-            let op = self.current_token.clone();
-            self.next_token();
-            let sag = self.parse_karsilastirma();
-            sol = Ifade::IkiliIslem {
-                sol: Box::new(sol),
-                operator: op,
-                sag: Box::new(sag),
-            };
-        }
-        sol
+        self.parse_ikili_zincir(
+            Self::parse_karsilastirma,
+            &[Token::EsitEsittir, Token::EsitDegil, Token::Esittir],
+        )
     }
 
     fn parse_karsilastirma(&mut self) -> Ifade {
-        let mut sol = self.parse_toplama();
-        while matches!(
-            self.current_token,
-            Token::Buyuktur | Token::Kucuktur | Token::BuyukEsit | Token::KucukEsit
-        ) {
-            let op = self.current_token.clone();
-            self.next_token();
-            let sag = self.parse_toplama();
-            sol = Ifade::IkiliIslem {
-                sol: Box::new(sol),
-                operator: op,
-                sag: Box::new(sag),
-            };
-        }
-        sol
+        self.parse_ikili_zincir(
+            Self::parse_toplama,
+            &[
+                Token::Buyuktur,
+                Token::Kucuktur,
+                Token::BuyukEsit,
+                Token::KucukEsit,
+            ],
+        )
     }
 
     fn parse_toplama(&mut self) -> Ifade {
-        let mut sol = self.parse_carpma();
-        while matches!(self.current_token, Token::Arti | Token::Eksi) {
-            let op = self.current_token.clone();
-            self.next_token();
-            let sag = self.parse_carpma();
-            sol = Ifade::IkiliIslem {
-                sol: Box::new(sol),
-                operator: op,
-                sag: Box::new(sag),
-            };
-        }
-        sol
+        self.parse_ikili_zincir(Self::parse_carpma, &[Token::Arti, Token::Eksi])
     }
 
     fn parse_carpma(&mut self) -> Ifade {
-        let mut sol = self.parse_birincil();
-        while matches!(self.current_token, Token::Carpi | Token::Bolnu | Token::Mod) {
-            let op = self.current_token.clone();
-            self.next_token();
-            let sag = self.parse_birincil();
-            sol = Ifade::IkiliIslem {
-                sol: Box::new(sol),
-                operator: op,
-                sag: Box::new(sag),
-            };
-        }
-        sol
+        self.parse_ikili_zincir(
+            Self::parse_birincil,
+            &[Token::Carpi, Token::Bolnu, Token::Mod],
+        )
     }
 
     fn parse_birincil(&mut self) -> Ifade {
+        // Her ifade özyinelemesi (parantez, argüman, tekli işlem) buradan geçer.
+        if !self.yuvalamaya_gir() {
+            self.son_derinlik = 1;
+            return Ifade::Bos;
+        }
+        let ifade = yigini_koru(|| self.parse_birincil_ic());
+        self.yuvalama -= 1;
+        ifade
+    }
+
+    fn parse_birincil_ic(&mut self) -> Ifade {
         match self.current_token {
             Token::Bekle => {
                 self.next_token();
-                Ifade::Bekle(Box::new(self.parse_birincil()))
+                let ic = self.parse_birincil();
+                self.son_derinlik += 1;
+                Ifade::Bekle(Box::new(ic))
             }
             Token::Degil => {
                 self.next_token();
-                Ifade::MantıksalDegil(Box::new(self.parse_birincil()))
+                let ic = self.parse_birincil();
+                self.son_derinlik += 1;
+                Ifade::MantıksalDegil(Box::new(ic))
             }
             Token::Eksi => {
                 self.next_token();
+                let ic = self.parse_birincil();
+                self.son_derinlik += 1;
                 Ifade::IkiliIslem {
                     sol: Box::new(Ifade::Sayi(0.0)),
                     operator: Token::Eksi,
-                    sag: Box::new(self.parse_birincil()),
+                    sag: Box::new(ic),
                 }
             }
             _ => self.parse_temel(),
@@ -833,6 +882,9 @@ impl Parser {
     }
 
     fn parse_temel(&mut self) -> Ifade {
+        // Yaprak düğümlerin derinliği 1'dir; parantez ve koleksiyonlar kendi
+        // alt ağaçlarının derinliğini `son_derinlik` içine yazar.
+        self.son_derinlik = 1;
         let mut node = match self.current_token.clone() {
             Token::Sayi(n) => {
                 self.next_token();
@@ -897,6 +949,7 @@ impl Parser {
         };
 
         // Postfix operatörler
+        let mut derinlik = self.son_derinlik;
         loop {
             match self.current_token {
                 Token::AcikParantez => {
@@ -905,18 +958,8 @@ impl Parser {
                     }
                     let call_pos = self.current_pos;
                     self.next_token();
-                    let mut args = Vec::new();
-                    if self.current_token != Token::KapaliParantez {
-                        loop {
-                            args.push(self.parse_ifade());
-                            if self.current_token == Token::Virgul {
-                                self.next_token();
-                            } else {
-                                break;
-                            }
-                        }
-                    }
-                    self.consume(Token::KapaliParantez);
+                    let (args, arg_derinligi) = self.parse_arguman_listesi();
+                    derinlik = derinlik.max(arg_derinligi) + 1;
                     node = Ifade::Cagri {
                         fonksiyon: Box::new(node),
                         argumanlar: args,
@@ -926,6 +969,7 @@ impl Parser {
                 Token::AcikKose => {
                     self.next_token();
                     let i = self.parse_ifade();
+                    derinlik = derinlik.max(self.son_derinlik) + 1;
                     self.consume(Token::KapaliKose);
                     node = Ifade::ListeErisim {
                         liste: Box::new(node),
@@ -937,6 +981,7 @@ impl Parser {
                     if let Token::Tanimlayici(ref s) = self.current_token {
                         let oz = s.clone();
                         self.next_token();
+                        derinlik += 1;
                         node = Ifade::NesneErisim {
                             nesne: Box::new(node),
                             ozellik: oz,
@@ -949,23 +994,15 @@ impl Parser {
                     self.next_token();
                     if self.current_token == Token::Uzunlugu {
                         self.next_token();
+                        derinlik += 1;
                         node = Ifade::Uzunluk(Box::new(node));
                     } else if self.current_token == Token::AcikParantez {
                         // Metot çağrısı: nesne'nin (arg1, arg2) metot'u
                         let call_pos = self.current_pos;
                         self.next_token();
-                        let mut args = Vec::new();
-                        if self.current_token != Token::KapaliParantez {
-                            loop {
-                                args.push(self.parse_ifade());
-                                if self.current_token == Token::Virgul {
-                                    self.next_token();
-                                } else {
-                                    break;
-                                }
-                            }
-                        }
-                        self.consume(Token::KapaliParantez);
+                        let (args, arg_derinligi) = self.parse_arguman_listesi();
+                        // Metot çağrısı NesneErisim içeren bir Cagri düğümüdür.
+                        derinlik = (derinlik + 1).max(arg_derinligi) + 1;
                         if let Token::Tanimlayici(ref s) = self.current_token {
                             let oz = s.clone();
                             self.next_token();
@@ -994,6 +1031,7 @@ impl Parser {
                         if self.current_token == Token::Iyelik {
                             self.next_token();
                         }
+                        derinlik += 1;
                         node = Ifade::NesneErisim {
                             nesne: Box::new(node),
                             ozellik: oz,
@@ -1004,17 +1042,20 @@ impl Parser {
                 }
                 Token::Uzunlugu => {
                     self.next_token();
+                    derinlik += 1;
                     node = Ifade::Uzunluk(Box::new(node));
                 }
                 Token::Ile => {
                     let call_pos = self.current_pos;
                     self.next_token();
                     let mut args = vec![node.clone()];
+                    let mut arg_derinligi = derinlik;
                     loop {
                         // Doğal çağrıda üst düzey `ve`, mantıksal işlem değil
                         // argüman ayıracıdır. Mantıksal bir argüman parantezle
                         // açıkça yazılabilir: `x ile (a ve b)'yi f`.
                         args.push(self.parse_esitlik());
+                        arg_derinligi = arg_derinligi.max(self.son_derinlik);
                         if matches!(self.current_token, Token::Ve | Token::Ile) {
                             self.next_token();
                         } else {
@@ -1028,6 +1069,7 @@ impl Parser {
                         if self.current_token == Token::Cagir {
                             self.next_token();
                         }
+                        derinlik = arg_derinligi + 1;
                         node = Ifade::Cagri {
                             fonksiyon: Box::new(Ifade::Degisken(ad)),
                             argumanlar: args,
@@ -1039,16 +1081,43 @@ impl Parser {
                 }
                 _ => break,
             }
+            // Yalnız bir postfix uygulandıysa buraya gelinir.
+            if !self.derinligi_denetle(derinlik) {
+                self.son_derinlik = 1;
+                return Ifade::Bos;
+            }
         }
+        self.son_derinlik = derinlik;
         node
+    }
+
+    /// `(` sonrasından başlayıp `)` dahil argümanları okur; en derin argümanı da döndürür.
+    fn parse_arguman_listesi(&mut self) -> (Vec<Ifade>, usize) {
+        let mut args = Vec::new();
+        let mut derinlik = 0;
+        if self.current_token != Token::KapaliParantez {
+            loop {
+                args.push(self.parse_ifade());
+                derinlik = derinlik.max(self.son_derinlik);
+                if self.current_token == Token::Virgul {
+                    self.next_token();
+                } else {
+                    break;
+                }
+            }
+        }
+        self.consume(Token::KapaliParantez);
+        (args, derinlik)
     }
 
     fn parse_liste(&mut self) -> Ifade {
         self.next_token(); // '[' yut
         let mut el = Vec::new();
+        let mut derinlik = 0;
         if self.current_token != Token::KapaliKose {
             loop {
                 el.push(self.parse_ifade());
+                derinlik = derinlik.max(self.son_derinlik);
                 if self.current_token == Token::Virgul {
                     self.next_token();
                 } else {
@@ -1057,17 +1126,21 @@ impl Parser {
             }
         }
         self.consume(Token::KapaliKose);
+        self.son_derinlik = derinlik + 1;
         Ifade::Liste(el)
     }
 
     fn parse_sozluk(&mut self) -> Ifade {
         self.next_token(); // '{' yut
         let mut ciftler = Vec::new();
+        let mut derinlik = 0;
         if self.current_token != Token::KapaliSuskun {
             loop {
                 let anahtar = self.parse_ifade();
+                derinlik = derinlik.max(self.son_derinlik);
                 self.consume(Token::IkiNokta);
                 let deger = self.parse_ifade();
+                derinlik = derinlik.max(self.son_derinlik);
                 ciftler.push((anahtar, deger));
                 if self.current_token == Token::Virgul {
                     self.next_token();
@@ -1077,6 +1150,7 @@ impl Parser {
             }
         }
         self.consume(Token::KapaliSuskun);
+        self.son_derinlik = derinlik + 1;
         Ifade::Sozluk(ciftler)
     }
 
@@ -1101,7 +1175,10 @@ impl Parser {
         }
 
         self.consume(Token::AcikSuskun);
+        // Gövde komutları kendi yuvalama sayımıyla ayrıştırılır; ifade
+        // ağacına tek düğüm olarak katılır.
         let govde = self.parse_blok();
+        self.son_derinlik = 1;
         Ifade::FonksiyonIfadesi {
             parametreler: params,
             govde,
@@ -1162,6 +1239,57 @@ mod tests {
                 !diagnostics.is_empty(),
                 "{word} ayrılmış sözcük olarak kalmalıdır"
             );
+        }
+    }
+
+    fn yuvalama_tanilari(kaynak: &str) -> Vec<String> {
+        let mut parser = Parser::new(Lexer::new(kaynak));
+        let (_, diagnostics) = parser.parse_program_with_diagnostics();
+        diagnostics.iter().map(ToString::to_string).collect()
+    }
+
+    #[test]
+    fn sinir_asan_yuvalama_tek_konumlu_taniyla_reddedilir() {
+        let n = 20_000;
+        let kaynaklar = [
+            format!("x = {}1{} olsun", "(".repeat(n), ")".repeat(n)),
+            format!("x = {}1{} olsun", "[".repeat(n), "]".repeat(n)),
+            format!("x = {}1{} olsun", "{\"a\": ".repeat(n), "}".repeat(n)),
+            format!("x = {}1 olsun", "- ".repeat(n)),
+            format!("x = {}1 olsun", "değil ".repeat(n)),
+            format!("x = 1{} olsun", " + 1".repeat(n)),
+            format!("x = 1{} olsun", " * 1".repeat(n)),
+            format!("x = a{} olsun", ".b".repeat(n)),
+            format!("x = a{} olsun", "[0]".repeat(n)),
+            format!("x = {}1 f olsun", "1 ile ".repeat(n)),
+            format!("{}{}", "doğru ise {\n".repeat(n), "}".repeat(n)),
+            format!("{}{}", "a sınıf olsun {\n".repeat(n), "}".repeat(n)),
+        ];
+        for kaynak in &kaynaklar {
+            let tanilar = yuvalama_tanilari(kaynak);
+            assert_eq!(tanilar.len(), 1, "{:.40}: {tanilar:?}", kaynak);
+            assert!(
+                tanilar[0].contains("İç içe geçme derinliği 200"),
+                "{:.40}: {tanilar:?}",
+                kaynak
+            );
+        }
+    }
+
+    #[test]
+    fn sinir_altindaki_yuvalama_kabul_edilir() {
+        let n = 150;
+        let kaynaklar = [
+            format!("x = {}1{} olsun", "(".repeat(n), ")".repeat(n)),
+            format!("x = {}1{} olsun", "[".repeat(n), "]".repeat(n)),
+            format!("x = {}1 olsun", "- ".repeat(n)),
+            format!("x = 1{} olsun", " + 1".repeat(n)),
+            format!("x = a{} olsun", ".b".repeat(n)),
+            format!("{}{}", "doğru ise {\n".repeat(n), "}".repeat(n)),
+        ];
+        for kaynak in &kaynaklar {
+            let tanilar = yuvalama_tanilari(kaynak);
+            assert!(tanilar.is_empty(), "{:.40}: {tanilar:?}", kaynak);
         }
     }
 

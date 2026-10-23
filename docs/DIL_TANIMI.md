@@ -305,3 +305,11 @@ Varsayılan yürütme sınırları 10.000.000 adım, 32 iç içe çağrı, 16 Mi
 payload’u 64 MiB ile sınırlıdır. Dosya, ağ, süreç, SQL, tensor, matris, regex,
 tokenizer ve benzeri yerleşikler ayrıca işlemine uygun boyut, süre ve öğe
 sınırları uygular. Sınır aşımı sessiz kısaltma değil yakalanabilir hata üretir.
+
+Kaynakta komut ve ifade iç içe geçmesi (bloklar, parantezler, tekli
+işlemler, ikili işlem zincirleri, erişim/çağrı zincirleri ve koleksiyon
+literalleri) 200 düzeyle sınırlıdır. Sayım tutucudur: bir ifadenin ağaç
+derinliğine onu çevreleyen blok ve alt ifade düzeyleri eklenir; örneğin tek
+ifadede 200'den fazla `+` zinciri reddedilir. Sınırı aşan kaynak çalıştırılmaz,
+tek bir konumlu sözdizimi hatası verir. Bu sınır ayrıştırıcı, yorumlayıcı ve
+derleyicinin ev sahibi yığınını taşırmasını önler.
