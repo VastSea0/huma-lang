@@ -1596,6 +1596,7 @@ dependencies = [
  "huma-stdlib",
  "huma-syntax",
  "regex",
+ "serde_json",
  "tokio",
  "tower-lsp",
  "walkdir",

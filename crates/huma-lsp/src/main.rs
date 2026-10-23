@@ -1,4 +1,5 @@
 use anyhow::Result;
+use huma_syntax::ast::Komut;
 use huma_syntax::lexer::Lexer;
 use huma_syntax::parser::Parser;
 use huma_syntax::HumaError;
@@ -17,6 +18,95 @@ const MAX_WORKSPACE_FILES: usize = 10_000;
 #[derive(Debug, Default)]
 struct Document {
     text: String,
+}
+
+/// Kaynakta bir adı tanımlayan komut.
+#[derive(Debug, Clone, PartialEq)]
+enum TanimTuru {
+    Fonksiyon(Vec<String>),
+    Sinif,
+    Degisken,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct Tanim {
+    ad: String,
+    tur: TanimTuru,
+    /// Kaynağın 1 tabanlı satır/sütunu (tanımlayan komutun başlangıcı).
+    satir: usize,
+    sutun: usize,
+}
+
+/// Ayrıştırıcının AST'sinden fonksiyon, sınıf, değişken ve aralık değişkeni
+/// tanımlarını kaynak sırasıyla toplar. Sözdizimi hatalı kaynakta da
+/// ayrıştırılabilen komutların tanımları döner.
+fn tanimlari_topla(text: &str) -> Vec<Tanim> {
+    fn gez(komutlar: &[Komut], konum: (usize, usize), out: &mut Vec<Tanim>) {
+        for komut in komutlar {
+            komutu_gez(komut, konum, out);
+        }
+    }
+    fn komutu_gez(komut: &Komut, konum: (usize, usize), out: &mut Vec<Tanim>) {
+        let mut ekle = |ad: &String, tur| {
+            out.push(Tanim {
+                ad: ad.clone(),
+                tur,
+                satir: konum.0,
+                sutun: konum.1,
+            })
+        };
+        match komut {
+            Komut::Konumlu {
+                komut,
+                satir,
+                sutun,
+            } => komutu_gez(komut, (*satir, *sutun), out),
+            Komut::FonksiyonTanimla {
+                ad,
+                parametreler,
+                govde,
+            } => {
+                ekle(ad, TanimTuru::Fonksiyon(parametreler.clone()));
+                gez(govde, konum, out);
+            }
+            // Sınıf gövdesi komutları konum taşımaz; sınıfın konumu kullanılır.
+            Komut::SinifTanimla { ad, metotlar } => {
+                ekle(ad, TanimTuru::Sinif);
+                gez(metotlar, konum, out);
+            }
+            Komut::DegiskenTanimla { ad, .. } => ekle(ad, TanimTuru::Degisken),
+            Komut::AralikDongusu {
+                degisken, govde, ..
+            } => {
+                ekle(degisken, TanimTuru::Degisken);
+                gez(govde, konum, out);
+            }
+            Komut::EgerKomutu {
+                govde,
+                degilse_govde,
+                ..
+            } => {
+                gez(govde, konum, out);
+                if let Some(govde) = degilse_govde {
+                    gez(govde, konum, out);
+                }
+            }
+            Komut::DonguKomutu { govde, .. } => gez(govde, konum, out),
+            Komut::DeneKomutu {
+                dene_govde,
+                hata_govde,
+                ..
+            } => {
+                gez(dene_govde, konum, out);
+                gez(hata_govde, konum, out);
+            }
+            _ => {}
+        }
+    }
+    let (program, _) = Parser::new(Lexer::new(text)).parse_program_with_diagnostics();
+    let mut out = Vec::new();
+    gez(&program, (1, 1), &mut out);
+    out
 }
 
 #[derive(Debug)]
@@ -102,13 +192,6 @@ impl Backend {
         Position::new(
             u32::try_from(line_index).unwrap_or(u32::MAX),
             u32::try_from(utf16_column).unwrap_or(u32::MAX),
-        )
-    }
-
-    fn line_end_position(line_index: usize, line: &str) -> Position {
-        Position::new(
-            u32::try_from(line_index).unwrap_or(u32::MAX),
-            u32::try_from(line.encode_utf16().count()).unwrap_or(u32::MAX),
         )
     }
 
@@ -204,6 +287,51 @@ impl Backend {
         out.sort();
         out.dedup();
         out
+    }
+
+    /// Adın ilk tanımını belirlenimli sırayla arar: önce isteğin yapıldığı
+    /// belge, sonra URI sırasıyla diğer açık belgeler, sonra yol sırasıyla
+    /// çalışma alanındaki açık olmayan dosyalar.
+    async fn tanim_bul(&self, uri: &Url, word: &str) -> Option<(Url, Tanim, String)> {
+        let adaylar: Vec<(Url, String)> = {
+            let docs = self.docs.lock().await;
+            let mut acik: Vec<(Url, String)> = docs
+                .iter()
+                .filter(|(u, _)| *u != uri)
+                .map(|(u, d)| (u.clone(), d.text.clone()))
+                .collect();
+            acik.sort_by(|a, b| a.0.as_str().cmp(b.0.as_str()));
+            let mut adaylar: Vec<(Url, String)> = docs
+                .get(uri)
+                .map(|d| (uri.clone(), d.text.clone()))
+                .into_iter()
+                .collect();
+            adaylar.extend(acik);
+            adaylar
+        };
+        for (aday_uri, text) in &adaylar {
+            if let Some(tanim) = tanimlari_topla(text).into_iter().find(|t| t.ad == word) {
+                return Some((aday_uri.clone(), tanim, text.clone()));
+            }
+        }
+        let root = self.root.read().await.clone()?;
+        let mut files = Self::scan_hb_files(&root);
+        files.sort();
+        for path in files {
+            let Ok(file_uri) = Url::from_file_path(&path) else {
+                continue;
+            };
+            if adaylar.iter().any(|(u, _)| *u == file_uri) {
+                continue;
+            }
+            let Some(text) = Self::read_workspace_source(&path) else {
+                continue;
+            };
+            if let Some(tanim) = tanimlari_topla(&text).into_iter().find(|t| t.ad == word) {
+                return Some((file_uri, tanim, text));
+            }
+        }
+        None
     }
 
     /// Returns a Turkish documentation string for known Hüma keywords.
@@ -351,45 +479,29 @@ impl LanguageServer for Backend {
             }));
         }
 
-        // 2) Look for function definition in workspace
-        let root_guard = self.root.read().await;
-        if let Some(root) = root_guard.as_ref() {
-            let files = Self::scan_hb_files(root);
-            let def_re = Regex::new(&format!(
-                r#"(?m)^\s*{}\s+fonksiyon\s+olsun(?:\s+(\w[\wÇĞİÖŞÜçğıöşü,\s]*)\s+alsın)?"#,
-                regex::escape(&word)
-            ))
-            .ok();
-            if let Some(def_re) = def_re {
-                for p in files {
-                    if let Some(text) = Self::read_workspace_source(&p) {
-                        if let Some(cap) = def_re.captures_iter(&text).next() {
-                            let params_str = cap
-                                .get(1)
-                                .map(|m| m.as_str().to_string())
-                                .unwrap_or_default();
-                            let hover_text = if params_str.is_empty() {
-                                format!("**{}** *(fonksiyon)*", word)
-                            } else {
-                                format!(
-                                    "**{}** *(fonksiyon)*\n\nParametreler: `{}`",
-                                    word, params_str
-                                )
-                            };
-                            return Ok(Some(Hover {
-                                contents: HoverContents::Markup(MarkupContent {
-                                    kind: MarkupKind::Markdown,
-                                    value: hover_text,
-                                }),
-                                range: None,
-                            }));
-                        }
-                    }
-                }
+        // 2) Kullanıcı tanımları (geçerli belge, açık belgeler, çalışma alanı)
+        let Some((_, tanim, _)) = self.tanim_bul(&uri, &word).await else {
+            return Ok(None);
+        };
+        let value = match tanim.tur {
+            TanimTuru::Fonksiyon(parametreler) if parametreler.is_empty() => {
+                format!("**{}** *(fonksiyon)*", tanim.ad)
             }
-        }
-
-        Ok(None)
+            TanimTuru::Fonksiyon(parametreler) => format!(
+                "**{}** *(fonksiyon)*\n\nParametreler: `{}`",
+                tanim.ad,
+                parametreler.join(", ")
+            ),
+            TanimTuru::Sinif => format!("**{}** *(sınıf)*", tanim.ad),
+            TanimTuru::Degisken => format!("**{}** *(değişken)*", tanim.ad),
+        };
+        Ok(Some(Hover {
+            contents: HoverContents::Markup(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value,
+            }),
+            range: None,
+        }))
     }
 
     async fn goto_definition(
@@ -399,77 +511,30 @@ impl LanguageServer for Backend {
         let uri = params.text_document_position_params.text_document.uri;
         let pos = params.text_document_position_params.position;
 
-        let docs = self.docs.lock().await;
-        let Some(doc) = docs.get(&uri) else {
+        let word = {
+            let docs = self.docs.lock().await;
+            let Some(doc) = docs.get(&uri) else {
+                return Ok(None);
+            };
+            let Some(word) = Self::word_at_position(&doc.text, pos) else {
+                return Ok(None);
+            };
+            word
+        };
+        let Some((tanim_uri, tanim, text)) = self.tanim_bul(&uri, &word).await else {
             return Ok(None);
         };
-        let Some(word) = Self::word_at_position(&doc.text, pos) else {
-            return Ok(None);
-        };
-
-        // 1) Search opened documents first
-        let def_re = Regex::new(&format!(
-            r#"(?m)^\s*{}\s+fonksiyon\b"#,
-            regex::escape(&word)
-        ))
-        .ok();
-        if let Some(def_re) = def_re {
-            for (u, d) in docs.iter() {
-                for (idx, line) in d.text.lines().enumerate() {
-                    if def_re.is_match(line) {
-                        let loc = Location {
-                            uri: u.clone(),
-                            range: Range {
-                                start: Position {
-                                    line: idx as u32,
-                                    character: 0,
-                                },
-                                end: Self::line_end_position(idx, line),
-                            },
-                        };
-                        return Ok(Some(GotoDefinitionResponse::Scalar(loc)));
-                    }
-                }
-            }
-        }
-        drop(docs);
-
-        // 2) Search workspace files
-        let root_guard = self.root.read().await;
-        let Some(root) = root_guard.as_ref() else {
-            return Ok(None);
-        };
-        let files = Self::scan_hb_files(root);
-        let def_re = Regex::new(&format!(
-            r#"(?m)^\s*{}\s+fonksiyon\b"#,
-            regex::escape(&word)
-        ))
-        .ok();
-        if let Some(def_re) = def_re {
-            for p in files {
-                if let Some(text) = Self::read_workspace_source(&p) {
-                    for (idx, line) in text.lines().enumerate() {
-                        if def_re.is_match(line) {
-                            if let Ok(u) = Url::from_file_path(&p) {
-                                let loc = Location {
-                                    uri: u,
-                                    range: Range {
-                                        start: Position {
-                                            line: idx as u32,
-                                            character: 0,
-                                        },
-                                        end: Self::line_end_position(idx, line),
-                                    },
-                                };
-                                return Ok(Some(GotoDefinitionResponse::Scalar(loc)));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(None)
+        let start = Self::source_position_to_lsp(&text, tanim.satir, tanim.sutun);
+        let end = Position::new(
+            start.line,
+            start
+                .character
+                .saturating_add(tanim.ad.encode_utf16().count() as u32),
+        );
+        Ok(Some(GotoDefinitionResponse::Scalar(Location {
+            uri: tanim_uri,
+            range: Range { start, end },
+        })))
     }
 
     async fn completion(&self, _params: CompletionParams) -> LspResult<Option<CompletionResponse>> {
@@ -601,10 +666,6 @@ mod tests {
         assert_eq!(
             Backend::source_position_to_lsp(text, 1, 3),
             Position::new(0, 3)
-        );
-        assert_eq!(
-            Backend::line_end_position(0, text),
-            Position::new(0, text.encode_utf16().count() as u32)
         );
     }
 }

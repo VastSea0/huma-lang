@@ -43,7 +43,7 @@ Başlangıç durumu (2026-10-23): `cargo clippy -D warnings` temiz,
 | B-029 | P2 | tests/ci | `soak.rs` testleri `#[ignore = "scheduled soak gate"]`; bunları çalıştıran zamanlanmış CI işi var mı doğrula, yoksa ölü test | `crates/huma-runtime/tests/soak.rs` | açık |
 | B-030 | P1 | tests | Derleyici testlerinden bazıları çıktı doğrulamıyor: `compile_and_run` yalnız hata olmadığına bakıyor (`compiler_vm_ic_ice_fonksiyon` "iç" yazdığını denetlemiyor), `compiler_derle_kontrollu_basarili` yalnız `is_ok` | `crates/huma-compiler/src/lib.rs:21,135-150` | açık |
 | B-031 | P2 | syntax | `Parser::parse_program()` genel API'si sözdizimi tanılarını sessizce atıyor; üretimde kullanılmıyor ama testlerde kullanılıyor (`tests/integration_tests.rs` derin özyineleme testi). Kaldır veya tanıları döndürsün | `crates/huma-syntax/src/parser.rs` `parse_program` | açık |
-| B-032 | P1 | cli | `huma run --json` "Output diagnostics in JSON" diyor fakat çalışma zamanı tanısı yine `tracing` metni olarak basılıyor; JSON çıktı yok | `huma run --json sifir.hb` | bitti (bkz. LOG 2026-10-23 #24) |
+| B-032 | P1 | cli | `huma run --json` "Output diagnostics in JSON" diyor fakat çalışma zamanı tanısı yine `tracing` metni olarak basılıyor; JSON çıktı yok | `huma run --json sifir.hb` | bitti (32f9e86) |
 | B-033 | P3 | cli | `huma build x.hb` çıktı adı verilmezse `x.hbc` yerine sabit `cikti.hbc` yazıyor; aynı dizinde iki derleme birbirini ezer | `huma build sifir.hb` → `cikti.hbc` | açık |
 | B-034 | P0 | ci | Main CI kırmızı: `rust-quality` Linux'a özgü `cfg` bloğunda `clippy::needless_return` ile düşüyor (`huma-perf/src/main.rs:301`); macOS'ta yerel clippy bu bloğu görmediğinden yakalanmadı. Ayrıca CI `tests` işi `needs: rust-quality` olduğu için hiç çalışmadı | `gh run view 39922940847 --log-failed` | bitti (28ef29f) |
 | B-035 | P0 | security | `cargo audit` 12 açık buluyor: rustls 0.23.42 (4), quinn-proto 0.11.16 (5), rustls-webpki 0.103.13, webpki-roots 1.0.9, h2 0.3.27; ayrıca yanked chacha20 0.10.1, bakımsız ttf-parser | `cargo audit` | bitti (5a55d91; ttf-parser bakımsız uyarısı GUI zincirinde kaldı, B-002/B-014 ile ele alınacak) |
@@ -67,6 +67,9 @@ Başlangıç durumu (2026-10-23): `cargo clippy -D warnings` temiz,
 | B-053 | P2 | tests | Başarısız e2e testleri geçici dizinlerini `target/` altında bırakıyor (temizlik `assert`lerden sonra) | `target/huma_*_e2e_*` | açık |
 | B-054 | P1 | vm | VM `devam` ve `kır` komutlarını derlemiyor (açık derleme hatası); README "kontrol akışı doğrulanmış alt küme" diyor | `tests/golden/dongu_ve_aralik.hb` | bitti (9f84205, 1f7031b) |
 | B-055 | P0 | vm | Arka uç ayrışması: `yakala hata { ("…" + hata)'yı yazdır }` yorumlayıcıda yakalanan hatayı metin olarak bağlıyor, VM'de hata değeri olarak bağlayıp kullanımda yeniden fırlatıyor ("Satır 5…: Satır 2…: Sıfıra bölme hatası") | `tests/golden/yakalanan_hata.hb` | bitti (0641339) |
+| B-056 | P1 | lsp | Tanıma gitme ve hover regex metin aramasıydı (`^\s*AD fonksiyon`): yalnız fonksiyonlar, değişken/sınıf yok; açık belgeler `HashMap` sırasıyla taranıyordu, aynı istek çalıştırmadan çalıştırmaya farklı dosya döndürüyordu (3 denemede 2 yanlış); hover açık belgeleri görmüyordu; LSP için hiç entegrasyon testi yoktu | python LSP istemcisi, 3 oturum | bitti (bkz. LOG 2026-10-23 #25) |
+| B-057 | P3 | lsp | `exit` bildiriminden sonra süreç stdin kapanana kadar sonlanmıyor (tower-lsp `serve` EOF bekliyor). Editörler pipe'ı kapattığı için pratikte sorun değil; spesifikasyona uyum için `exit`te sonlanmalı | lsp istemcisi: `exit` sonrası `poll()` None | açık |
+| B-058 | P3 | lsp | Anahtar sözcük hover örneklerinin bir kısmı geçersiz Hüma (`çağır hesapla(5)`, `{ ... }`); örnekler korpus gibi ayrıştırılarak doğrulanmalı | `crates/huma-lsp/src/main.rs` `keyword_hover` | açık |
 
 ## Keşif kaydı
 
@@ -77,3 +80,4 @@ Ajan derinlemesine taradığı her alanı buraya işler.
 | 2026-10-23 | Genel yüzey taraması (ilk teşhis) | B-001…B-016 | Derin okuma yapılmadı; tüm crate'ler yeniden taranmalı |
 | 2026-10-23 | CLI düşmanca girdi bataryası + yorumlayıcı/VM çapraz yürütme | B-018…B-029 | Boş dosya, BOM, geçersiz UTF-8, derin yuvalama, sıfıra bölme, büyük sayı, sonsuz döngü/özyineleme, döngüsel liste, kapalı yetenek, NFC denendi. NFC, sıfıra bölme, adım/özyineleme sınırları iki arka uçta da doğru |
 | 2026-10-23 | .github/workflows (CI gerçekten neyi koruyor?) — kısmi | B-034…B-038 | Push sonrası `gh run list` ile CI durumu denetlendi; son 4 main çalışması kırmızıydı |
+| 2026-10-23 | huma-lsp (gerçek JSON-RPC oturumu) | B-056…B-058 | Tanılar doğru konumda; tanıma gitme deterministik değildi |
