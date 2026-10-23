@@ -15,4 +15,5 @@ Yalnız ekleme. Her yineleme bir satır.
 | 2026-10-23 #9 | 82a145f | B-047 | Bağımlılıksız projede `huma kur` boş kilit üretir; `ilkle` ile aynı `bos_kilit_json` yardımcısı. Uzak CI: `tests` işi af26ae9'da ilk kez yeşil | B-044…B-048 |
 | 2026-10-23 #10 | d210c9f | B-019 | `run --help`, CLI modül belgesi, DIL_TANIMI §13, PERFORMANS, site güvenlik örneği ve install.sh hızlı başlangıcı yönetilen çalıştırmayı anlatıyor; `benchmarks/` paket oldu ve `huma paket run cekirdek[-vm]` 5000050000 üretiyor | — |
 | 2026-10-23 #11 | 7f29415 | B-046 | `paket run` bilgi satırı stderr'e taşındı; e2e test stdout'un yalnız program çıktısı olduğunu doğruluyor | — |
-| 2026-10-23 #12 | (bu commit) | B-045 | `paket run` alt süreç çıkış kodunu `BetikCikisKodu` bağlamıyla yayıyor; e2e testte çalışma zamanı 4, sözdizimi 3 | — |
+| 2026-10-23 #12 | a777d71 | B-045 | `paket run` alt süreç çıkış kodunu `BetikCikisKodu` bağlamıyla yayıyor; e2e testte çalışma zamanı 4, sözdizimi 3 | — |
+| 2026-10-23 #13 | (bu commit) | B-050 | Çağrı-dışı kullanılmayan ifade komutu ve yanlış biçimli ekle/çıkar sözdizimi hatası; komut başlatabilen sonekler ile `(`/`[` aynı satır kuralı. Ortaya çıkan 6 bozuk kütüphane/test çağrı yeri onarıldı. Eski/yeni ikililerle 21 örnek karşılaştırıldı: farklar yalnız tohumsuz rastgelelik ve onarılan `güvenli_oku` | B-049, B-051…B-053 |

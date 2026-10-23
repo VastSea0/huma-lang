@@ -71,6 +71,26 @@ Fonksiyon çağrısından sonra kullanılan `olsun`, çağrının sonucunun bile
 model.egit(veri, etiketler, 10, 0.01) olsun
 ```
 
+`olsun`'suz bir ifade komutu yalnız yan etkisi için çalıştırılan bir çağrı
+olabilir (`f()`, `nesne.metot(1)`, `1 ile 2'yi topla`, `bekle f()`). Değeri
+kullanılmayan diğer ifadeler (`1 + 2`, `x`, `"a" + 5'i f`) sözdizimi hatasıdır;
+böyle bir değer bilerek atılacaksa `olsun` ile yazılır.
+
+Geriye dönük uyumluluk notu: yorumlayıcı olsun'suz `hedef = değer` komutunu da
+atama olarak çalıştırır ve bu biçim fonksiyon içinde yerel değişken
+oluşturmak yerine en yakın mevcut değişkeni (yoksa genel değişkeni) günceller.
+Bu davranış yukarıdaki kuralla çelişir ve kaldırılması değerlendirilmektedir;
+yeni kodda kullanılmamalıdır.
+
+Satır sonları çoğunlukla anlamsızdır, ancak komut başlatabilen sonek sözcükler
+(`yazdır`, `döndür`, `yükle`) ile çağrı `(` ve indeks `[` işlemleri önceki
+token'la aynı satırda olmalıdır. Yeni satırda bunlar yeni bir komut başlatır:
+
+```huma
+f()
+yazdır "mesaj"     // iki komut: f() çağrılır, "mesaj" yazdırılır
+```
+
 ## 4. Ek ayıracı
 
 Kesme işareti, bir Hüma tanımlayıcısını Türkçe görünümlü durum ekinden ayıran programlama dili işaretidir:
@@ -140,7 +160,7 @@ x > 0 ve x < 10 ise {
 yanlış ve tanımsız_değişken
 ```
 
-Eşitlik için ifadelerde `=` veya `==` kabul edilir. Atama, yalnızca cümle sonundaki `olsun` ile oluşur.
+Eşitlik için ifadelerde `=` veya `==` kabul edilir. Atama, yalnızca cümle sonundaki `olsun` ile oluşur (geriye dönük uyumluluk istisnası için §3).
 
 Koşul doğruluğu tek bir çalışma zamanı kuralına sahiptir: `boş`, `0`, boş metin,
 boş bayt, boş liste, boş sözlük ve boş vektör yanlıştır. Diğer geçerli değerler

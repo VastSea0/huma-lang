@@ -23,7 +23,12 @@ komut            = fonksiyon-tanımı
                  | "devam", ayraç
                  | "kır", ayraç
                  | ifade, "olsun", ayraç
-                 | ifade, ayraç ;
+                 | çağrı-komutu, ayraç ;
+
+(* Olsun'suz ifade komutu yalnız yan etkisi için çalıştırılan bir çağrıdır;
+   değeri atılacak başka ifadeler "olsun" ile yazılır. Geriye dönük uyumluluk:
+   olsun'suz "atanabilir = ifade" de kabul edilir (bkz. DIL_TANIMI §3). *)
+çağrı-komutu     = [ "bekle" ], art-ifade (* son art-işlem bir çağrıdır *) ;
 
 fonksiyon-tanımı = tanımlayıcı, "fonksiyon", "olsun",
                    [ parametreler, "alsın" ], blok ;
@@ -71,6 +76,8 @@ toplama          = çarpma, { ( "+" | "-" ), çarpma } ;
 çarpma           = tekli, { ( "*" | "/" | "%" ), tekli } ;
 tekli            = ( "bekle" | "değil" | "-" ), tekli | art-ifade ;
 
+(* "(" ve "[" art-işlemleri ile sonek "yazdır", "döndür", "yükle" önceki
+   token'la aynı satırda olmalıdır; yeni satırda yeni bir komut başlatırlar. *)
 art-ifade        = temel, { art-işlem } ;
 art-işlem        = "(", [ argümanlar ], ")"
                  | "[", ifade, "]"

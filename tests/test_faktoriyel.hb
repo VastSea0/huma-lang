@@ -5,4 +5,4 @@ faktöriyel fonksiyon olsun n alsın {
         n * faktöriyel(n - 1)'i döndür
     }
 }
-"Sonuç: " + 5'i faktöriyel'i yazdır;
+("Sonuç: " + faktöriyel(5))'i yazdır

@@ -17,9 +17,9 @@
 
 güvenli_oku fonksiyon olsun yol alsın {
     dene {
-        yol'u dosya_oku döndür
+        dosya_oku(yol)'u döndür
     } yakala sorun {
-        "Dosya okunamadı: " + yol'u hata_yaz
+        hata_yaz("Dosya okunamadı: " + yol)
         ""'yi döndür
     }
 }

@@ -26,6 +26,8 @@ pub struct Parser {
     son_derinlik: usize,
     /// Yuvalama sınırı aşıldığında ayrıştırma kaynağın sonuna atlanır.
     durduruldu: bool,
+    /// Bir önceki token'ın başladığı satır.
+    onceki_satir: usize,
 }
 
 impl Parser {
@@ -74,7 +76,16 @@ impl Parser {
             yuvalama: 0,
             son_derinlik: 0,
             durduruldu: false,
+            onceki_satir: 0,
         }
+    }
+
+    /// Mevcut token önceki token'la aynı satırda mı? Komut başlatabilen
+    /// sözcükler (`yazdır`, `döndür`, `yükle`) ile `(` ve `[` yalnız aynı
+    /// satırdaysa önceki ifadeye sonek olarak bağlanır; yeni satırda yeni bir
+    /// komut başlatırlar.
+    fn ayni_satirda(&self) -> bool {
+        self.current_pos.0 == self.onceki_satir
     }
 
     /// Yuvalama sınırını aşan kaynağı tek bir tanıyla reddeder ve kalan
@@ -112,6 +123,7 @@ impl Parser {
     }
 
     fn next_token(&mut self) {
+        self.onceki_satir = self.current_pos.0;
         self.current_token = self.peek_token.clone();
         self.current_pos = self.peek_pos;
         self.peek_token = self.lexer.next_token();
@@ -323,12 +335,13 @@ impl Parser {
 
     /// Genel ifade tabanlı komut: ifade parse et, ardından postfix kontroller
     fn parse_genel_ifade_komutu(&mut self) -> Option<Komut> {
+        let konum = self.current_pos;
         let ifade = self.parse_ifade();
-        self.parse_ifade_devam(ifade)
+        self.parse_ifade_devam(ifade, konum)
     }
 
     /// İfade parse edildikten sonra postfix kontrolleri yap
-    fn parse_ifade_devam(&mut self, ifade: Ifade) -> Option<Komut> {
+    fn parse_ifade_devam(&mut self, ifade: Ifade, komut_konumu: (usize, usize)) -> Option<Komut> {
         // Postfix: uzunluğu
         let ifade = if self.current_token == Token::Uzunlugu {
             self.next_token();
@@ -448,7 +461,7 @@ impl Parser {
         }
 
         // Postfix: yazdır
-        if self.current_token == Token::Yazdir {
+        if self.current_token == Token::Yazdir && self.ayni_satirda() {
             self.next_token();
             if self.current_token == Token::NoktaliVirgul {
                 self.next_token();
@@ -457,7 +470,7 @@ impl Parser {
         }
 
         // Postfix: döndür
-        if self.current_token == Token::Dondur {
+        if self.current_token == Token::Dondur && self.ayni_satirda() {
             self.next_token();
             if self.current_token == Token::NoktaliVirgul {
                 self.next_token();
@@ -466,7 +479,7 @@ impl Parser {
         }
 
         // Postfix: yükle
-        if self.current_token == Token::Yukle {
+        if self.current_token == Token::Yukle && self.ayni_satirda() {
             self.next_token();
             if self.current_token == Token::NoktaliVirgul {
                 self.next_token();
@@ -578,7 +591,8 @@ impl Parser {
                     deger: *indeks,
                 });
             }
-            return Some(Komut::IfadeKomutu(ifade));
+            self.error("'ekle' biçimi: liste'ye değer'i ekle");
+            return None;
         }
 
         // Postfix: çıkar
@@ -593,20 +607,65 @@ impl Parser {
                     indeks: *indeks,
                 });
             }
-            return Some(Komut::IfadeKomutu(ifade));
+            self.error("'çıkar' biçimi: liste'den indeks'i çıkar");
+            return None;
         }
 
         if self.current_token == Token::NoktaliVirgul {
             self.next_token();
         }
-        Some(Komut::IfadeKomutu(ifade))
+        self.kullanilmayan_ifadeyi_reddet(ifade, komut_konumu)
+    }
+
+    /// `olsun`'suz ifade komutu yalnız yan etkisi için çalıştırılan bir çağrı
+    /// olabilir. Diğer ifadelerin değeri sessizce atılırdı; bu da bir satırın
+    /// iki komuta bölünmesini gizlerdi (`"a" + 5'i f'i yazdır` →
+    /// `"a" + 5` atılır, `f` yazdırılır).
+    ///
+    /// İstisna: olsun'suz `hedef = değer` yorumlayıcıda atama olarak çalışır.
+    /// Bu DIL_TANIMI §3 ile çelişir ve depoda yaygın kullanılır; karar B-049'da.
+    fn kullanilmayan_ifadeyi_reddet(
+        &mut self,
+        ifade: Ifade,
+        (satir, sutun): (usize, usize),
+    ) -> Option<Komut> {
+        fn cagri_mi(ifade: &Ifade) -> bool {
+            match ifade {
+                Ifade::Cagri { .. } => true,
+                Ifade::Bekle(ic) => cagri_mi(ic),
+                _ => false,
+            }
+        }
+        if cagri_mi(&ifade) {
+            return Some(Komut::IfadeKomutu(ifade));
+        }
+        if matches!(
+            ifade,
+            Ifade::IkiliIslem {
+                operator: Token::Esittir,
+                ..
+            }
+        ) {
+            return Some(Komut::IfadeKomutu(ifade));
+        }
+        if !self.durduruldu {
+            self.errors.push(HumaError::SyntaxError {
+                line: satir,
+                col: sutun,
+                message: "İfadenin değeri kullanılmıyor; yazdırmak için '…'yı yazdır', \
+                          bilerek atmak için '… olsun' kullanın"
+                    .to_string(),
+            });
+        }
+        None
     }
 
     /// kendisi'nin alan = değer olsun veya kendisi'nin alan ifadesi
     fn parse_kendisi_komutu(&mut self) -> Option<Komut> {
         // 'kendisi' yi ifade olarak parse et (parse_temel handle edecek)
+        let konum = self.current_pos;
         let ifade = self.parse_ifade();
-        self.parse_ifade_devam(ifade)
+        self.parse_ifade_devam(ifade, konum)
     }
 
     /// isim fonksiyon olsun [param, ... alsın] { gövde }
@@ -953,7 +1012,7 @@ impl Parser {
         loop {
             match self.current_token {
                 Token::AcikParantez => {
-                    if matches!(node, Ifade::Sayi(_)) {
+                    if matches!(node, Ifade::Sayi(_)) || !self.ayni_satirda() {
                         break;
                     }
                     let call_pos = self.current_pos;
@@ -966,7 +1025,7 @@ impl Parser {
                         pos: call_pos,
                     };
                 }
-                Token::AcikKose => {
+                Token::AcikKose if self.ayni_satirda() => {
                     self.next_token();
                     let i = self.parse_ifade();
                     derinlik = derinlik.max(self.son_derinlik) + 1;
@@ -1217,7 +1276,9 @@ mod tests {
 
     #[test]
     fn yakala_hata_kanonik_hata_degiskenini_baglar() {
-        let mut parser = Parser::new(Lexer::new("dene { 1 / 0 } yakala hata { hata'yı yazdır }"));
+        let mut parser = Parser::new(Lexer::new(
+            "dene { 1 / 0 olsun } yakala hata { hata'yı yazdır }",
+        ));
         let (program, diagnostics) = parser.parse_program_with_diagnostics();
         assert!(diagnostics.is_empty(), "{diagnostics:?}");
         let Komut::Konumlu { komut, .. } = &program[0] else {
@@ -1291,6 +1352,85 @@ mod tests {
             let tanilar = yuvalama_tanilari(kaynak);
             assert!(tanilar.is_empty(), "{:.40}: {tanilar:?}", kaynak);
         }
+    }
+
+    fn komutlar(kaynak: &str) -> (Vec<Komut>, Vec<String>) {
+        let mut parser = Parser::new(Lexer::new(kaynak));
+        let (program, diagnostics) = parser.parse_program_with_diagnostics();
+        let program = program
+            .into_iter()
+            .map(|komut| match komut {
+                Komut::Konumlu { komut, .. } => *komut,
+                other => other,
+            })
+            .collect();
+        (
+            program,
+            diagnostics.iter().map(ToString::to_string).collect(),
+        )
+    }
+
+    #[test]
+    fn degeri_atilan_cagri_disi_ifade_reddedilir() {
+        // Eskiden iki komuta bölünüp "Sonuç: " + 5 sessizce atılıyor,
+        // faktöriyel fonksiyonunun kendisi yazdırılıyordu.
+        for kaynak in [
+            "\"Sonuç: \" + 5'i faktöriyel'i yazdır",
+            "1 + 2",
+            "x",
+            "x'i f",
+            "a ekle",
+            "a çıkar",
+        ] {
+            let (_, tanilar) = komutlar(kaynak);
+            assert!(!tanilar.is_empty(), "{kaynak} reddedilmeli");
+        }
+        let (_, tanilar) = komutlar("1 + 2");
+        assert!(tanilar[0].contains("Satır 1, Sütun 1"), "{tanilar:?}");
+        assert!(tanilar[0].contains("değeri kullanılmıyor"), "{tanilar:?}");
+    }
+
+    #[test]
+    fn yan_etkili_cagri_ve_bilerek_atilan_ifade_kabul_edilir() {
+        for kaynak in ["f()", "a.b(1)", "1 ile 2'yi f", "bekle f()", "1 + 2 olsun"] {
+            let (_, tanilar) = komutlar(kaynak);
+            assert!(tanilar.is_empty(), "{kaynak}: {tanilar:?}");
+        }
+    }
+
+    #[test]
+    fn yeni_satirdaki_komut_sozcugu_onceki_ifadeye_baglanmaz() {
+        let (program, tanilar) = komutlar("f()\nyazdır \"mesaj\"");
+        assert!(tanilar.is_empty(), "{tanilar:?}");
+        assert!(matches!(
+            &program[0],
+            Komut::IfadeKomutu(Ifade::Cagri { .. })
+        ));
+        assert!(matches!(&program[1], Komut::YazdirKomutu(Ifade::Metin(m)) if m == "mesaj"));
+
+        let (program, tanilar) = komutlar("f()\ndöndür 1");
+        assert!(tanilar.is_empty(), "{tanilar:?}");
+        assert!(matches!(&program[1], Komut::DondurKomutu(Ifade::Sayi(_))));
+
+        // `f()` sonrasındaki yeni satır parantezi çağrı değil yeni ifadedir.
+        let (program, tanilar) = komutlar("f()\n(1)'i yazdır");
+        assert!(tanilar.is_empty(), "{tanilar:?}");
+        assert_eq!(program.len(), 2);
+        let (program, tanilar) = komutlar("f()\n[1]'i yazdır");
+        assert!(tanilar.is_empty(), "{tanilar:?}");
+        assert_eq!(program.len(), 2);
+
+        // Aynı satırdaki sonek biçimleri değişmez.
+        let (program, tanilar) = komutlar("f(1)'i yazdır\na[0]'ı döndür");
+        assert!(tanilar.is_empty(), "{tanilar:?}");
+        assert!(matches!(
+            &program[0],
+            Komut::YazdirKomutu(Ifade::Cagri { .. })
+        ));
+        assert!(matches!(
+            &program[1],
+            Komut::DondurKomutu(Ifade::ListeErisim { .. })
+        ));
     }
 
     #[test]

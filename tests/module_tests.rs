@@ -452,3 +452,42 @@ fn basarisiz_modul_duzeltildikten_sonra_yeniden_yuklenebilir() {
 
     std::fs::remove_dir_all(dizin).expect("Geçici modül dizini temizlenmeli");
 }
+
+/// REGRESYON: `güvenli_oku` gövdesi (`yol'u dosya_oku döndür`) üç ayrı atılan
+/// ifadeye ayrışıyordu; fonksiyon dosyayı okumadan `boş` döndürüyordu.
+#[test]
+fn lib_dosya_guvenli_oku_icerigi_dondurur() {
+    let dizin = gecici_modul_dizini("guvenli_oku");
+    let dosya = dizin.join("veri.txt");
+    std::fs::write(&dosya, "merhaba").expect("Test dosyası yazılmalı");
+    let lib = proje_koku().join("lib").to_string_lossy().to_string();
+    let kod = format!(
+        "yükle \"dosya.hb\"\ngüvenli_oku({:?})'yu yazdır\ngüvenli_oku({:?})'yu yazdır\n",
+        dosya.to_string_lossy(),
+        dizin.join("yok.txt").to_string_lossy()
+    );
+    let (cikti, hata_var) = eval_with_paths(&kod, vec![lib]);
+    assert!(!hata_var, "{cikti}");
+    let satirlar: Vec<&str> = cikti.lines().collect();
+    assert_eq!(satirlar[0], "merhaba", "{cikti}");
+    assert!(
+        satirlar[1].contains("[HATA]") && satirlar[1].contains("yok.txt"),
+        "{cikti}"
+    );
+    assert_eq!(satirlar[2], "", "{cikti}");
+    std::fs::remove_dir_all(&dizin).expect("Geçici dizin temizlenmeli");
+}
+
+/// REGRESYON: `beklet` hiç uyumuyordu; `kronometre_bitir` yalnız " saniye"
+/// parçasını renkli yazıyordu.
+#[test]
+fn lib_zaman_beklet_uyur_ve_kronometre_tum_iletiyi_yazar() {
+    let lib = proje_koku().join("lib").to_string_lossy().to_string();
+    let kod = "yükle \"zaman.hb\"\nb = kronometre_başlat() olsun\nbeklet(0.05) olsun\nf = kronometre_bitir(b) olsun\n(f >= 0.04)'ı yazdır\n";
+    let (cikti, hata_var) = eval_with_paths(kod, vec![lib]);
+    assert!(!hata_var, "{cikti}");
+    let satirlar: Vec<&str> = cikti.lines().collect();
+    assert!(satirlar[0].contains("Geçen süre: "), "{cikti}");
+    assert!(satirlar[0].contains(" saniye"), "{cikti}");
+    assert_eq!(satirlar[1], "1", "{cikti}");
+}

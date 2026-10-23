@@ -1,7 +1,7 @@
 "renkler.hb"'yi yükle
 
 beklet fonksiyon olsun saniye alsın {
-    (saniye * 1000)'i uyut
+    uyut(saniye * 1000)
 }
 
 kronometre_başlat fonksiyon olsun {
@@ -11,6 +11,6 @@ kronometre_başlat fonksiyon olsun {
 kronometre_bitir fonksiyon olsun başlangıç alsın {
     bitiş = zaman() olsun
     fark = bitiş - başlangıç olsun
-    "Geçen süre: " + fark + " saniye" ile TURKUAZ'ı renkli_yaz
+    ("Geçen süre: " + fark + " saniye") ile TURKUAZ'ı renkli_yaz
     fark'ı döndür
 }

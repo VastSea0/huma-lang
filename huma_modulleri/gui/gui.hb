@@ -18,10 +18,10 @@ pencere_oluştur fonksiyon olsun başlık, genişlik, yükseklik, çizim_fks als
 // Kullanım Renkli: "Tamam" ile 255 ve 0 ve 0'ı renkli_buton_ekle
 buton_ekle fonksiyon olsun metin, p1, p2, p3, p4, p5 alsın {
     p1 == boş ise {
-        metin'i buton döndür
+        buton(metin)'u döndür
     } yoksa {
         p2 == boş ise {
-            metin'i buton döndür
+            buton(metin)'u döndür
         } yoksa {
             p3 == boş ise {
                 metin ile p1 ve p2'yi buton döndür
@@ -40,7 +40,7 @@ buton_ekle fonksiyon olsun metin, p1, p2, p3, p4, p5 alsın {
 // Kullanım: "Başlık" ile yazı_ekle
 yazı_ekle fonksiyon olsun metin, p1, p2, p3 alsın {
     p1 == boş ise {
-        metin'i etiket
+        etiket(metin)
     } yoksa {
         p2 == boş ise {
             metin ile p1'i etiket
@@ -53,18 +53,18 @@ yazı_ekle fonksiyon olsun metin, p1, p2, p3 alsın {
 // Metin kutusu ekler
 metin_kutusu_ekle fonksiyon olsun metin, w alsın {
     w == boş ise {
-        metin'i girdi_alanı döndür
+        girdi_alanı(metin)'nı döndür
     } yoksa {
         metin ile w'yi girdi_alanı döndür
     }
 }
 
 tema_degistir fonksiyon olsun tema alsın {
-    tema'yı tema_ayarla
+    tema_ayarla(tema)
 }
 
 büyük_metin_kutusu_ekle fonksiyon olsun metin alsın {
-    metin'i büyük_girdi_alanı döndür
+    büyük_girdi_alanı(metin)'nı döndür
 }
 
 // Kaydırıcı ekler
@@ -80,11 +80,11 @@ onay_kutusu_ekle fonksiyon olsun durum, metin alsın {
 }
 
 yan_yana_diz fonksiyon olsun fks alsın {
-    fks'ı yan_yana
+    yan_yana(fks)
 }
 
 alt_alta_diz fonksiyon olsun fks alsın {
-    fks'ı alt_alta
+    alt_alta(fks)
 }
 
 ayraç_çiz fonksiyon olsun {
@@ -92,7 +92,7 @@ ayraç_çiz fonksiyon olsun {
 }
 
 boşluk_bırak fonksiyon olsun miktar alsın {
-    miktar'ı boşluk
+    boşluk(miktar)
 }
 
 sekme_ekle fonksiyon olsun seçili_mi, metin alsın {
@@ -104,7 +104,7 @@ yüzen_pencere_ekle fonksiyon olsun başlık, açık_mı, fks alsın {
 }
 
 menü_çubuğu_ekle fonksiyon olsun fks alsın {
-    fks'ı menü_çubuğu
+    menü_çubuğu(fks)
 }
 
 açılır_menü_ekle fonksiyon olsun başlık, fks alsın {
