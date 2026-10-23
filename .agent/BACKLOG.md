@@ -20,7 +20,7 @@ Başlangıç durumu (2026-10-23): `cargo clippy -D warnings` temiz,
 | B-006 | P1 | syntax | `ast.rs` içinde `#[allow(dead_code)]` ile susturulmuş enum varyantları (ör. `NesneOlustur`). Ya kullan ya sil | `crates/huma-syntax/src/ast.rs:28,63` | bitti (e18095c) |
 | B-007 | P1 | cli | `exit_codes` modülü `#[allow(dead_code)]` ile susturulmuş; tanımlı çıkış kodları gerçekten kullanılmıyor olabilir | `crates/huma-cli/src/main.rs:21` | bitti (4fbd7d3) |
 | B-008 | P2 | runtime | `#[allow(unpredictable_function_pointer_comparisons)]` — değer eşitliğinde fonksiyon işaretçisi karşılaştırması; semantik olarak tanımsız sonuç riski | `crates/huma-runtime/src/value.rs:59` | açık |
-| B-009 | P2 | modules | `nlp_temel` modülünün en az 3 kopyası var ve birbirinden sapmış (`huma_modulleri/`, `examples/tor-qurtu/huma_modulleri/`, `examples/musteri_geri_bildirim_analizci/huma_modulleri/`). Vendoring yerine paket yöneticisi/yol bağımlılığı kullan | `diff -rq` | açık |
+| B-009 | P2 | modules | `nlp_temel` modülünün en az 3 kopyası var ve birbirinden sapmış (`huma_modulleri/`, `examples/tor-qurtu/huma_modulleri/`, `examples/musteri_geri_bildirim_analizci/huma_modulleri/`). Vendoring yerine paket yöneticisi/yol bağımlılığı kullan | `diff -rq` | bitti (bkz. LOG 2026-10-23 #35) |
 | B-010 | P1 | examples | Kapsam şişmesi + scratch dosyalar: `examples/huma_gpt/` (scratch_test_100m.hb, transformer_100m.hb, eğitim verisi), `examples/kelimeyivektore/` (~900 KB JSON), `examples/tor-qurtu/` (1.1 MB), `debug_heceleme.hb`, `simple_test.hb`, `check_type.hb`. Anayasa'ya göre çekirdek odaklı olunmalı | `du -sh examples/*` | bitti (9a84654, 074d5a3) |
 | B-011 | P1 | docs | README "Verified status" tablosu ve CHANGELOG'daki her iddia (nesilli GC + yazma bariyeri, interpreter/VM hata eşliği, O(1) argmax, 100M Transformer) bir teste bağlanmalı veya silinmeli | `README.md`, `README.en.md`, `CHANGELOG.md`, `docs/*.md` | bitti (10ab3ef) |
 | B-012 | P1 | www | `www/site/README.md` create-next-app şablonu; `public/` altında kullanılmayan şablon SVG'leri (next.svg, vercel.svg, file.svg, globe.svg, window.svg) | `www/site/` | bitti (d941648) |
@@ -74,6 +74,7 @@ Başlangıç durumu (2026-10-23): `cargo clippy -D warnings` temiz,
 | B-060 | P1 | ci | `fuzz.yml` komutu `cargo fuzz run <hedef> --locked` cargo-fuzz 0.13 tarafından reddediliyor ("unexpected argument '--locked'"); iş akışı çalışsaydı her hedefte düşerdi | yerelde aynı komut | bitti (6fdfce4) |
 | B-061 | P1 | fuzz | `fuzz/Cargo.lock` 13b463a'dan (B-018, `huma-syntax`'a stacker eklendi) beri eskiydi; fuzz ayrı workspace olduğundan kök `--locked` kapıları bunu görmüyordu | `cargo metadata --locked --manifest-path fuzz/Cargo.toml` | bitti (6fdfce4) |
 | B-062 | P1 | packages | Yönetilen çalıştırma kurulu paketin kilitteki sürüm/özetle eşleştiğini doğrulamıyor: kilit `nlp_temel 3.1.0` (eski özet) derken kurulu 3.2.0 ile program çalıştı. DURUM belgesi "SemVer/kilit/özet doğrulayan" diyor | `examples/nlp_uygulamasi`: eski kilit + `huma kur` sonrası `paket run baslat` | açık |
+| B-063 | P3 | packages | `huma kur` bağımlılık eklemediği hâlde kullanıcının `huma.json` dosyasını anahtar sırasına göre yeniden yazıyor ve dosya sonu satırsonunu siliyor (gereksiz diff) | `examples/nlp_uygulamasi`: `huma kur --güvenilir` | açık |
 
 ## Keşif kaydı
 

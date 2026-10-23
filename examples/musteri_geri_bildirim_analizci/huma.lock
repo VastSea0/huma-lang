@@ -1,10 +1,10 @@
 {
+  "guncelleme_zamani": "2026-10-23T14:30:21.089050+03:00",
   "paketler": {
     "nlp_temel": {
-      "surum": "3.1.0",
-      "hash": "b9b65507d049594d9ebc44b009e3d82db0c980a98cdbbabf86c4e686c1e06fb7",
-      "kaynak": "yerel"
+      "hash": "1cfcd902cd9f21af43405474e5a9b07ff169cfa0b93e7bf34da503aab3ebc668",
+      "kaynak": "yerel-imzasız-güvenilir",
+      "surum": "3.2.0"
     }
-  },
-  "guncelleme_zamani": "2026-07-25T21:51:28.302974+03:00"
+  }
 }
