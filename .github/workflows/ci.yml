@@ -47,6 +47,10 @@ jobs:
       - name: Reject Rust warnings
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
+      # fuzz/ ayrı bir workspace; kök değişikliği kilidini sessizce eskitir.
+      - name: Verify fuzz lock file
+        run: cargo metadata --locked --format-version 1 --manifest-path fuzz/Cargo.toml > /dev/null
+
   platform-check:
     name: Stable compile (${{ matrix.os }})
     strategy:

@@ -24,5 +24,9 @@ jobs:
       - name: Install cargo-fuzz
         uses: taiki-e/install-action@82fc405565b9cf90abfe700ba43b4751ce2fe422 # cargo-fuzz
 
+      # cargo-fuzz `--locked` kabul etmez; kilit tazeliği ayrıca denetlenir.
+      - name: Verify fuzz lock file
+        run: cargo metadata --locked --format-version 1 --manifest-path fuzz/Cargo.toml > /dev/null
+
       - name: Fuzz ${{ matrix.target }}
-        run: cargo fuzz run ${{ matrix.target }} --locked -- -max_total_time=300 -max_len=65536
+        run: cargo fuzz run ${{ matrix.target }} -- -max_total_time=300 -max_len=65536
