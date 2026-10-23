@@ -10,6 +10,21 @@ pub struct Derleyici {
     instructions: Vec<OpCode>,
     instruction_spans: Vec<Option<SourceSpan>>,
     errors: Vec<String>,
+    /// İçten dışa açık döngüler; `devam`/`kır` atlamaları buraya yamalanır.
+    donguler: Vec<DonguBaglami>,
+    /// Derlenmekte olan iç içe `dene` gövdesi sayısı.
+    dene_derinligi: usize,
+}
+
+struct DonguBaglami {
+    /// `devam` hedefi; aralık döngüsünde artırma kodu gövdeden sonra
+    /// üretildiği için başta bilinmez ve `devam_yamalari` ile doldurulur.
+    devam_hedefi: Option<usize>,
+    devam_yamalari: Vec<usize>,
+    kir_yamalari: Vec<usize>,
+    /// Döngü başladığında açık olan `dene` sayısı. Döngüden çıkan bir
+    /// atlama, aradaki her `dene` için hata işleyicisini kapatmalıdır.
+    dene_derinligi: usize,
 }
 
 impl Default for Derleyici {
@@ -26,6 +41,54 @@ impl Derleyici {
             instructions: Vec::new(),
             instruction_spans: Vec::new(),
             errors: Vec::new(),
+            donguler: Vec::new(),
+            dene_derinligi: 0,
+        }
+    }
+
+    fn dongu_baslat(&mut self, devam_hedefi: Option<usize>) {
+        self.donguler.push(DonguBaglami {
+            devam_hedefi,
+            devam_yamalari: Vec::new(),
+            kir_yamalari: Vec::new(),
+            dene_derinligi: self.dene_derinligi,
+        });
+    }
+
+    fn dongu_bitir(&mut self, devam_hedefi: usize, kir_hedefi: usize) {
+        let Some(dongu) = self.donguler.pop() else {
+            self.errors
+                .push("İç derleyici hatası: kapatılacak döngü yok".to_string());
+            return;
+        };
+        for index in dongu.devam_yamalari {
+            self.instructions[index] = OpCode::Jump(devam_hedefi);
+        }
+        for index in dongu.kir_yamalari {
+            self.instructions[index] = OpCode::Jump(kir_hedefi);
+        }
+    }
+
+    fn dongu_atlamasi(&mut self, devam: bool) {
+        let Some(dongu) = self.donguler.last() else {
+            self.errors.push(format!(
+                "{} komutu yalnızca döngü içinde kullanılabilir",
+                if devam { "devam" } else { "kır" }
+            ));
+            return;
+        };
+        let hedef = if devam { dongu.devam_hedefi } else { None };
+        for _ in dongu.dene_derinligi..self.dene_derinligi {
+            self.instructions.push(OpCode::TryBlockEnd);
+        }
+        let index = self.instructions.len();
+        self.instructions.push(OpCode::Jump(hedef.unwrap_or(0)));
+        if let (None, Some(dongu)) = (hedef, self.donguler.last_mut()) {
+            if devam {
+                dongu.devam_yamalari.push(index);
+            } else {
+                dongu.kir_yamalari.push(index);
+            }
         }
     }
 
@@ -374,6 +437,7 @@ impl Derleyici {
                 let jump_if_false_idx = self.instructions.len();
                 self.instructions.push(OpCode::JumpIfFalse(0));
 
+                self.dongu_baslat(Some(start_idx));
                 for k in govde {
                     self.komut_derle(k);
                 }
@@ -381,7 +445,10 @@ impl Derleyici {
                 self.instructions.push(OpCode::Jump(start_idx));
                 let end_idx = self.instructions.len();
                 self.instructions[jump_if_false_idx] = OpCode::JumpIfFalse(end_idx);
+                self.dongu_bitir(start_idx, end_idx);
             }
+            Komut::Devam => self.dongu_atlamasi(true),
+            Komut::Kir => self.dongu_atlamasi(false),
             Komut::DondurKomutu(ifade) => {
                 self.ifade_derle(ifade);
                 self.instructions.push(OpCode::Return);
@@ -407,11 +474,13 @@ impl Derleyici {
                 let jump_if_false_idx = self.instructions.len();
                 self.instructions.push(OpCode::JumpIfFalse(0));
 
+                self.dongu_baslat(None);
                 for k in govde {
                     self.komut_derle(k);
                 }
 
                 // Increment var = var + 1
+                let increment_idx = self.instructions.len();
                 self.instructions
                     .push(OpCode::LoadVar(degisken.clone().into()));
                 let one_idx = self.constant_ekle(Constant::Sayi(1.0));
@@ -422,6 +491,7 @@ impl Derleyici {
                 self.instructions.push(OpCode::Jump(start_idx));
                 let end_idx = self.instructions.len();
                 self.instructions[jump_if_false_idx] = OpCode::JumpIfFalse(end_idx);
+                self.dongu_bitir(increment_idx, end_idx);
             }
             Komut::FonksiyonTanimla {
                 ad,
@@ -443,9 +513,11 @@ impl Derleyici {
                 let try_start_idx = self.instructions.len();
                 self.instructions.push(OpCode::TryBlockStart(0));
 
+                self.dene_derinligi += 1;
                 for k in dene_govde {
                     self.komut_derle(k);
                 }
+                self.dene_derinligi -= 1;
 
                 self.instructions.push(OpCode::TryBlockEnd);
 

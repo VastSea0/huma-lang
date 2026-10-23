@@ -65,8 +65,8 @@ Başlangıç durumu (2026-10-23): `cargo clippy -D warnings` temiz,
 | B-051 | P1 | examples | Çalıştırılınca hata veren örnekler: `heceleme.hb`, `debug_heceleme.hb` (tanımsız `içeriyor_mu`), `iris_siniflandirma.hb` (relu'ya vektör), `lineer_regresyon_demo.hb`, `lojistik_regresyon_demo.hb` (vektör indeksi), `uygulama_tahmin.hb` (metin/sayı karşılaştırması), `yeni_sozdizimi.hb` (tanımsız `kendisi`); `builtin_test.hb` tohumsuz rastgele çıktı veriyor. CI yalnız `*_test.hb` dosyalarını çalıştırdığından görünmüyor | `cd examples && huma __test-dosyasi <dosya>` | açık |
 | B-052 | P3 | spec | Tek argümanlı doğal çağrı (`x'i f`) yazarların beklediği ama spesifikasyonda olmayan biçim; `ile … ve …` çok argümanlı biçimin doğal tekil karşılığı olarak eklenmesi değerlendirilmeli (lexer belirtme ekini token olarak iletmeli) | `gui.hb` geçmişi, B-050 | açık |
 | B-053 | P2 | tests | Başarısız e2e testleri geçici dizinlerini `target/` altında bırakıyor (temizlik `assert`lerden sonra) | `target/huma_*_e2e_*` | açık |
-| B-054 | P1 | vm | VM `devam` ve `kır` komutlarını derlemiyor (açık derleme hatası); README "kontrol akışı doğrulanmış alt küme" diyor | `tests/golden/dongu_ve_aralik.hb` | açık |
-| B-055 | P0 | vm | Arka uç ayrışması: `yakala hata { ("…" + hata)'yı yazdır }` yorumlayıcıda yakalanan hatayı metin olarak bağlıyor, VM'de hata değeri olarak bağlayıp kullanımda yeniden fırlatıyor ("Satır 5…: Satır 2…: Sıfıra bölme hatası") | `tests/golden/yakalanan_hata.hb` | bitti (bkz. LOG 2026-10-23 #15) |
+| B-054 | P1 | vm | VM `devam` ve `kır` komutlarını derlemiyor (açık derleme hatası); README "kontrol akışı doğrulanmış alt küme" diyor | `tests/golden/dongu_ve_aralik.hb` | bitti (9f84205 + bkz. LOG 2026-10-23 #18) |
+| B-055 | P0 | vm | Arka uç ayrışması: `yakala hata { ("…" + hata)'yı yazdır }` yorumlayıcıda yakalanan hatayı metin olarak bağlıyor, VM'de hata değeri olarak bağlayıp kullanımda yeniden fırlatıyor ("Satır 5…: Satır 2…: Sıfıra bölme hatası") | `tests/golden/yakalanan_hata.hb` | bitti (0641339) |
 
 ## Keşif kaydı
 

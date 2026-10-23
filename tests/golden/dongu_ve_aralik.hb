@@ -1,4 +1,3 @@
-// golden: yalnız-yorumlayıcı VM devam/kır derlemiyor (B-054)
 toplam = 0 olsun
 i = 1'den 10'a kadar {
     toplam = toplam + i olsun
