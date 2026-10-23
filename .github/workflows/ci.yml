@@ -11,16 +11,21 @@ on:
 jobs:
   security-audit:
     runs-on: ubuntu-latest
-    permissions:
-      checks: write
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@e43eeffd51aefeea929f4ea14e09fd077153e788 # 1.94.1
+
+      # rustsec/audit-check cargo-audit'i `--locked` olmadan derliyordu;
+      # güncel bağımlılıkları pinli 1.94.1 araç zincirini desteklemediği için
+      # iş denetim yapamadan düşüyordu. Sürüm ve kilit dosyası sabitlenir.
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked --version 0.22.2
+
       - name: Audit Rust dependencies
-        uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+        run: cargo audit
 
   rust-quality:
     runs-on: ubuntu-latest
