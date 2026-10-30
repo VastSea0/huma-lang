@@ -1,4 +1,10 @@
 {
-  "paketler": {},
-  "guncelleme_zamani": "2026-03-31T21:36:04.842083892+03:00"
+  "guncelleme_zamani": "2026-10-23T14:38:06.558790+03:00",
+  "paketler": {
+    "huma_sunucu": {
+      "hash": "7d7bc6dd9a4861682caf07ef365ca110ad84eec6c94b4b7e63788db62b02a9d1",
+      "kaynak": "yerel-imzasız-güvenilir",
+      "surum": "1.0.0"
+    }
+  }
 }

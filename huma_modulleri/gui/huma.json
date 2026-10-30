@@ -1,6 +1,6 @@
 {
   "ad": "gui",
-  "surum": "1.0.0",
+  "surum": "1.0.1",
   "aciklama": "Hüma Native GUI kütüphanesi. Dear ImGui tabanlı, hızlı yerel masaüstü arayüz oluşturma araçları; hazır tema paleti ve tam kişiselleştirme desteği.",
   "yazar": "Egehan KAHRAMAN",
   "giris": "gui.hb",

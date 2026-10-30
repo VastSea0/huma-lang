@@ -5,5 +5,10 @@
   "yazar": "Geliştirici",
   "giris": "huma_todo_sunucu.hb",
   "huma_surum": ">=0.4.0",
-  "bagimliliklar": {}
+  "bagimliliklar": {
+    "huma_sunucu": "^1.0.0"
+  },
+  "betikler": {
+    "baslat": "huma run huma_todo_sunucu.hb --izin ağ-sunucu --izin dosya-okuma --izin dosya-yazma"
+  }
 }

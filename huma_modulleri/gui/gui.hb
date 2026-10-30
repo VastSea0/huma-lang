@@ -2,7 +2,7 @@
 // Dear ImGui (dear-imgui-rs) tabanlı, hızlı ve hafif yerel arayüz oluşturma araçları.
 // Kişiselleştirme için bkz: tema_ayarla, tema_olustur, tema_listele.
 
-GUI_SÜRÜM = "1.0.0" olsun
+GUI_SÜRÜM = "1.0.1" olsun
 
 gui_sürüm_al fonksiyon olsun {
     GUI_SÜRÜM'ü döndür

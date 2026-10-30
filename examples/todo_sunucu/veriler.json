@@ -1,10 +1,5 @@
 [
   {
-    "id": 1.0,
-    "metin": "Hüma Backend'ini Öğren",
-    "tamamlandı": 1.0
-  },
-  {
     "id": 2.0,
     "metin": "ToDo API'si Yaz",
     "tamamlandı": 0.0
